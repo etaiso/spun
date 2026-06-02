@@ -99,3 +99,40 @@ describe('parseIcy — happy path', () => {
     expect(canceled).toBe(true);
   });
 });
+
+describe('parseIcy — edge cases', () => {
+  it('emits nothing for an L=0 (no-change) marker', async () => {
+    const metaInt = 4;
+    const stream = streamFromChunks([
+      new Uint8Array(metaInt),
+      new Uint8Array([0]),         // L=0 → no metadata payload
+      new Uint8Array(metaInt),
+      new Uint8Array([0]),
+    ]);
+
+    const events = await collect(parseIcy(stream, metaInt));
+    expect(events).toEqual([]);
+  });
+
+  it('parses a UTF-8 title with non-ASCII characters', async () => {
+    const metaInt = 4;
+    const stream = streamFromChunks([
+      new Uint8Array(metaInt),
+      buildMetadataBlock("StreamTitle='Beyoncé - Déjà Vu';"),
+    ]);
+
+    const events = await collect(parseIcy(stream, metaInt));
+    expect(events).toEqual([{ title: 'Beyoncé - Déjà Vu' }]);
+  });
+
+  it('emits nothing and does not throw on malformed metadata', async () => {
+    const metaInt = 4;
+    const stream = streamFromChunks([
+      new Uint8Array(metaInt),
+      buildMetadataBlock('garbage with no StreamTitle field'),
+    ]);
+
+    const events = await collect(parseIcy(stream, metaInt));
+    expect(events).toEqual([]);
+  });
+});
