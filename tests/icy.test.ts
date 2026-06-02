@@ -80,4 +80,18 @@ describe('parseIcy — happy path', () => {
     const events = await collect(parseIcy(stream, metaInt));
     expect(events).toEqual([{ title: 'Split - test' }]);
   });
+
+  it('cancels the upstream reader when the consumer aborts early', async () => {
+    let canceled = false;
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array(4));
+      },
+      cancel() { canceled = true; },
+    });
+
+    const gen = parseIcy(stream, 4);
+    await gen.return(undefined);
+    expect(canceled).toBe(true);
+  });
 });
