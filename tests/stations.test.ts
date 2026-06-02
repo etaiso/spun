@@ -24,6 +24,20 @@ describe('normalizeStation', () => {
     });
   });
 
+  it('does not throw on null or missing name', () => {
+    const raw = {
+      stationuuid: 'x',
+      name: null as unknown as string,
+      url_resolved: 'http://x',
+      url: '',
+      favicon: '',
+      country: '',
+      bitrate: 0,
+      codec: '',
+    };
+    expect(normalizeStation(raw).name).toBe('');
+  });
+
   it('falls back to url when url_resolved is empty', () => {
     const raw = {
       stationuuid: 'x',

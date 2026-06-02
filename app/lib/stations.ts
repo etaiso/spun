@@ -22,7 +22,7 @@ type RawStation = {
 export function normalizeStation(raw: RawStation): Station {
   return {
     id: raw.stationuuid,
-    name: raw.name.trim(),
+    name: (raw.name ?? '').trim(),
     streamUrl: raw.url_resolved || raw.url,
     favicon: raw.favicon,
     country: raw.country,
