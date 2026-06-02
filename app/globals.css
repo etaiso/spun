@@ -13,19 +13,6 @@
   --color-warm: #d2691e;
 }
 
-@theme inline {
-  --color-bg: var(--color-bg);
-  --color-bg-2: var(--color-bg-2);
-  --color-ink: var(--color-ink);
-  --color-ink-2: var(--color-ink-2);
-  --color-ink-3: var(--color-ink-3);
-  --color-ink-4: var(--color-ink-4);
-  --color-line: var(--color-line);
-  --color-accent: var(--color-accent);
-  --color-accent-2: var(--color-accent-2);
-  --color-warm: var(--color-warm);
-}
-
 html, body { background: var(--color-bg); color: var(--color-ink); }
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
