@@ -81,17 +81,21 @@ describe('parseIcy — happy path', () => {
     expect(events).toEqual([{ title: 'Split - test' }]);
   });
 
-  it('cancels the upstream reader when the consumer aborts early', async () => {
+  it('cancels the upstream reader when the consumer breaks out early', async () => {
     let canceled = false;
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
         controller.enqueue(new Uint8Array(4));
+        controller.enqueue(buildMetadataBlock("StreamTitle='Only - song';"));
+        // never closes — would hang if cancel didn't propagate
       },
       cancel() { canceled = true; },
     });
 
-    const gen = parseIcy(stream, 4);
-    await gen.return(undefined);
+    for await (const ev of parseIcy(stream, 4)) {
+      expect(ev.title).toBe('Only - song');
+      break;
+    }
     expect(canceled).toBe(true);
   });
 });
