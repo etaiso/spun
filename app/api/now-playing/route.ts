@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
   }
 
   const upstreamController = new AbortController();
-  req.signal.addEventListener('abort', () => upstreamController.abort());
+  req.signal.addEventListener('abort', () => upstreamController.abort(), { once: true });
 
   let upstream: Response;
   try {
@@ -31,9 +31,16 @@ export async function GET(req: NextRequest) {
       signal: upstreamController.signal,
     });
   } catch (e) {
-    return new Response(sseLine({ type: 'error', message: String(e) }), {
-      headers: { 'Content-Type': 'text/event-stream' },
-    });
+    // Return a real HTTP error rather than a 200 SSE-with-error event.
+    // EventSource treats a 2xx response that ends as "reconnect" — so a
+    // typo'd URL would loop. A non-2xx status makes the client's onerror
+    // fire without auto-reconnecting through us.
+    return new Response(`upstream fetch failed: ${String(e)}`, { status: 502 });
+  }
+
+  if (!upstream.ok) {
+    upstreamController.abort();
+    return new Response(`upstream returned ${upstream.status}`, { status: 502 });
   }
 
   const metaIntHeader = upstream.headers.get('icy-metaint');
@@ -66,6 +73,9 @@ export async function GET(req: NextRequest) {
 
       try {
         for await (const event of parseIcy(upstream.body!, metaInt)) {
+          // Drop empty titles at the source — they're common between tracks
+          // and the client shouldn't have to repeat the filter.
+          if (event.title === '') continue;
           controller.enqueue(encoder.encode(sseLine({ type: 'track', title: event.title })));
         }
       } catch (e) {
