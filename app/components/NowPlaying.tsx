@@ -16,10 +16,22 @@ function nowHHMM() {
 }
 
 function splitArtistTitle(raw: string): { artist: string; title: string } {
-  const sep = raw.includes(' — ') ? ' — ' : raw.includes(' - ') ? ' - ' : null;
-  if (!sep) return { artist: '', title: raw };
-  const [artist, ...rest] = raw.split(sep);
-  return { artist: artist.trim(), title: rest.join(sep).trim() };
+  // Try separators in order of confidence: em-dash and en-dash are
+  // unambiguous; ASCII hyphen is only used if the left side has no hyphen
+  // (avoids miscategorizing titles like "Song - Live Version").
+  for (const sep of [' — ', ' – '] as const) {
+    if (raw.includes(sep)) {
+      const [artist, ...rest] = raw.split(sep);
+      return { artist: artist.trim(), title: rest.join(sep).trim() };
+    }
+  }
+  const hyphenIdx = raw.indexOf(' - ');
+  if (hyphenIdx > 0 && !raw.slice(0, hyphenIdx).includes('-')) {
+    const artist = raw.slice(0, hyphenIdx);
+    const title = raw.slice(hyphenIdx + 3);
+    return { artist: artist.trim(), title: title.trim() };
+  }
+  return { artist: '', title: raw };
 }
 
 type Props = {
@@ -91,8 +103,10 @@ export function NowPlaying({ station, playState }: Props) {
     );
   }
 
-  // ② Audio still connecting
-  if (playState === 'connecting') {
+  // ② Audio still connecting — but only show the full splash on initial
+  // connect. Once we've seen a track or have history, a mid-stream buffer
+  // underrun (which also fires 'connecting') shouldn't wipe the view.
+  if (playState === 'connecting' && currentRaw === null && history.length === 0) {
     return (
       <div className="flex flex-col gap-5">
         <div className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-warm)]">
