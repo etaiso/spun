@@ -112,12 +112,12 @@ export function CommandPalette({ onClose, onSelect }: Props) {
         {/* Results */}
         <div ref={listRef} className="max-h-[50vh] overflow-y-auto py-2">
           {query.trim() === '' && (
-            <div className="px-5 py-8 text-center text-sm text-[var(--color-ink-3)]">
+            <div className="px-5 py-10 text-center text-base text-[var(--color-ink-3)]">
               Type to search thousands of stations.
             </div>
           )}
           {query.trim() !== '' && !loading && results.length === 0 && (
-            <div className="px-5 py-8 text-center text-sm text-[var(--color-ink-3)]">
+            <div className="px-5 py-10 text-center text-base text-[var(--color-ink-3)]">
               No stations found.
             </div>
           )}
@@ -156,10 +156,10 @@ export function CommandPalette({ onClose, onSelect }: Props) {
         </div>
 
         {/* Footer hint (Raycast-style) */}
-        <div className="flex items-center gap-4 px-5 h-10 border-t border-[var(--color-line)] text-[11px] text-[var(--color-ink-3)]">
-          <span><kbd className="font-semibold">↵</kbd> play</span>
-          <span><kbd className="font-semibold">↑</kbd><kbd className="font-semibold">↓</kbd> navigate</span>
-          <span className="ml-auto"><kbd className="font-semibold">esc</kbd> close</span>
+        <div className="flex items-center gap-5 px-5 h-12 border-t border-[var(--color-line)] text-[13px] text-[var(--color-ink-3)]">
+          <span className="flex items-center gap-1.5"><kbd className="min-w-6 px-1.5 py-1 rounded-md border border-[var(--color-line)] bg-white text-center font-semibold text-[12px]">↵</kbd> play</span>
+          <span className="flex items-center gap-1.5"><kbd className="min-w-6 px-1.5 py-1 rounded-md border border-[var(--color-line)] bg-white text-center font-semibold text-[12px]">↑</kbd><kbd className="min-w-6 px-1.5 py-1 rounded-md border border-[var(--color-line)] bg-white text-center font-semibold text-[12px]">↓</kbd> navigate</span>
+          <span className="ml-auto flex items-center gap-1.5"><kbd className="px-1.5 py-1 rounded-md border border-[var(--color-line)] bg-white font-semibold text-[12px]">esc</kbd> close</span>
         </div>
       </div>
     </div>
