@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { Station } from '@/app/lib/stations';
 import { useFavorites } from '@/app/lib/favorites';
+import { useRegion } from '@/app/lib/region';
 import { StationRow } from './StationRow';
 import { CollapsibleSection } from './CollapsibleSection';
 
@@ -28,12 +29,14 @@ export function Recommended({ selectedId, onSelect, nowPlaying }: Props) {
   const [stations, setStations] = useState<Station[] | null>(null);
   const [errored, setErrored] = useState(false);
   const { isFavorite, toggle } = useFavorites();
+  const { region } = useRegion();
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch('/api/popular');
+        const url = region ? `/api/popular?region=${encodeURIComponent(region)}` : '/api/popular';
+        const res = await fetch(url);
         if (!res.ok) { if (!cancelled) setErrored(true); return; }
         const data = (await res.json()) as unknown;
         if (!cancelled) {
@@ -44,7 +47,7 @@ export function Recommended({ selectedId, onSelect, nowPlaying }: Props) {
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [region]);
 
   return (
     <CollapsibleSection title="✦ Popular">
