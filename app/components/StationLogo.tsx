@@ -6,7 +6,10 @@ import { gradientForName } from '@/app/lib/colors';
 type Props = { name: string; favicon: string; size?: number };
 
 export function StationLogo({ name, favicon, size = 40 }: Props) {
-  const [failed, setFailed] = useState(false);
+  // Track which URL failed instead of a boolean, so a new favicon prop
+  // automatically un-fails without needing useEffect to reset.
+  const [failedFor, setFailedFor] = useState<string | null>(null);
+  const failed = failedFor === favicon;
   const letter = (name.trim()[0] ?? '?').toUpperCase();
 
   if (!favicon || failed) {
@@ -24,7 +27,8 @@ export function StationLogo({ name, favicon, size = 40 }: Props) {
     <img
       src={favicon}
       alt=""
-      onError={() => setFailed(true)}
+      loading="lazy"
+      onError={() => setFailedFor(favicon)}
       width={size}
       height={size}
       className="rounded-[10px] object-cover shrink-0 bg-[var(--color-line)]"
