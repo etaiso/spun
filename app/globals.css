@@ -49,3 +49,26 @@ body {
 .marquee { overflow: hidden; white-space: nowrap; }
 .marquee-inner { display: inline-block; will-change: transform; animation: marquee 12s linear infinite; }
 .marquee:hover .marquee-inner { animation-play-state: paused; }
+
+/* Radio waves — faint concentric broadcast rings behind the now-playing
+   canvas. Thin warm outlines fading outward; gently pulse while playing. */
+.radio-waves span {
+  position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, -50%); border-radius: 50%;
+  border: 1.5px solid rgba(210, 105, 30, 0.16);
+}
+.radio-waves span:nth-child(1) { width: 320px; height: 320px; }
+.radio-waves span:nth-child(2) { width: 560px; height: 560px; border-color: rgba(210, 105, 30, 0.11); }
+.radio-waves span:nth-child(3) { width: 840px; height: 840px; border-color: rgba(210, 105, 30, 0.07); }
+.radio-waves span:nth-child(4) { width: 1140px; height: 1140px; border-color: rgba(210, 105, 30, 0.045); }
+
+@keyframes ring-pulse {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); }
+  50% { transform: translate(-50%, -50%) scale(1.04); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .radio-waves--playing span { animation: ring-pulse 4.5s ease-in-out infinite; }
+  .radio-waves--playing span:nth-child(2) { animation-delay: 0.5s; }
+  .radio-waves--playing span:nth-child(3) { animation-delay: 1s; }
+  .radio-waves--playing span:nth-child(4) { animation-delay: 1.5s; }
+}

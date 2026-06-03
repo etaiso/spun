@@ -11,6 +11,7 @@ import { NowPlaying } from './components/NowPlaying';
 import { CommandPalette } from './components/CommandPalette';
 import { ShortcutsHelp } from './components/ShortcutsHelp';
 import { RegionPicker } from './components/RegionPicker';
+import { RadioWaves } from './components/RadioWaves';
 import type { PlayState } from './components/Player';
 
 export default function Home() {
@@ -86,10 +87,11 @@ export default function Home() {
       <TopBar onOpenSearch={() => setPaletteOpen(true)} />
       <div className="flex flex-1 min-h-0">
         <Sidebar selected={selected} onSelect={handleSelect} nowPlaying={currentTrack} />
-        <main className="flex-1 p-10 bg-[var(--color-bg)] overflow-y-auto">
+        <main className="relative flex-1 p-10 bg-[var(--color-bg)] overflow-y-auto">
+          {selected && <RadioWaves playing={playState === 'playing'} />}
           {/* Centered, width-capped stage so the title + artwork sit in the
               middle of the panel instead of sprawling top-left. */}
-          <div className="max-w-4xl w-full mx-auto flex flex-col gap-6 min-h-full justify-center">
+          <div className="relative z-10 max-w-4xl w-full mx-auto flex flex-col gap-6 min-h-full justify-center">
             {selected ? (
               // Single key on the Fragment so both children remount together
               // when the station changes. Short `<>` can't carry a key, and
