@@ -9,26 +9,27 @@ import { CollapsibleSection } from './CollapsibleSection';
 type Props = {
   selectedId: string | null;
   onSelect: (s: Station) => void;
-  nowPlaying: string | null;
 };
 
-export function RecentlyPlayed({ selectedId, onSelect, nowPlaying }: Props) {
+export function RecentlyPlayed({ selectedId, onSelect }: Props) {
   const { recent } = useRecent();
   const { isFavorite, toggle } = useFavorites();
 
-  if (recent.length === 0) return null;
+  // The currently-playing station lives in the Now Playing card above, so
+  // drop it here to avoid showing it twice.
+  const items = recent.filter(s => s.id !== selectedId);
+  if (items.length === 0) return null;
 
   return (
-    <CollapsibleSection title="↻ Recently played" count={recent.length}>
-      {recent.map(s => (
+    <CollapsibleSection title="↻ Recently played" count={items.length}>
+      {items.map(s => (
         <StationRow
           key={s.id}
           station={s}
-          isActive={s.id === selectedId}
+          isActive={false}
           isFavorite={isFavorite(s.id)}
           onSelect={() => onSelect(s)}
           onToggleFavorite={() => toggle(s)}
-          nowPlaying={s.id === selectedId ? nowPlaying : null}
         />
       ))}
     </CollapsibleSection>

@@ -85,7 +85,7 @@ export default function Home() {
     <div className="flex flex-col h-screen">
       <TopBar onOpenSearch={() => setPaletteOpen(true)} />
       <div className="flex flex-1 min-h-0">
-        <Sidebar selectedId={selected?.id ?? null} onSelect={handleSelect} nowPlaying={currentTrack} />
+        <Sidebar selected={selected} onSelect={handleSelect} nowPlaying={currentTrack} />
         <main className="flex-1 p-10 bg-[var(--color-bg)] overflow-y-auto">
           {/* Centered, width-capped stage so the title + artwork sit in the
               middle of the panel instead of sprawling top-left. */}

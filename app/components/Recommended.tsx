@@ -10,7 +10,6 @@ import { CollapsibleSection } from './CollapsibleSection';
 type Props = {
   selectedId: string | null;
   onSelect: (s: Station) => void;
-  nowPlaying: string | null;
 };
 
 function SkeletonRow() {
@@ -25,7 +24,7 @@ function SkeletonRow() {
   );
 }
 
-export function Recommended({ selectedId, onSelect, nowPlaying }: Props) {
+export function Recommended({ selectedId, onSelect }: Props) {
   const [stations, setStations] = useState<Station[] | null>(null);
   const [errored, setErrored] = useState(false);
   const { isFavorite, toggle } = useFavorites();
@@ -69,7 +68,6 @@ export function Recommended({ selectedId, onSelect, nowPlaying }: Props) {
           isFavorite={isFavorite(s.id)}
           onSelect={() => onSelect(s)}
           onToggleFavorite={() => toggle(s)}
-          nowPlaying={s.id === selectedId ? nowPlaying : null}
         />
       ))}
     </CollapsibleSection>

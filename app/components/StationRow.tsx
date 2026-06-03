@@ -9,12 +9,9 @@ type Props = {
   isFavorite: boolean;
   onSelect: () => void;
   onToggleFavorite: () => void;
-  // When this row is the active station and a song is detected, the current
-  // track title — shown as a marquee in place of the country/bitrate line.
-  nowPlaying?: string | null;
 };
 
-export function StationRow({ station, isActive, isFavorite, onSelect, onToggleFavorite, nowPlaying }: Props) {
+export function StationRow({ station, isActive, isFavorite, onSelect, onToggleFavorite }: Props) {
   return (
     <div
       role="button"
@@ -37,17 +34,9 @@ export function StationRow({ station, isActive, isFavorite, onSelect, onToggleFa
       <StationLogo name={station.name} favicon={station.favicon} />
       <div className="flex-1 min-w-0">
         <div className="text-[15px] font-semibold tracking-tight truncate">{station.name}</div>
-        {nowPlaying ? (
-          <div className="marquee text-xs text-[var(--color-warm)] font-semibold">
-            <span className="marquee-inner">
-              ♪ {nowPlaying}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;♪ {nowPlaying}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-            </span>
-          </div>
-        ) : (
-          <div className="text-xs text-[var(--color-ink-3)] truncate">
-            {[station.country, station.bitrate > 0 ? `${station.bitrate} kbps` : null].filter(Boolean).join(' · ')}
-          </div>
-        )}
+        <div className="text-xs text-[var(--color-ink-3)] truncate">
+          {[station.country, station.bitrate > 0 ? `${station.bitrate} kbps` : null].filter(Boolean).join(' · ')}
+        </div>
       </div>
       <button
         onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }}
