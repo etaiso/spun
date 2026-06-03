@@ -11,8 +11,6 @@ const RECOGNIZER_URL = process.env.RECOGNIZER_URL || 'http://127.0.0.1:8755';
 // How often to re-fingerprint while metadata still isn't naming a song
 // (catches song changes on metadata-less stations).
 const FINGERPRINT_INTERVAL_MS = 60_000;
-// Give broadcast metadata a moment to provide a title before we fingerprint.
-const FINGERPRINT_INITIAL_DELAY_MS = 3_500;
 
 function sseLine(obj: unknown): string {
   return `data: ${JSON.stringify(obj)}\n\n`;
@@ -20,21 +18,33 @@ function sseLine(obj: unknown): string {
 
 type Recognized = { raw: string; cover: string | null };
 
-async function fingerprint(streamUrl: string): Promise<Recognized | null> {
+async function fingerprint(streamUrl: string, external?: AbortSignal): Promise<Recognized | null> {
+  // Own controller aborted by either a timeout (capture ~6s + recognition +
+  // headroom) or the caller's external signal (a broadcast title arriving
+  // mid-fingerprint). Avoids AbortSignal.any() for older-Node compatibility.
+  const ctrl = new AbortController();
+  const timeout = setTimeout(() => ctrl.abort(), 25_000);
+  const onExternal = () => ctrl.abort();
+  if (external) {
+    if (external.aborted) ctrl.abort();
+    else external.addEventListener('abort', onExternal, { once: true });
+  }
   try {
     const res = await fetch(`${RECOGNIZER_URL}/recognize`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url: streamUrl, seconds: 6 }),
-      // capture (~6s) + recognition + headroom
-      signal: AbortSignal.timeout(25_000),
+      signal: ctrl.signal,
     });
     if (!res.ok) return null;
     const data = (await res.json()) as { match?: boolean; raw?: string; cover?: string };
     return data?.match && data?.raw ? { raw: data.raw, cover: data.cover || null } : null;
   } catch {
-    // Sidecar down / timeout — graceful no-op.
+    // Sidecar down / timeout / aborted — graceful no-op.
     return null;
+  } finally {
+    clearTimeout(timeout);
+    external?.removeEventListener('abort', onExternal);
   }
 }
 
@@ -82,6 +92,7 @@ export async function GET(req: NextRequest) {
       let lastTitle: string | null = null; // last title we sent (any source)
       let haveMetaTitle = false; // metadata gave a real (non-empty) title
       let fpInFlight = false;
+      let fpAbort: AbortController | null = null; // cancels an in-flight fingerprint
 
       const send = (obj: unknown) => {
         if (closed) return;
@@ -94,13 +105,18 @@ export async function GET(req: NextRequest) {
       }, 15_000);
 
       // Fingerprint fallback. No-ops once metadata has named a song, or if
-      // another attempt is already running.
-      async function tryFingerprint() {
+      // another attempt is already running. `silent` skips the "recognizing"
+      // status (used for the initial parallel attempt on metadata stations, so
+      // a quick broadcast title doesn't get preceded by an Identifying… flash).
+      async function tryFingerprint(silent = false) {
         if (closed || haveMetaTitle || fpInFlight) return;
         fpInFlight = true;
-        send({ type: 'recognizing' });
-        const match = await fingerprint(streamUrlStr);
+        if (!silent) send({ type: 'recognizing' });
+        fpAbort = new AbortController();
+        const match = await fingerprint(streamUrlStr, fpAbort.signal);
+        fpAbort = null;
         fpInFlight = false;
+        // Metadata may have arrived (and aborted us) while we were working.
         if (closed || haveMetaTitle) return;
         if (match) {
           if (match.raw !== lastTitle) {
@@ -115,8 +131,12 @@ export async function GET(req: NextRequest) {
         }
       }
 
-      const fpInitial = setTimeout(tryFingerprint, hasMeta ? FINGERPRINT_INITIAL_DELAY_MS : 0);
-      const fpInterval = setInterval(tryFingerprint, FINGERPRINT_INTERVAL_MS);
+      // Kick off recognition immediately on connect, in parallel with the
+      // metadata wait — whichever resolves first wins, with metadata preferred
+      // (it aborts the fingerprint if it arrives). On metadata stations the
+      // first attempt is silent to avoid a recognizing flash before the title.
+      const fpInitial = setTimeout(() => tryFingerprint(hasMeta), 0);
+      const fpInterval = setInterval(() => tryFingerprint(), FINGERPRINT_INTERVAL_MS);
 
       try {
         if (hasMeta) {
@@ -127,8 +147,9 @@ export async function GET(req: NextRequest) {
               tryFingerprint();
               continue;
             }
-            // Real broadcast title always wins over fingerprinting.
+            // Real broadcast title always wins — cancel any in-flight fingerprint.
             haveMetaTitle = true;
+            (fpAbort as AbortController | null)?.abort();
             if (event.title !== lastTitle) {
               lastTitle = event.title;
               send({ type: 'track', title: event.title, source: 'metadata' });
