@@ -10,11 +10,37 @@ type Props = {
   onPlayStateChange: (s: PlayState) => void;
 };
 
+const VOLUME_KEY = 'radio:volume';
+const DEFAULT_VOLUME = 0.65;
+
+function readStoredVolume(): number {
+  if (typeof window === 'undefined') return DEFAULT_VOLUME;
+  try {
+    const raw = window.localStorage.getItem(VOLUME_KEY);
+    if (raw === null) return DEFAULT_VOLUME;
+    const v = parseFloat(raw);
+    return Number.isFinite(v) && v >= 0 && v <= 1 ? v : DEFAULT_VOLUME;
+  } catch {
+    return DEFAULT_VOLUME;
+  }
+}
+
 export function Player({ station, onPlayStateChange }: Props) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [paused, setPaused] = useState(false);
-  const [volume, setVolume] = useState(0.65);
+  // Lazy init: Player is only rendered after a user gesture (selectedStation
+  // starts null), so no SSR happens here — safe to read localStorage on
+  // first render without a hydration mismatch.
+  const [volume, setVolume] = useState<number>(readStoredVolume);
   const [muted, setMuted] = useState(false);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(VOLUME_KEY, String(volume));
+    } catch {
+      // Safari private mode / quota — best-effort persistence.
+    }
+  }, [volume]);
 
   // Stash the callback in a ref so the station-change effect can call it
   // without re-firing when the parent re-renders with a new closure.
