@@ -5,6 +5,7 @@ import type { Station } from '@/app/lib/stations';
 import { isNonTrack } from '@/app/lib/nonTrack';
 import { useFavorites } from '@/app/lib/favorites';
 import { StationCover } from './StationCover';
+import { RadioWaves } from './RadioWaves';
 import type { PlayState } from './Player';
 
 type MetaState = 'waiting' | 'playing' | 'no-metadata' | 'no-song' | 'recognizing';
@@ -189,6 +190,7 @@ export function NowPlaying({ station, playState, everPlayed, onTrack }: Props) {
       <NowPlayingFrame
         stationName={station.name}
         headerExtras={headerExtras}
+        playing={playState === 'playing'}
         art={<div className="w-[200px] h-[200px] rounded-2xl bg-[var(--color-line)] flex items-center justify-center text-5xl text-[var(--color-ink-4)]">♪</div>}
         title="This station doesn't share song info"
         subtitle="Audio keeps playing — you just won't see track names."
@@ -206,6 +208,7 @@ export function NowPlaying({ station, playState, everPlayed, onTrack }: Props) {
       <NowPlayingFrame
         stationName={station.name}
         headerExtras={headerExtras}
+        playing={playState === 'playing'}
         art={<StationCover name={station.name} favicon={station.favicon} size={200} />}
         title="No song info right now"
         subtitle="This station isn't sharing track names at the moment."
@@ -220,6 +223,7 @@ export function NowPlaying({ station, playState, everPlayed, onTrack }: Props) {
       <NowPlayingFrame
         stationName={station.name}
         headerExtras={headerExtras}
+        playing={playState === 'playing'}
         art={<StationCover name={station.name} favicon={station.favicon} size={200} dim />}
         title={<>Identifying song <span className="dots"><span /><span /><span /></span></>}
         subtitle="Fingerprinting the audio with Shazam…"
@@ -235,6 +239,7 @@ export function NowPlaying({ station, playState, everPlayed, onTrack }: Props) {
       <NowPlayingFrame
         stationName={station.name}
         headerExtras={headerExtras}
+        playing={playState === 'playing'}
         art={<StationCover name={station.name} favicon={station.favicon} size={200} dim />}
         title={<>Listening for song info <span className="dots"><span /><span /><span /></span></>}
         subtitle="Most stations announce the track within ~30 seconds"
@@ -250,6 +255,7 @@ export function NowPlaying({ station, playState, everPlayed, onTrack }: Props) {
       <NowPlayingFrame
         stationName={station.name}
         headerExtras={headerExtras}
+        playing={playState === 'playing'}
         art={<StationCover name={station.name} favicon={station.favicon} size={200} />}
         title={station.name}
         subtitle="Between tracks · DJ, news, or station ID"
@@ -327,7 +333,7 @@ function NowPlayingHeaderControls({
 }
 
 function NowPlayingFrame({
-  stationName, headerExtras, art, title, subtitle, badge, history, titleClassName = '',
+  stationName, headerExtras, art, title, subtitle, badge, history, titleClassName = '', playing = false,
 }: {
   stationName: string;
   headerExtras?: React.ReactNode;
@@ -337,6 +343,7 @@ function NowPlayingFrame({
   badge?: React.ReactNode;
   history: HistoryEntry[];
   titleClassName?: string;
+  playing?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-6">
@@ -347,7 +354,11 @@ function NowPlayingFrame({
         {headerExtras}
       </div>
       <div className="flex gap-8 items-end flex-wrap">
-        {art}
+        {/* Cover with the broadcast-wave rings radiating from behind it. */}
+        <div className="relative shrink-0">
+          <RadioWaves playing={playing} />
+          <div className="relative z-10">{art}</div>
+        </div>
         {/* basis-80 + flex-wrap: the text block keeps its own line beside the
             art when there's room, and drops below it (full width) when the
             panel is too narrow — no horizontal overflow from the big title. */}

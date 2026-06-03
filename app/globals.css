@@ -56,20 +56,20 @@ body {
    rings react more (--k). Falls back to a gentle timed pulse when the audio
    can't be analysed. */
 .radio-waves span {
-  --k: 0.55;
+  --k: 0.20;
   position: absolute; left: 50%; top: 50%; border-radius: 50%;
-  border: 2px solid rgba(210, 105, 30, calc(0.18 + var(--wave, 0) * 0.30));
+  border: 1px solid rgba(210, 105, 30, calc(0.16 + var(--wave, 0) * 0.22));
   transform: translate(-50%, -50%) scale(calc(1 + var(--wave, 0) * var(--k)));
-  transition: transform 0.06s ease-out;
+  transition: transform 0.07s ease-out;
 }
-.radio-waves span:nth-child(1) { width: 300px; height: 300px; }
-.radio-waves span:nth-child(2) { width: 540px; height: 540px; border-color: rgba(210, 105, 30, calc(0.13 + var(--wave, 0) * 0.24)); --k: 0.44; }
-.radio-waves span:nth-child(3) { width: 800px; height: 800px; border-color: rgba(210, 105, 30, calc(0.09 + var(--wave, 0) * 0.18)); --k: 0.34; }
-.radio-waves span:nth-child(4) { width: 1080px; height: 1080px; border-color: rgba(210, 105, 30, calc(0.06 + var(--wave, 0) * 0.12)); --k: 0.26; }
+.radio-waves span:nth-child(1) { width: 250px; height: 250px; }
+.radio-waves span:nth-child(2) { width: 330px; height: 330px; border-color: rgba(210, 105, 30, calc(0.11 + var(--wave, 0) * 0.16)); --k: 0.16; }
+.radio-waves span:nth-child(3) { width: 420px; height: 420px; border-color: rgba(210, 105, 30, calc(0.07 + var(--wave, 0) * 0.11)); --k: 0.12; }
+.radio-waves span:nth-child(4) { width: 520px; height: 520px; border-color: rgba(210, 105, 30, calc(0.045 + var(--wave, 0) * 0.08)); --k: 0.09; }
 
 @keyframes ring-pulse {
   0%, 100% { transform: translate(-50%, -50%) scale(1); }
-  50% { transform: translate(-50%, -50%) scale(1.08); }
+  50% { transform: translate(-50%, -50%) scale(1.05); }
 }
 @media (prefers-reduced-motion: no-preference) {
   .radio-waves--fallback span { animation: ring-pulse 4.5s ease-in-out infinite; }
