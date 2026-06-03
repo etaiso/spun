@@ -15,6 +15,11 @@ export function Player({ station, onPlayStateChange }: Props) {
   const [paused, setPaused] = useState(false);
   const [volume, setVolume] = useState(0.65);
 
+  // Stash the callback in a ref so the station-change effect can call it
+  // without re-firing when the parent re-renders with a new closure.
+  const cbRef = useRef(onPlayStateChange);
+  useEffect(() => { cbRef.current = onPlayStateChange; });
+
   useEffect(() => {
     const a = audioRef.current;
     if (!a) return;
@@ -23,37 +28,47 @@ export function Player({ station, onPlayStateChange }: Props) {
 
   useEffect(() => {
     setPaused(false);
-    onPlayStateChange('connecting');
-  }, [station.id, onPlayStateChange]);
+    cbRef.current('connecting');
+  }, [station.id]);
 
-  function onPlay() { onPlayStateChange('playing'); }
-  function onWaiting() { onPlayStateChange('connecting'); }
-  function onError() { onPlayStateChange('error'); }
+  function handlePlay() { setPaused(false); cbRef.current('playing'); }
+  function handlePause() { setPaused(true); }
+  function handleWaiting() { cbRef.current('connecting'); }
+  function handleError() { cbRef.current('error'); }
 
   function togglePlay() {
     const a = audioRef.current;
     if (!a) return;
-    if (a.paused) { a.play(); setPaused(false); } else { a.pause(); setPaused(true); }
+    if (a.paused) {
+      setPaused(false);
+      a.play().catch(() => cbRef.current('error'));
+    } else {
+      a.pause();
+      setPaused(true);
+    }
   }
 
   function retry() {
     const a = audioRef.current;
     if (!a) return;
     a.load();
-    a.play().catch(() => {});
+    a.play().catch(() => cbRef.current('error'));
   }
 
   return (
     <div className="flex items-center gap-5 pt-2">
       <audio
         ref={audioRef}
+        // Inner key guards against streamUrl swaps within a single station
+        // selection (e.g. mirror failover); parent typically keys by id.
         key={station.streamUrl}
         src={station.streamUrl}
         autoPlay
-        onPlay={onPlay}
-        onWaiting={onWaiting}
-        onError={onError}
-        onPlaying={onPlay}
+        onPlay={handlePlay}
+        onPlaying={handlePlay}
+        onPause={handlePause}
+        onWaiting={handleWaiting}
+        onError={handleError}
       />
       <button
         onClick={togglePlay}
@@ -63,7 +78,7 @@ export function Player({ station, onPlayStateChange }: Props) {
         {paused ? '▶' : '⏸'}
       </button>
       <div className="flex items-center gap-3 flex-1 max-w-[280px] text-[var(--color-ink-3)]">
-        <span className="text-base">🔊</span>
+        <span className="text-base" aria-hidden="true">🔊</span>
         <input
           type="range"
           min={0}
