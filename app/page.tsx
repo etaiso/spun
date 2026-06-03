@@ -11,6 +11,7 @@ import { NowPlaying } from './components/NowPlaying';
 import { CommandPalette } from './components/CommandPalette';
 import { ShortcutsHelp } from './components/ShortcutsHelp';
 import { RegionPicker } from './components/RegionPicker';
+import { DebugPanel } from './components/DebugPanel';
 import type { PlayState } from './components/Player';
 
 export default function Home() {
@@ -119,6 +120,9 @@ export default function Home() {
         <CommandPalette onClose={() => setPaletteOpen(false)} onSelect={handleSelect} />
       )}
       <ShortcutsHelp open={showHelp} onOpenChange={setShowHelp} />
+      {process.env.NODE_ENV === 'development' && (
+        <DebugPanel station={selected} playState={playState} currentTrack={currentTrack} />
+      )}
     </div>
   );
 }

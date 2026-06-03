@@ -53,6 +53,11 @@ export function connectIfRunning(el: HTMLMediaElement): boolean {
   }
 }
 
+/** AudioContext state for debugging: 'none' | 'suspended' | 'running' | … */
+export function getContextState(): string {
+  return ctx ? ctx.state : 'none';
+}
+
 /** Current low-frequency (bass-weighted) energy, 0…1. 0 when no signal. */
 export function getEnergy(): number {
   if (!analyser || !freq) return 0;
