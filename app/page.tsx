@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import type { Station } from './lib/stations';
 import { Sidebar } from './components/Sidebar';
 import { Player } from './components/Player';
@@ -16,10 +16,13 @@ export default function Home() {
       <Sidebar selectedId={selected?.id ?? null} onSelect={setSelected} />
       <main className="flex-1 p-10 flex flex-col gap-6 bg-[var(--color-bg)] overflow-y-auto">
         {selected ? (
-          <>
-            <NowPlaying key={selected.id} station={selected} playState={playState} />
-            <Player key={selected.id} station={selected} onPlayStateChange={setPlayState} />
-          </>
+          // Single key on the Fragment so both children remount together when
+          // the station changes. Short `<>` can't carry a key, and putting the
+          // same key on both children produces React's duplicate-key error.
+          <Fragment key={selected.id}>
+            <NowPlaying station={selected} playState={playState} />
+            <Player station={selected} onPlayStateChange={setPlayState} />
+          </Fragment>
         ) : (
           <div className="flex-1 flex items-center justify-center text-center">
             <div>
