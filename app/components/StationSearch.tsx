@@ -32,21 +32,25 @@ export function StationSearch({ selectedId, onSelect }: Props) {
     const q = query.trim();
     if (q === '') { setResults([]); setLoading(false); return; }
 
+    let cancelled = false;
     const ctrl = new AbortController();
     setLoading(true);
     const timer = setTimeout(async () => {
       try {
         const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`, { signal: ctrl.signal });
-        const data = (await res.json()) as Station[];
-        setResults(data);
+        if (!res.ok) { if (!cancelled) setResults([]); return; }
+        const data = (await res.json()) as unknown;
+        if (!cancelled) setResults(Array.isArray(data) ? (data as Station[]) : []);
       } catch (e) {
-        if ((e as Error).name !== 'AbortError') setResults([]);
+        if (!cancelled && (e as Error).name !== 'AbortError') setResults([]);
       } finally {
-        setLoading(false);
+        // Only the most recent effect run drives the spinner; otherwise a
+        // superseded run's finally would flip loading off mid-debounce.
+        if (!cancelled) setLoading(false);
       }
     }, 250);
 
-    return () => { clearTimeout(timer); ctrl.abort(); };
+    return () => { cancelled = true; clearTimeout(timer); ctrl.abort(); };
   }, [query]);
 
   return (
@@ -54,15 +58,17 @@ export function StationSearch({ selectedId, onSelect }: Props) {
       <div className="text-[11px] tracking-[1.4px] text-[var(--color-warm)] font-extrabold uppercase mb-3.5">
         Browse
       </div>
-      <div className="bg-white border-[1.5px] border-[var(--color-line)] rounded-full px-4 py-2.5 mb-4 flex items-center gap-2.5 shadow-[0_2px_6px_rgba(0,0,0,0.03)] focus-within:border-[var(--color-warm)]">
-        <span>🔍</span>
+      <div role="search" className="bg-white border-[1.5px] border-[var(--color-line)] rounded-full px-4 py-2.5 mb-4 flex items-center gap-2.5 shadow-[0_2px_6px_rgba(0,0,0,0.03)] focus-within:border-[var(--color-warm)]">
+        <span aria-hidden="true">🔍</span>
         <input
+          type="search"
+          aria-label="Search stations"
           value={query}
           onChange={e => setQuery(e.target.value)}
           placeholder="Search stations…"
           className="flex-1 outline-none bg-transparent text-sm text-[var(--color-ink)] placeholder:text-[var(--color-ink-3)]"
         />
-        {loading && <span className="spin-warm" />}
+        {loading && <span className="spin-warm" aria-label="Searching" />}
       </div>
       {loading && results.length === 0 && (
         <>
