@@ -14,6 +14,7 @@ export function Player({ station, onPlayStateChange }: Props) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [paused, setPaused] = useState(false);
   const [volume, setVolume] = useState(0.65);
+  const [muted, setMuted] = useState(false);
 
   // Stash the callback in a ref so the station-change effect can call it
   // without re-firing when the parent re-renders with a new closure.
@@ -25,6 +26,12 @@ export function Player({ station, onPlayStateChange }: Props) {
     if (!a) return;
     a.volume = volume;
   }, [volume]);
+
+  useEffect(() => {
+    const a = audioRef.current;
+    if (!a) return;
+    a.muted = muted;
+  }, [muted]);
 
   // Fire 'connecting' once on mount. The parent keys this component by
   // station.id, so a station change remounts (paused state resets to its
@@ -50,13 +57,6 @@ export function Player({ station, onPlayStateChange }: Props) {
     }
   }
 
-  function retry() {
-    const a = audioRef.current;
-    if (!a) return;
-    a.load();
-    a.play().catch(() => cbRef.current('error'));
-  }
-
   return (
     <div className="flex items-center gap-5 pt-2">
       <audio
@@ -80,7 +80,14 @@ export function Player({ station, onPlayStateChange }: Props) {
         {paused ? '▶' : '⏸'}
       </button>
       <div className="flex items-center gap-3 flex-1 max-w-[280px] text-[var(--color-ink-3)]">
-        <span className="text-base" aria-hidden="true">🔊</span>
+        <button
+          onClick={() => setMuted(m => !m)}
+          className="text-base leading-none hover:text-[var(--color-ink)] transition-colors"
+          aria-label={muted ? 'Unmute' : 'Mute'}
+          title={muted ? 'Unmute' : 'Mute'}
+        >
+          {muted ? '🔇' : '🔊'}
+        </button>
         <input
           type="range"
           min={0}
@@ -92,9 +99,6 @@ export function Player({ station, onPlayStateChange }: Props) {
           aria-label="Volume"
         />
       </div>
-      <button onClick={retry} className="text-xs text-[var(--color-ink-3)] hover:text-[var(--color-ink)] underline">
-        Retry
-      </button>
     </div>
   );
 }

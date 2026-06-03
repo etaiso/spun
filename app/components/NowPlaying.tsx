@@ -43,6 +43,9 @@ export function NowPlaying({ station, playState }: Props) {
   const [metaState, setMetaState] = useState<MetaState>('waiting');
   const [currentRaw, setCurrentRaw] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [lastUpdate, setLastUpdate] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Track previous title via a ref so we can avoid the React anti-pattern of
   // calling setHistory from inside a setCurrentRaw updater (which double-fires
@@ -51,6 +54,9 @@ export function NowPlaying({ station, playState }: Props) {
 
   // Parent keys this component by station.id, so a station change remounts
   // and all the useState initial values are fresh. No explicit reset needed.
+  // refreshKey bumps when the user clicks the manual refresh button, which
+  // forces this effect to re-run (closing the old EventSource and opening a
+  // fresh one — the server starts a new ICY parse).
   useEffect(() => {
     const es = new EventSource(`/api/now-playing?url=${encodeURIComponent(station.streamUrl)}`);
 
@@ -63,8 +69,12 @@ export function NowPlaying({ station, playState }: Props) {
 
         if (msg.type === 'no-metadata') {
           setMetaState('no-metadata');
+          setLastUpdate(nowHHMM());
+          setRefreshing(false);
         } else if (msg.type === 'track') {
           setMetaState('playing');
+          setLastUpdate(nowHHMM());
+          setRefreshing(false);
           const prev = prevTitleRef.current;
           if (prev === msg.title) return;
           if (prev !== null && !isNonTrack(prev, station.name)) {
@@ -78,7 +88,18 @@ export function NowPlaying({ station, playState }: Props) {
     };
 
     return () => es.close();
-  }, [station.id, station.streamUrl, station.name]);
+  }, [station.id, station.streamUrl, station.name, refreshKey]);
+
+  function refresh() {
+    setRefreshing(true);
+    // Optimistic timestamp: ICY only re-broadcasts StreamTitle when the song
+    // changes, so a refresh may not deliver a new event for minutes. Stamp
+    // "I checked now" immediately, then clear the spinner after a short
+    // window. If fresh metadata does arrive, both update naturally.
+    setLastUpdate(nowHHMM());
+    setRefreshKey(k => k + 1);
+    setTimeout(() => setRefreshing(false), 1500);
+  }
 
   // ===== Render branches matched to the 6 states in the spec =====
 
@@ -121,11 +142,21 @@ export function NowPlaying({ station, playState }: Props) {
     );
   }
 
+  // Header bits shared across states ③/④/⑤/① (all the NowPlayingFrame branches)
+  const headerExtras = (
+    <NowPlayingHeaderControls
+      lastUpdate={lastUpdate}
+      refreshing={refreshing}
+      onRefresh={refresh}
+    />
+  );
+
   // ④ Station has no metadata
   if (metaState === 'no-metadata') {
     return (
       <NowPlayingFrame
         stationName={station.name}
+        headerExtras={headerExtras}
         art={<div className="w-[200px] h-[200px] rounded-2xl bg-[var(--color-line)] flex items-center justify-center text-5xl text-[var(--color-ink-4)]">♪</div>}
         title="This station doesn't share song info"
         subtitle="Audio keeps playing — you just won't see track names."
@@ -139,6 +170,7 @@ export function NowPlaying({ station, playState }: Props) {
     return (
       <NowPlayingFrame
         stationName={station.name}
+        headerExtras={headerExtras}
         art={<div className="w-[200px] h-[200px] rounded-2xl opacity-50" style={{ background: gradientForName(station.name) }} />}
         title={<>Listening for song info <span className="dots"><span /><span /><span /></span></>}
         subtitle="Most stations announce the track within ~30 seconds"
@@ -153,6 +185,7 @@ export function NowPlaying({ station, playState }: Props) {
     return (
       <NowPlayingFrame
         stationName={station.name}
+        headerExtras={headerExtras}
         art={<div className="w-[200px] h-[200px] rounded-2xl bg-gradient-to-br from-[#8a7a6e] to-[#4a3f37] flex items-center justify-center text-4xl">🎙️</div>}
         title={station.name}
         subtitle="Between tracks · DJ, news, or station ID"
@@ -166,6 +199,7 @@ export function NowPlaying({ station, playState }: Props) {
   return (
     <NowPlayingFrame
       stationName={station.name}
+      headerExtras={headerExtras}
       art={<div className="w-[220px] h-[220px] rounded-2xl shadow-[0_16px_48px_rgba(192,57,43,0.28)]" style={{ background: gradientForName(station.name) }} />}
       title={title}
       subtitle={artist}
@@ -174,10 +208,38 @@ export function NowPlaying({ station, playState }: Props) {
   );
 }
 
+function NowPlayingHeaderControls({
+  lastUpdate, refreshing, onRefresh,
+}: {
+  lastUpdate: string | null;
+  refreshing: boolean;
+  onRefresh: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-3 text-[var(--color-ink-3)]">
+      <button
+        onClick={onRefresh}
+        disabled={refreshing}
+        aria-label="Check for song update"
+        title="Check for song update"
+        className="w-7 h-7 rounded-full border border-[var(--color-line)] flex items-center justify-center text-[13px] text-[var(--color-ink-3)] hover:text-[var(--color-ink)] hover:border-[var(--color-warm)] hover:bg-white transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+      >
+        {refreshing ? <span className="spin-warm" /> : <span aria-hidden="true">↻</span>}
+      </button>
+      {lastUpdate && (
+        <span className="text-[11px] tracking-[0.6px] uppercase font-semibold text-[var(--color-ink-3)] tabular-nums">
+          Updated {lastUpdate}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function NowPlayingFrame({
-  stationName, art, title, subtitle, history, titleClassName = '',
+  stationName, headerExtras, art, title, subtitle, history, titleClassName = '',
 }: {
   stationName: string;
+  headerExtras?: React.ReactNode;
   art: React.ReactNode;
   title: React.ReactNode;
   subtitle?: React.ReactNode;
@@ -186,8 +248,11 @@ function NowPlayingFrame({
 }) {
   return (
     <div className="flex flex-col gap-6">
-      <div className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-warm)]">
-        Now playing on {stationName}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-warm)]">
+          Now playing on {stationName}
+        </div>
+        {headerExtras}
       </div>
       <div className="flex gap-8 items-end">
         {art}
