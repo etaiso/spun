@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Station } from '@/app/lib/stations';
 import { isNonTrack } from '@/app/lib/nonTrack';
+import { useFavorites } from '@/app/lib/favorites';
 import { StationCover } from './StationCover';
 import type { PlayState } from './Player';
 
@@ -48,6 +49,7 @@ type Props = {
 };
 
 export function NowPlaying({ station, playState, everPlayed, onTrack }: Props) {
+  const { isFavorite, toggle: toggleFavorite } = useFavorites();
   const [metaState, setMetaState] = useState<MetaState>('waiting');
   const [currentRaw, setCurrentRaw] = useState<string | null>(null);
   const [currentSource, setCurrentSource] = useState<TrackSource>('metadata');
@@ -176,6 +178,8 @@ export function NowPlaying({ station, playState, everPlayed, onTrack }: Props) {
       lastUpdate={lastUpdate}
       refreshing={refreshing}
       onRefresh={refresh}
+      isFavorite={isFavorite(station.id)}
+      onToggleFavorite={() => toggleFavorite(station)}
     />
   );
 
@@ -283,14 +287,27 @@ export function NowPlaying({ station, playState, everPlayed, onTrack }: Props) {
 }
 
 function NowPlayingHeaderControls({
-  lastUpdate, refreshing, onRefresh,
+  lastUpdate, refreshing, onRefresh, isFavorite, onToggleFavorite,
 }: {
   lastUpdate: string | null;
   refreshing: boolean;
   onRefresh: () => void;
+  isFavorite: boolean;
+  onToggleFavorite: () => void;
 }) {
   return (
     <div className="flex items-center gap-3 text-[var(--color-ink-3)]">
+      <button
+        onClick={onToggleFavorite}
+        aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+        title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+        className={[
+          'w-7 h-7 flex items-center justify-center text-xl leading-none cursor-pointer transition-transform hover:scale-125',
+          isFavorite ? 'text-[var(--color-warm)]' : 'text-[var(--color-ink-4)] hover:text-[var(--color-warm)]',
+        ].join(' ')}
+      >
+        {isFavorite ? '★' : '☆'}
+      </button>
       <button
         onClick={onRefresh}
         disabled={refreshing}
