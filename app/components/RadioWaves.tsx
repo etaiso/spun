@@ -1,11 +1,50 @@
 'use client';
 
-// Decorative broadcast rings behind the now-playing canvas. Purely visual;
-// gently pulses while audio is playing.
+import { useEffect, useRef, useState } from 'react';
+import { getEnergy } from '@/app/lib/audioBus';
+
+// Decorative broadcast rings behind the now-playing canvas. While audio plays
+// they scale to the live bass energy read from the Web Audio analyser. If no
+// signal is available (e.g. the analyser couldn't be wired), they fall back to
+// a gentle timed pulse instead.
 export function RadioWaves({ playing }: { playing: boolean }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [fallback, setFallback] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!playing || !el) {
+      el?.style.setProperty('--wave', '0');
+      setFallback(false);
+      return;
+    }
+
+    let raf = 0;
+    let smooth = 0;
+    let peak = 0;
+    const startedAt = performance.now();
+
+    const tick = () => {
+      const energy = getEnergy(); // 0…1
+      // Ease toward the new value so the rings breathe rather than jitter.
+      smooth += (energy - smooth) * 0.25;
+      peak = Math.max(peak, energy);
+      el.style.setProperty('--wave', smooth.toFixed(3));
+
+      // If a few seconds in we've seen no real signal, the stream isn't
+      // analysable — switch to the timed-pulse fallback.
+      if (!fallback && performance.now() - startedAt > 3500 && peak < 0.02) {
+        setFallback(true);
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [playing, fallback]);
+
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-      <div className={`radio-waves absolute inset-0${playing ? ' radio-waves--playing' : ''}`}>
+      <div ref={ref} className={`radio-waves absolute inset-0${fallback ? ' radio-waves--fallback' : ''}`}>
         <span />
         <span />
         <span />

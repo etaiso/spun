@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { Station } from '@/app/lib/stations';
+import { resumeAudio, connectIfRunning } from '@/app/lib/audioBus';
 
 export type PlayState = 'idle' | 'connecting' | 'playing' | 'error';
 
@@ -133,7 +134,15 @@ export function Player({ station, onPlayStateChange }: Props) {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  function handlePlay() { setPaused(false); cbRef.current('playing'); }
+  // Wire the element into the Web Audio analyser once the context is running
+  // (after a gesture) so the canvas visualiser can react to the live audio.
+  function setupAnalysis() {
+    const a = audioRef.current;
+    if (!a) return;
+    resumeAudio().then(() => connectIfRunning(a));
+  }
+
+  function handlePlay() { setPaused(false); cbRef.current('playing'); setupAnalysis(); }
   function handlePause() { setPaused(true); }
   function handleWaiting() { cbRef.current('connecting'); }
   function handleError() { cbRef.current('error'); }
@@ -144,6 +153,7 @@ export function Player({ station, onPlayStateChange }: Props) {
     if (a.paused) {
       setPaused(false);
       cbRef.current('connecting');
+      setupAnalysis(); // resume/connect within the click gesture
       a.play().catch(() => cbRef.current('error'));
     } else {
       a.pause();
@@ -158,7 +168,9 @@ export function Player({ station, onPlayStateChange }: Props) {
         // Inner key guards against streamUrl swaps within a single station
         // selection (e.g. mirror failover); parent typically keys by id.
         key={station.streamUrl}
-        src={station.streamUrl}
+        // Proxied through our origin so Web Audio can analyse it for the
+        // canvas visualiser (cross-origin streams can't be analysed).
+        src={`/api/stream?url=${encodeURIComponent(station.streamUrl)}`}
         autoPlay={autoplay}
         preload={autoplay ? 'auto' : 'none'}
         onPlay={handlePlay}
