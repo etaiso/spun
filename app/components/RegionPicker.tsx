@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useRegion } from '@/app/lib/region';
+import { useRegion, useRegionLock } from '@/app/lib/region';
 
 // A practical spread of countries for the picker. The user's detected region
 // is always included even if it's not in this list.
@@ -19,6 +19,7 @@ function flagEmoji(code: string): string {
 
 export function RegionPicker() {
   const { region, setRegion } = useRegion();
+  const { locked, setLocked } = useRegionLock();
 
   const options = useMemo(() => {
     const codes = Array.from(new Set([region, ...CODES].filter(Boolean)));
@@ -30,8 +31,8 @@ export function RegionPicker() {
   }, [region]);
 
   return (
-    <footer className="flex items-center gap-3 px-6 h-12 border-t border-[var(--color-line)] bg-[var(--color-bg-2)] shrink-0 text-[var(--color-ink-3)]">
-      <label htmlFor="region-select" className="text-[11px] tracking-[1.2px] uppercase font-bold">
+    <div className="flex flex-col gap-2">
+      <label htmlFor="region-select" className="text-[11px] tracking-[1.2px] uppercase font-bold text-[var(--color-ink-3)]">
         Search region
       </label>
       <div className="relative">
@@ -39,7 +40,7 @@ export function RegionPicker() {
           id="region-select"
           value={region}
           onChange={(e) => setRegion(e.target.value)}
-          className="appearance-none cursor-pointer rounded-full border border-[var(--color-line)] bg-white pl-3 pr-8 py-1.5 text-sm text-[var(--color-ink)] hover:border-[var(--color-warm)] transition-colors"
+          className="appearance-none cursor-pointer w-full rounded-full border border-[var(--color-line)] bg-white pl-3 pr-8 py-2 text-sm text-[var(--color-ink)] hover:border-[var(--color-warm)] transition-colors"
         >
           <option value="">🌐 Global (no preference)</option>
           {options.map(o => (
@@ -51,6 +52,41 @@ export function RegionPicker() {
       <span className="text-xs text-[var(--color-ink-4)]">
         Stations from your region rank higher in search.
       </span>
-    </footer>
+
+      <label
+        className={[
+          'mt-2 flex items-start gap-3 cursor-pointer select-none',
+          region ? '' : 'opacity-50 cursor-not-allowed',
+        ].join(' ')}
+      >
+        <button
+          type="button"
+          role="switch"
+          aria-checked={locked && !!region}
+          disabled={!region}
+          onClick={() => setLocked(!locked)}
+          className={[
+            'mt-0.5 shrink-0 relative h-5 w-9 rounded-full transition-colors',
+            locked && region ? 'bg-[var(--color-warm)]' : 'bg-[var(--color-line)]',
+            region ? 'cursor-pointer' : 'cursor-not-allowed',
+          ].join(' ')}
+        >
+          <span
+            className={[
+              'absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all',
+              locked && region ? 'left-[18px]' : 'left-0.5',
+            ].join(' ')}
+          />
+        </button>
+        <span className="flex flex-col">
+          <span className="text-sm font-medium text-[var(--color-ink)]">Region-only mode</span>
+          <span className="text-xs text-[var(--color-ink-4)]">
+            {region
+              ? 'Show only stations from this region everywhere — search, favorites, popular and recent.'
+              : 'Pick a region above to enable this.'}
+          </span>
+        </span>
+      </label>
+    </div>
   );
 }

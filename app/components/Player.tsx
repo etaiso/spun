@@ -83,10 +83,46 @@ export function Player({ station, onPlayStateChange }: Props) {
     a.muted = muted;
   }, [muted]);
 
-  // Report initial state on mount so the parent stays in sync. With autoplay
-  // we're starting a connect; without it we're idle until the user clicks play.
+  // On mount, start playback when autoplay is enabled. Browsers block
+  // audio-with-sound before any user interaction (e.g. after a reload), so we
+  // call play() ourselves to catch the rejection: instead of a stuck
+  // "connecting" splash we show the station ready/paused, and arm the next
+  // pointer interaction to start it — the closest to autoplay the platform
+  // allows without a gesture.
   useEffect(() => {
-    cbRef.current(autoplay ? 'connecting' : 'idle');
+    if (!autoplay) { cbRef.current('idle'); return; }
+    const a = audioRef.current;
+    if (!a) return;
+
+    let cancelled = false;
+    let disarm: (() => void) | undefined;
+
+    // If the native autoplay attribute already started playback, leave the
+    // 'playing' state from onPlay alone; otherwise report connecting.
+    if (a.paused) cbRef.current('connecting');
+    a.play().catch(() => {
+      if (cancelled) return;
+      // Blocked until a gesture — reflect reality and wait for one.
+      setPaused(true);
+      cbRef.current('idle');
+      const onPointer = (e: PointerEvent) => {
+        // The play/pause button starts playback itself; don't double-fire and
+        // race it (which would immediately re-pause).
+        if ((e.target as HTMLElement | null)?.closest('[data-autoplay-ignore]')) {
+          disarm?.();
+          return;
+        }
+        disarm?.();
+        setPaused(false);
+        cbRef.current('connecting');
+        setupAnalysis();
+        a.play().catch(() => cbRef.current('error'));
+      };
+      window.addEventListener('pointerdown', onPointer, { capture: true });
+      disarm = () => window.removeEventListener('pointerdown', onPointer, { capture: true });
+    });
+
+    return () => { cancelled = true; disarm?.(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -96,7 +132,10 @@ export function Player({ station, onPlayStateChange }: Props) {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const t = e.target as HTMLElement | null;
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      // Skip only when typing into a text field — NOT the volume slider
+      // (type="range"), so M / Space / arrows still work while it's focused.
+      if (t && (t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (t && t.tagName === 'INPUT' && (t as HTMLInputElement).type !== 'range') return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const a = audioRef.current;
       switch (e.key) {
@@ -162,7 +201,7 @@ export function Player({ station, onPlayStateChange }: Props) {
   }
 
   return (
-    <div className="flex items-center gap-5 pt-2 flex-wrap">
+    <div className="relative z-10 flex items-center gap-5 pt-2 flex-wrap bg-[var(--color-bg)]">
       <audio
         ref={audioRef}
         // Inner key guards against streamUrl swaps within a single station
@@ -171,6 +210,9 @@ export function Player({ station, onPlayStateChange }: Props) {
         // Proxied through our origin so Web Audio can analyse it for the
         // canvas visualiser (cross-origin streams can't be analysed).
         src={`/api/stream?url=${encodeURIComponent(station.streamUrl)}`}
+        // Native autoplay attempt (some browsers/settings honor the attribute
+        // more leniently than a script play()). The mount effect below also
+        // calls play() to catch a block and arm a gesture-resume fallback.
         autoPlay={autoplay}
         preload={autoplay ? 'auto' : 'none'}
         onPlay={handlePlay}
@@ -181,6 +223,7 @@ export function Player({ station, onPlayStateChange }: Props) {
       />
       <button
         onClick={togglePlay}
+        data-autoplay-ignore
         className="w-14 h-14 rounded-full bg-[var(--color-ink)] text-white text-xl flex items-center justify-center shadow-[0_8px_20px_rgba(0,0,0,0.2)] cursor-pointer"
         aria-label={paused ? 'Play' : 'Pause'}
       >
@@ -189,11 +232,32 @@ export function Player({ station, onPlayStateChange }: Props) {
       <div className="flex items-center gap-3 max-w-[280px] text-[var(--color-ink-3)]">
         <button
           onClick={() => setMuted(m => !m)}
-          className="text-base leading-none hover:text-[var(--color-ink)] transition-colors cursor-pointer"
+          className="shrink-0 hover:text-[var(--color-ink)] transition-colors cursor-pointer"
           aria-label={muted ? 'Unmute' : 'Mute'}
           title={muted ? 'Unmute' : 'Mute'}
         >
-          {muted ? '🔇' : '🔊'}
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="w-5 h-5"
+          >
+            <path d="M11 5 6 9H2v6h4l5 4V5z" />
+            {muted ? (
+              <>
+                <line x1="22" y1="9" x2="16" y2="15" />
+                <line x1="16" y1="9" x2="22" y2="15" />
+              </>
+            ) : (
+              <>
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+              </>
+            )}
+          </svg>
         </button>
         <input
           type="range"

@@ -4,14 +4,15 @@ import { Fragment, useCallback, useEffect, useState } from 'react';
 import type { Station } from './lib/stations';
 import { useRecent } from './lib/recent';
 import { useFavorites } from './lib/favorites';
+import { useHidden } from './lib/hidden';
+import { useDetectRegionByIP } from './lib/region';
 import { TopBar } from './components/TopBar';
 import { Sidebar } from './components/Sidebar';
 import { Player } from './components/Player';
 import { NowPlaying } from './components/NowPlaying';
 import { CommandPalette } from './components/CommandPalette';
 import { ShortcutsHelp } from './components/ShortcutsHelp';
-import { RegionPicker } from './components/RegionPicker';
-import { DebugPanel } from './components/DebugPanel';
+import { SettingsDialog } from './components/SettingsDialog';
 import type { PlayState } from './components/Player';
 
 export default function Home() {
@@ -21,8 +22,32 @@ export default function Home() {
   const [currentTrack, setCurrentTrack] = useState<string | null>(null);
   const [showHelp, setShowHelp] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const { add: addRecent } = useRecent();
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const { recent, add: addRecent } = useRecent();
   const { favorites } = useFavorites();
+  const { isHidden } = useHidden();
+
+  // Refine the search region from the user's IP (physical location), unless
+  // they've manually chosen one in Settings.
+  useDetectRegionByIP();
+
+  // The station on screen: the user's explicit pick, otherwise the most recent
+  // non-hidden station so a reload returns to it. `recent` is empty on the server
+  // and during hydration (useSyncExternalStore server snapshot) then fills from
+  // localStorage on the client, so this restores post-hydration with no
+  // mismatch — and deriving it (vs. setState in an effect) avoids a cascading
+  // render.
+  const currentStation = selected ?? recent.find(s => !isHidden(s.id)) ?? null;
+
+  // Reflect what's playing in the browser tab: "Song — Station", or just the
+  // station name, falling back to "Radio" when nothing's selected.
+  useEffect(() => {
+    document.title = currentStation
+      ? currentTrack
+        ? `♫ ${currentTrack} — ${currentStation.name}`
+        : currentStation.name
+      : 'Radio';
+  }, [currentStation, currentTrack]);
 
   // Track play-state from Player. Also remember whether audio has ever played
   // for the current station — NowPlaying uses that to avoid re-showing the
@@ -69,7 +94,7 @@ export default function Home() {
       } else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
         if (favorites.length === 0) return;
         e.preventDefault();
-        const i = favorites.findIndex(f => f.id === selected?.id);
+        const i = favorites.findIndex(f => f.id === currentStation?.id);
         const len = favorites.length;
         const next =
           e.key === 'ArrowRight'
@@ -80,24 +105,28 @@ export default function Home() {
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [favorites, handleSelect, selected, paletteOpen]);
+  }, [favorites, handleSelect, currentStation, paletteOpen]);
 
   return (
     <div className="flex flex-col h-screen">
-      <TopBar onOpenSearch={() => setPaletteOpen(true)} />
+      <TopBar
+        onOpenSearch={() => setPaletteOpen(true)}
+        onOpenSettings={() => setSettingsOpen(true)}
+        settingsActive={settingsOpen}
+      />
       <div className="flex flex-1 min-h-0">
-        <Sidebar selected={selected} onSelect={handleSelect} nowPlaying={currentTrack} />
+        <Sidebar selected={currentStation} onSelect={handleSelect} nowPlaying={currentTrack} />
         <main className="flex-1 p-10 bg-[var(--color-bg)] overflow-y-auto overflow-x-hidden">
           {/* Centered, width-capped stage so the title + artwork sit in the
               middle of the panel instead of sprawling top-left. */}
           <div className="max-w-4xl w-full mx-auto flex flex-col gap-6 min-h-full justify-center">
-            {selected ? (
+            {currentStation ? (
               // Single key on the Fragment so both children remount together
               // when the station changes. Short `<>` can't carry a key, and
               // the same key on both children is a React duplicate-key error.
-              <Fragment key={selected.id}>
-                <NowPlaying station={selected} playState={playState} everPlayed={everPlayed} onTrack={setCurrentTrack} />
-                <Player station={selected} onPlayStateChange={handlePlayState} />
+              <Fragment key={currentStation.id}>
+                <NowPlaying station={currentStation} playState={playState} everPlayed={everPlayed} onTrack={setCurrentTrack} />
+                <Player station={currentStation} onPlayStateChange={handlePlayState} />
               </Fragment>
             ) : (
               <div className="flex items-center justify-center text-center">
@@ -115,14 +144,17 @@ export default function Home() {
           </div>
         </main>
       </div>
-      <RegionPicker />
       {paletteOpen && (
         <CommandPalette onClose={() => setPaletteOpen(false)} onSelect={handleSelect} />
       )}
       <ShortcutsHelp open={showHelp} onOpenChange={setShowHelp} />
-      {process.env.NODE_ENV === 'development' && (
-        <DebugPanel station={selected} playState={playState} currentTrack={currentTrack} />
-      )}
+      <SettingsDialog
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        station={currentStation}
+        playState={playState}
+        currentTrack={currentTrack}
+      />
     </div>
   );
 }

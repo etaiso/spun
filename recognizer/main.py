@@ -11,7 +11,8 @@ talks to this over plain HTTP on localhost.
 
 Run:  ./recognizer/run.sh   (creates a venv, installs deps, starts uvicorn)
 API:  POST /recognize  { "url": "<stream url>", "seconds": 6 }
-      -> 200 { "artist": "...", "title": "...", "raw": "Artist - Title" }
+      -> 200 { "match": true, "artist": "...", "title": "...",
+               "raw": "Artist - Title", "cover": "<art url|>" }
       -> 200 { "match": false }            (no song identified)
       -> 503 { "error": "..." }            (capture/recognition failed)
 """
@@ -90,7 +91,19 @@ async def recognize(req: RecognizeRequest):
     artist = track.get("subtitle") or ""
     title = track.get("title") or ""
     raw = f"{artist} - {title}".strip(" -") if artist else title
-    return {"match": True, "artist": artist, "title": title, "raw": raw}
+
+    # Album/track cover art. Shazam returns several image fields; prefer the
+    # high-res cover, then the standard cover, then the share image. May be
+    # absent for some tracks — return "" and let the client fall back.
+    images = track.get("images") or {}
+    cover = (
+        images.get("coverarthq")
+        or images.get("coverart")
+        or (track.get("share") or {}).get("image")
+        or ""
+    )
+
+    return {"match": True, "artist": artist, "title": title, "raw": raw, "cover": cover}
 
 
 def _error(message: str):

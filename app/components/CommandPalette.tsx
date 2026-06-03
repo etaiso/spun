@@ -4,7 +4,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Station } from '@/app/lib/stations';
 import { useFavorites } from '@/app/lib/favorites';
 import { useRecent } from '@/app/lib/recent';
-import { useRegion } from '@/app/lib/region';
+import { useRegion, useRegionFilter } from '@/app/lib/region';
+import { useHiddenFilter } from '@/app/lib/hidden';
 import { rankStations } from '@/app/lib/rank';
 import { StationLogo } from './StationLogo';
 
@@ -25,14 +26,18 @@ export function CommandPalette({ onClose, onSelect }: Props) {
   const { favorites, isFavorite, toggle } = useFavorites();
   const { recent } = useRecent();
   const { region } = useRegion();
+  const filterByRegion = useRegionFilter();
+  const filterHidden = useHiddenFilter();
 
   // Rank the candidate pool by region + recently-played + favorite + fuzzy
-  // relevance + popularity. Recomputes when results or the user's lists change.
+  // relevance + popularity. Hidden stations are dropped, and when the region
+  // lock is on the pool is filtered to the region first. Recomputes when
+  // results or the user's lists change.
   const results = useMemo(() => {
     const recentIds = new Set(recent.map(s => s.id));
     const favoriteIds = new Set(favorites.map(s => s.id));
-    return rankStations(raw, { query, region, recentIds, favoriteIds });
-  }, [raw, query, region, recent, favorites]);
+    return rankStations(filterHidden(filterByRegion(raw)), { query, region, recentIds, favoriteIds });
+  }, [raw, query, region, recent, favorites, filterByRegion, filterHidden]);
 
   // Focus the input on mount.
   useEffect(() => {
@@ -79,7 +84,7 @@ export function CommandPalette({ onClose, onSelect }: Props) {
   // With an empty query, the palette shows recently-played as a jumping-off
   // point; once you type, it shows ranked search results.
   const showingRecent = query.trim() === '';
-  const displayed = showingRecent ? recent : results;
+  const displayed = showingRecent ? filterHidden(filterByRegion(recent)) : results;
 
   function choose(s: Station | undefined) {
     if (!s) return;

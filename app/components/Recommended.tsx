@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import type { Station } from '@/app/lib/stations';
 import { useFavorites } from '@/app/lib/favorites';
-import { useRegion } from '@/app/lib/region';
+import { useRegion, useRegionFilter } from '@/app/lib/region';
+import { useHiddenFilter } from '@/app/lib/hidden';
 import { StationRow } from './StationRow';
 import { CollapsibleSection } from './CollapsibleSection';
 
@@ -28,6 +29,8 @@ export function Recommended({ onSelect }: Props) {
   const [errored, setErrored] = useState(false);
   const { isFavorite, toggle } = useFavorites();
   const { region } = useRegion();
+  const filterByRegion = useRegionFilter();
+  const filterHidden = useHiddenFilter();
 
   useEffect(() => {
     let cancelled = false;
@@ -47,6 +50,8 @@ export function Recommended({ onSelect }: Props) {
     return () => { cancelled = true; };
   }, [region]);
 
+  const shown = filterHidden(filterByRegion(stations ?? []));
+
   return (
     <CollapsibleSection title="✦ Popular">
       {stations === null && !errored && (
@@ -59,7 +64,12 @@ export function Recommended({ onSelect }: Props) {
           Couldn&apos;t load popular stations.
         </div>
       )}
-      {stations?.map(s => (
+      {stations !== null && !errored && shown.length === 0 && (
+        <div className="text-sm text-[var(--color-ink-3)] px-1 py-2">
+          No popular stations in this region.
+        </div>
+      )}
+      {shown.map(s => (
         <StationRow
           key={s.id}
           station={s}

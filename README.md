@@ -12,18 +12,26 @@ falls back to **fingerprinting the live audio with Shazam** to identify it.
 
 - 🔎 **Command palette search** (`⌘K` / `Ctrl K`), Raycast-style with a glass
   overlay, fuzzy matching, and results ranked by your region, recently played,
-  and favorites. Empty query shows Recently played.
-- ⭐ **Favorites**, **Recently played**, and a region-aware **Popular** list —
-  all persisted in the browser. Star the current station from the sidebar or
-  the stage.
-- 🎙️ **Now playing** with the current song, live session history, station
-  cover art, a "Now playing" card, and a scrolling marquee in the sidebar.
+  and favorites. Empty query shows your recently played stations.
+- ⭐ **Favorites** and a region-aware **Popular** list, persisted in the
+  browser. Duplicate entries (the same station submitted to radio-browser more
+  than once) are collapsed, while staying searchable by any of their names.
+- 🎙️ **Now playing** with the current song and **album cover art** — from
+  Shazam, with an iTunes Search fallback for broadcast-metadata tracks — plus a
+  **playlist history** that's restored when you reload or switch back to a
+  station (within 5 minutes). The active station + song also appear in the
+  browser tab title.
 - 〰️ **Audio-reactive canvas** — concentric "radio wave" rings behind the
   player that pulse to the live audio (Web Audio analyser), with a gentle
   timed fallback when a stream can't be analysed.
 - ✦ **Shazam fallback** for stations that broadcast no song title.
-- 🌍 **Region picker** that drives search/Popular ranking (defaults to your
-  locale, overridable, persisted).
+- ⚙️ **Settings** (gear in the top bar): **localization**, **region-only mode**
+  (filter every list to a single country), and **hidden stations**.
+- 🙈 **Hide stations** — right-click any station in the sidebar to banish it
+  from search, favorites, popular and recent; restore it from Settings.
+- 🌍 **Region detection** from your IP (with a browser-locale fallback), shown
+  in the top bar and overridable in Settings — drives search/Popular ranking.
+- 🔁 Reopens your **last played station** on reload.
 - ⌨️ Keyboard shortcuts (play/pause, mute, volume, prev/next favorite,
   search, help), an auto-play toggle (off by default), and persisted volume.
 
@@ -91,7 +99,8 @@ Browser ── plays audio ─────────────────�
   changes to the browser over Server-Sent Events.
 - When the metadata is empty or absent, the route asks the recognizer to
   fingerprint ~6 seconds of the live audio and returns the match (tagged
-  "Identified by Shazam").
+  "Identified by Shazam") along with its cover art. Broadcast-metadata tracks
+  that carry no art get a cover from the iTunes Search API.
 
 ### API routes
 
@@ -124,8 +133,9 @@ npm run lint     # ESLint
   [Uvicorn](https://www.uvicorn.org/) · [ShazamIO](https://github.com/shazamio/ShazamIO) ·
   `ffmpeg`
 
-State (favorites, recently played, volume, auto-play, region) is persisted in
-`localStorage`; there's no database or accounts.
+State (favorites, recently played, volume, auto-play, region + region-only
+mode, hidden stations, and a short-lived per-station now-playing cache) is
+persisted in `localStorage`; there's no database or accounts.
 
 ## Project layout
 

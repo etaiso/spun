@@ -58,7 +58,11 @@ export function rankStations(stations: Station[], ctx: RankContext): Station[] {
   const n = stations.length;
   return stations
     .map((s, i) => {
-      const fuzzy = fuzzyScore(ctx.query, s.name);
+      // Match against the display name AND any merged alias names, so a station
+      // deduped to one name (e.g. "Glglz") is still found by an alias ("גלגלצ").
+      const fuzzy = s.aliases?.length
+        ? Math.max(fuzzyScore(ctx.query, s.name), ...s.aliases.map(a => fuzzyScore(ctx.query, a)))
+        : fuzzyScore(ctx.query, s.name);
       const popularity = n > 1 ? (n - i) / n : 1;
       const region = ctx.region && s.countrycode === ctx.region ? 1 : 0;
       const recent = ctx.recentIds.has(s.id) ? 1 : 0;

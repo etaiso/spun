@@ -9,30 +9,38 @@ type Props = {
   size: number;
   dim?: boolean;
   className?: string;
+  // Track/album art (e.g. from Shazam). When present it's shown full-bleed as
+  // real cover artwork; on load failure we fall back to the station favicon,
+  // then to the station name.
+  cover?: string;
 };
 
 /**
- * Large station artwork for the now-playing panel. radio-browser's only
- * image field is `favicon`, so that's our "cover". It's shown object-contain
- * on the station's deterministic gradient (handles logos of any size without
- * stretching). When there's no favicon — or it fails to load — we fall back
- * to the station NAME on the gradient rather than a blank colored rectangle.
+ * Large station artwork for the now-playing panel. Prefers track cover art
+ * (`cover`, e.g. from Shazam) when available, otherwise radio-browser's
+ * `favicon`. Either image is shown full-bleed (object-cover) so it fills the
+ * square edge-to-edge with no border. When neither image is available — or both
+ * fail to load — we fall back to the station NAME on the deterministic
+ * gradient rather than a blank colored rectangle.
  */
-export function StationCover({ name, favicon, size, dim = false, className = '' }: Props) {
-  const [failedFor, setFailedFor] = useState<string | null>(null);
-  const showImage = favicon && favicon !== failedFor;
+export function StationCover({ name, favicon, size, dim = false, className = '', cover }: Props) {
+  const [failed, setFailed] = useState<Record<string, boolean>>({});
+
+  const coverOk = cover && !failed[cover];
+  const faviconOk = favicon && !failed[favicon];
+  const src = coverOk ? cover : faviconOk ? favicon : null;
 
   return (
     <div
       className={`relative rounded-2xl overflow-hidden shrink-0 ${className}`}
       style={{ width: size, height: size, background: gradientForName(name), opacity: dim ? 0.55 : 1 }}
     >
-      {showImage ? (
+      {src ? (
         <img
-          src={favicon}
+          src={src}
           alt=""
-          onError={() => setFailedFor(favicon)}
-          className="absolute inset-0 w-full h-full object-contain p-[14%] drop-shadow-[0_2px_8px_rgba(0,0,0,0.2)]"
+          onError={() => setFailed(f => ({ ...f, [src]: true }))}
+          className="absolute inset-0 w-full h-full object-cover"
         />
       ) : (
         <div className="absolute inset-0 flex items-center justify-center p-5 text-center">

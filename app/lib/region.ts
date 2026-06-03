@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useSyncExternalStore } from 'react';
 
 /**
  * Best-guess ISO 3166 alpha-2 region for the current user, derived from their
@@ -58,4 +58,118 @@ export function useRegion(): { region: string; setRegion: (r: string) => void } 
     for (const cb of listeners) cb();
   }, []);
   return { region, setRegion };
+}
+
+// ── IP-based region detection ──────────────────────────────────────────────
+// The locale heuristic above keys off the *language* order, which often says
+// "US" for an English UI even when the user is elsewhere. An IP lookup reflects
+// physical location. It runs client-side on purpose: that geolocates the user's
+// own public IP. (A server call would geolocate the server's IP — wrong in dev
+// or in production depending on where it runs.)
+
+// Has the user explicitly picked a region via the picker? That's the only thing
+// written to localStorage, and it always wins over auto-detection.
+function hasExplicitChoice(): boolean {
+  if (typeof window === 'undefined') return false;
+  try { return !!window.localStorage.getItem(KEY); } catch { return false; }
+}
+
+const IP_SESSION_KEY = 'radio:ipRegion';
+
+/** Resolve the user's country (ISO 3166 alpha-2) from their IP, or null. */
+export async function detectRegionByIP(signal?: AbortSignal): Promise<string | null> {
+  try {
+    const res = await fetch('https://get.geojs.io/v1/ip/country.json', { signal });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { country?: string };
+    const code = (data?.country ?? '').toString().toUpperCase();
+    return /^[A-Z]{2}$/.test(code) ? code : null;
+  } catch {
+    return null;
+  }
+}
+
+// Apply an auto-detected region: update the effective region in memory and
+// notify subscribers, but DON'T persist — only explicit picker choices are
+// stored. Never overrides a manual choice.
+function applyAutoRegion(code: string): void {
+  if (!code || hasExplicitChoice()) return;
+  if (cache === code) return;
+  cache = code;
+  for (const cb of listeners) cb();
+}
+
+/**
+ * One-shot IP region detection. Call once near the app root. No-op when the
+ * user has already chosen a region. Caches the result in sessionStorage so we
+ * don't re-hit the geo service on every reload within a session.
+ */
+export function useDetectRegionByIP(): void {
+  useEffect(() => {
+    if (hasExplicitChoice()) return;
+
+    let cached: string | null = null;
+    try { cached = window.sessionStorage.getItem(IP_SESSION_KEY); } catch { /* ignore */ }
+    if (cached) { applyAutoRegion(cached); return; }
+
+    const ctrl = new AbortController();
+    detectRegionByIP(ctrl.signal).then(code => {
+      if (!code) return;
+      try { window.sessionStorage.setItem(IP_SESSION_KEY, code); } catch { /* ignore */ }
+      applyAutoRegion(code);
+    });
+    return () => ctrl.abort();
+  }, []);
+}
+
+// ── Region lock ──────────────────────────────────────────────────────────
+// When enabled, every station list in the app (search, favorites, popular,
+// recently played) is filtered down to the active region. A no-op when the
+// region is "Global" (empty) — there's nothing to lock to.
+const LOCK_KEY = 'radio:regionLock';
+let lockCache: boolean | null = null;
+const lockListeners = new Set<() => void>();
+
+function readLock(): boolean {
+  if (lockCache !== null) return lockCache;
+  let v = false;
+  if (typeof window !== 'undefined') {
+    try { v = window.localStorage.getItem(LOCK_KEY) === '1'; } catch { /* ignore */ }
+  }
+  lockCache = v;
+  return lockCache;
+}
+
+function subscribeLock(cb: () => void): () => void {
+  lockListeners.add(cb);
+  const onStorage = (e: StorageEvent) => { if (e.key === LOCK_KEY) { lockCache = null; cb(); } };
+  window.addEventListener('storage', onStorage);
+  return () => { lockListeners.delete(cb); window.removeEventListener('storage', onStorage); };
+}
+
+export function useRegionLock(): { locked: boolean; setLocked: (v: boolean) => void } {
+  const locked = useSyncExternalStore(subscribeLock, readLock, () => false);
+  const setLocked = useCallback((v: boolean) => {
+    lockCache = v;
+    try { window.localStorage.setItem(LOCK_KEY, v ? '1' : '0'); } catch { /* ignore */ }
+    for (const cb of lockListeners) cb();
+  }, []);
+  return { locked, setLocked };
+}
+
+/**
+ * Returns a filter that, when the region lock is active AND a region is set,
+ * keeps only stations from that region. Otherwise it's the identity filter.
+ * Use across every station list so the lock applies app-wide.
+ */
+export function useRegionFilter(): <T extends { countrycode: string }>(stations: T[]) => T[] {
+  const region = useSyncExternalStore(subscribe, read, () => '');
+  const locked = useSyncExternalStore(subscribeLock, readLock, () => false);
+  return useCallback(
+    <T extends { countrycode: string }>(stations: T[]) => {
+      if (!locked || !region) return stations;
+      return stations.filter(s => s.countrycode === region);
+    },
+    [locked, region],
+  );
 }

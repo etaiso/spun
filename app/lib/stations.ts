@@ -7,6 +7,10 @@ export type Station = {
   countrycode: string; // ISO 3166 alpha-2, e.g. "IL" — used for region ranking
   bitrate: number;
   codec: string;
+  // Alternate names from duplicate records that were merged into this one
+  // (e.g. a Hebrew "גלגלצ - Glglz" folded into "Glglz"). Kept so the station
+  // stays searchable by any of its submitted names. See lib/dedupe.ts.
+  aliases?: string[];
 };
 
 type RawStation = {
