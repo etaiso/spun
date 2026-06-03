@@ -1,8 +1,11 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Station } from '@/app/lib/stations';
 import { useFavorites } from '@/app/lib/favorites';
+import { useRecent } from '@/app/lib/recent';
+import { userRegion } from '@/app/lib/region';
+import { rankStations } from '@/app/lib/rank';
 import { StationLogo } from './StationLogo';
 
 type Props = {
@@ -14,12 +17,23 @@ type Props = {
 // so state starts clean with no reset effect.
 export function CommandPalette({ onClose, onSelect }: Props) {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<Station[]>([]);
+  const [raw, setRaw] = useState<Station[]>([]); // candidate pool from the API
   const [loading, setLoading] = useState(false);
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
-  const { isFavorite, toggle } = useFavorites();
+  const { favorites, isFavorite, toggle } = useFavorites();
+  const { recent } = useRecent();
+
+  const region = useMemo(() => userRegion(), []);
+
+  // Rank the candidate pool by region + recently-played + favorite + fuzzy
+  // relevance + popularity. Recomputes when results or the user's lists change.
+  const results = useMemo(() => {
+    const recentIds = new Set(recent.map(s => s.id));
+    const favoriteIds = new Set(favorites.map(s => s.id));
+    return rankStations(raw, { query, region, recentIds, favoriteIds });
+  }, [raw, query, region, recent, favorites]);
 
   // Focus the input on mount.
   useEffect(() => {
@@ -27,33 +41,35 @@ export function CommandPalette({ onClose, onSelect }: Props) {
     return () => clearTimeout(t);
   }, []);
 
-  // Debounced search.
+  // Debounced search → fills the candidate pool (ranking happens above).
   useEffect(() => {
     const q = query.trim();
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (q === '') { setResults([]); setLoading(false); return; }
+    if (q === '') { setRaw([]); setLoading(false); return; }
 
     let cancelled = false;
     const ctrl = new AbortController();
     setLoading(true);
+    const params = new URLSearchParams({ q });
+    if (region) params.set('region', region);
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`, { signal: ctrl.signal });
-        if (!res.ok) { if (!cancelled) setResults([]); return; }
+        const res = await fetch(`/api/search?${params.toString()}`, { signal: ctrl.signal });
+        if (!res.ok) { if (!cancelled) setRaw([]); return; }
         const data = (await res.json()) as unknown;
         if (!cancelled) {
-          setResults(Array.isArray(data) ? (data as Station[]) : []);
+          setRaw(Array.isArray(data) ? (data as Station[]) : []);
           setActive(0);
         }
       } catch (e) {
-        if (!cancelled && (e as Error).name !== 'AbortError') setResults([]);
+        if (!cancelled && (e as Error).name !== 'AbortError') setRaw([]);
       } finally {
         if (!cancelled) setLoading(false);
       }
     }, 200);
 
     return () => { cancelled = true; clearTimeout(timer); ctrl.abort(); };
-  }, [query]);
+  }, [query, region]);
 
   // Keep the active row scrolled into view.
   useEffect(() => {

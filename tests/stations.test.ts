@@ -10,6 +10,7 @@ describe('normalizeStation', () => {
       url: 'http://kexp.example/playlist.pls',
       favicon: 'https://kexp.example/logo.png',
       country: 'United States',
+      countrycode: 'us',
       bitrate: 128,
       codec: 'MP3',
     };
@@ -19,9 +20,18 @@ describe('normalizeStation', () => {
       streamUrl: 'https://kexp.example/stream',
       favicon: 'https://kexp.example/logo.png',
       country: 'United States',
+      countrycode: 'US',
       bitrate: 128,
       codec: 'MP3',
     });
+  });
+
+  it('uppercases the country code', () => {
+    const raw = {
+      stationuuid: 'x', name: 'X', url_resolved: 'http://x', url: '',
+      favicon: '', country: 'Israel', countrycode: 'il', bitrate: 0, codec: '',
+    };
+    expect(normalizeStation(raw).countrycode).toBe('IL');
   });
 
   it('does not throw on null or missing name', () => {
@@ -32,6 +42,7 @@ describe('normalizeStation', () => {
       url: '',
       favicon: '',
       country: '',
+      countrycode: '',
       bitrate: 0,
       codec: '',
     };
@@ -46,6 +57,7 @@ describe('normalizeStation', () => {
       url: 'http://fallback/stream',
       favicon: '',
       country: '',
+      countrycode: '',
       bitrate: 0,
       codec: '',
     };
