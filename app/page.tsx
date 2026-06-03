@@ -4,9 +4,11 @@ import { Fragment, useCallback, useEffect, useState } from 'react';
 import type { Station } from './lib/stations';
 import { useRecent } from './lib/recent';
 import { useFavorites } from './lib/favorites';
+import { TopBar } from './components/TopBar';
 import { Sidebar } from './components/Sidebar';
 import { Player } from './components/Player';
 import { NowPlaying } from './components/NowPlaying';
+import { CommandPalette } from './components/CommandPalette';
 import { ShortcutsHelp } from './components/ShortcutsHelp';
 import type { PlayState } from './components/Player';
 
@@ -15,6 +17,7 @@ export default function Home() {
   const [playState, setPlayState] = useState<PlayState>('idle');
   const [everPlayed, setEverPlayed] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const { add: addRecent } = useRecent();
   const { favorites } = useFavorites();
 
@@ -37,10 +40,19 @@ export default function Home() {
     addRecent(s);
   }, [addRecent]);
 
-  // Page-level shortcuts: ←/→ cycle favorites, ? toggles help, Esc closes.
-  // (Audio shortcuts — Space/M/↑/↓ — live in Player, which owns the audio.)
+  // Page-level shortcuts. ⌘K / Ctrl+K opens the command palette (handled
+  // before the modifier bail). ←/→ cycle favorites, ? toggles help, Esc
+  // closes. Audio shortcuts (Space/M/↑/↓) live in Player.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        setPaletteOpen(o => !o);
+        return;
+      }
+      // Palette owns the keyboard while open.
+      if (paletteOpen) return;
+
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -64,38 +76,44 @@ export default function Home() {
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [favorites, handleSelect, selected]);
+  }, [favorites, handleSelect, selected, paletteOpen]);
 
   return (
-    <div className="flex min-h-screen">
-      <Sidebar selectedId={selected?.id ?? null} onSelect={handleSelect} />
-      <main className="flex-1 p-10 bg-[var(--color-bg)] overflow-y-auto">
-        {/* Cap the content width so the 42px title and artwork don't sprawl
-            edge-to-edge on large screens. */}
-        <div className="max-w-4xl w-full flex flex-col gap-6 min-h-full">
-          {selected ? (
-            // Single key on the Fragment so both children remount together when
-            // the station changes. Short `<>` can't carry a key, and putting the
-            // same key on both children produces React's duplicate-key error.
-            <Fragment key={selected.id}>
-              <NowPlaying station={selected} playState={playState} everPlayed={everPlayed} />
-              <Player station={selected} onPlayStateChange={handlePlayState} />
-            </Fragment>
-          ) : (
-            <div className="flex-1 flex items-center justify-center text-center">
-              <div>
-                <div className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-warm)] mb-3">
-                  Radio
-                </div>
-                <div className="text-[32px] font-bold tracking-tight">Pick a station to begin</div>
-                <div className="text-base text-[var(--color-ink-3)] mt-3 max-w-md mx-auto">
-                  Browse the sidebar — start with the popular list, or search for something specific. Star what you love to pin it to the top.
+    <div className="flex flex-col h-screen">
+      <TopBar onOpenSearch={() => setPaletteOpen(true)} />
+      <div className="flex flex-1 min-h-0">
+        <Sidebar selectedId={selected?.id ?? null} onSelect={handleSelect} />
+        <main className="flex-1 p-10 bg-[var(--color-bg)] overflow-y-auto">
+          {/* Centered, width-capped stage so the title + artwork sit in the
+              middle of the panel instead of sprawling top-left. */}
+          <div className="max-w-4xl w-full mx-auto flex flex-col gap-6 min-h-full justify-center">
+            {selected ? (
+              // Single key on the Fragment so both children remount together
+              // when the station changes. Short `<>` can't carry a key, and
+              // the same key on both children is a React duplicate-key error.
+              <Fragment key={selected.id}>
+                <NowPlaying station={selected} playState={playState} everPlayed={everPlayed} />
+                <Player station={selected} onPlayStateChange={handlePlayState} />
+              </Fragment>
+            ) : (
+              <div className="flex items-center justify-center text-center">
+                <div>
+                  <div className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-warm)] mb-3">
+                    Radio
+                  </div>
+                  <div className="text-[32px] font-bold tracking-tight">Pick a station to begin</div>
+                  <div className="text-base text-[var(--color-ink-3)] mt-3 max-w-md mx-auto">
+                    Press <kbd className="px-1.5 py-0.5 rounded border border-[var(--color-line)] bg-white text-[12px] font-semibold">⌘K</kbd> to search, or browse the popular list in the sidebar. Star what you love to pin it to the top.
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-        </div>
-      </main>
+            )}
+          </div>
+        </main>
+      </div>
+      {paletteOpen && (
+        <CommandPalette onClose={() => setPaletteOpen(false)} onSelect={handleSelect} />
+      )}
       <ShortcutsHelp open={showHelp} onOpenChange={setShowHelp} />
     </div>
   );

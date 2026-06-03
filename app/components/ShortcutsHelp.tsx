@@ -3,7 +3,8 @@
 type Shortcut = { keys: string[]; label: string };
 
 const SHORTCUTS: Shortcut[] = [
-  { keys: ['Space', 'K'], label: 'Play / pause' },
+  { keys: ['⌘', 'K'], label: 'Search stations' },
+  { keys: ['Space'], label: 'Play / pause' },
   { keys: ['M'], label: 'Mute / unmute' },
   { keys: ['↑', '↓'], label: 'Volume up / down' },
   { keys: ['←', '→'], label: 'Previous / next favorite' },
