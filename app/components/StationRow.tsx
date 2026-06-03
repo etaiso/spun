@@ -14,9 +14,18 @@ type Props = {
 export function StationRow({ station, isActive, isFavorite, onSelect, onToggleFavorite }: Props) {
   return (
     <div
+      role="button"
+      tabIndex={0}
+      aria-current={isActive ? 'true' : undefined}
       onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
       className={[
-        'flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-colors mb-1',
+        'flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-colors mb-1 outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-warm)]',
         isActive
           ? 'bg-white shadow-[0_2px_8px_rgba(0,0,0,0.06)] border border-[var(--color-line)]'
           : 'hover:bg-[rgba(210,105,30,0.05)]',
@@ -26,7 +35,7 @@ export function StationRow({ station, isActive, isFavorite, onSelect, onToggleFa
       <div className="flex-1 min-w-0">
         <div className="text-[15px] font-semibold tracking-tight truncate">{station.name}</div>
         <div className="text-xs text-[var(--color-ink-3)] truncate">
-          {[station.country, station.bitrate && `${station.bitrate} kbps`].filter(Boolean).join(' · ')}
+          {[station.country, station.bitrate > 0 ? `${station.bitrate} kbps` : null].filter(Boolean).join(' · ')}
         </div>
       </div>
       <button
