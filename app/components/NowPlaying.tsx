@@ -49,12 +49,9 @@ export function NowPlaying({ station, playState }: Props) {
   // in StrictMode).
   const prevTitleRef = useRef<string | null>(null);
 
+  // Parent keys this component by station.id, so a station change remounts
+  // and all the useState initial values are fresh. No explicit reset needed.
   useEffect(() => {
-    setMetaState('waiting');
-    setCurrentRaw(null);
-    setHistory([]);
-    prevTitleRef.current = null;
-
     const es = new EventSource(`/api/now-playing?url=${encodeURIComponent(station.streamUrl)}`);
 
     es.onmessage = (ev) => {

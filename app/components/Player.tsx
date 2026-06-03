@@ -26,10 +26,12 @@ export function Player({ station, onPlayStateChange }: Props) {
     a.volume = volume;
   }, [volume]);
 
+  // Fire 'connecting' once on mount. The parent keys this component by
+  // station.id, so a station change remounts (paused state resets to its
+  // useState initial value automatically — no explicit reset needed here).
   useEffect(() => {
-    setPaused(false);
     cbRef.current('connecting');
-  }, [station.id]);
+  }, []);
 
   function handlePlay() { setPaused(false); cbRef.current('playing'); }
   function handlePause() { setPaused(true); }

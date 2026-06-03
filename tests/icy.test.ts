@@ -13,10 +13,6 @@ function buildMetadataBlock(payload: string): Uint8Array {
   return out;
 }
 
-function buildEmptyMetaMarker(): Uint8Array {
-  return new Uint8Array([0]); // L=0 → no metadata
-}
-
 function streamFromChunks(chunks: Uint8Array[]): ReadableStream<Uint8Array> {
   return new ReadableStream({
     start(controller) {

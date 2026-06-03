@@ -30,6 +30,10 @@ export function StationSearch({ selectedId, onSelect }: Props) {
 
   useEffect(() => {
     const q = query.trim();
+    // Clear previous results when the query is empty. This is a legitimate
+    // state-reset on prop change (no remount because the component is always
+    // mounted while the sidebar is open).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (q === '') { setResults([]); setLoading(false); return; }
 
     let cancelled = false;
