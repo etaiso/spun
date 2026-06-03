@@ -41,7 +41,13 @@ export function StationRow({ station, isActive, isFavorite, onSelect, onToggleFa
       <button
         onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }}
         aria-label={isFavorite ? 'Unfavorite' : 'Favorite'}
-        className={`text-lg leading-none ${isFavorite ? 'text-[var(--color-warm)]' : 'text-[var(--color-ink-4)] hover:text-[var(--color-warm)]'}`}
+        title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+        className={[
+          'shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-lg leading-none',
+          'cursor-pointer border border-transparent transition-colors',
+          'hover:border-[var(--color-warm)] hover:bg-[rgba(210,105,30,0.08)] hover:text-[var(--color-warm)]',
+          isFavorite ? 'text-[var(--color-warm)]' : 'text-[var(--color-ink-4)]',
+        ].join(' ')}
       >
         {isFavorite ? '★' : '☆'}
       </button>

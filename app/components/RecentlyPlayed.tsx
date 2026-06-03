@@ -4,6 +4,7 @@ import type { Station } from '@/app/lib/stations';
 import { useRecent } from '@/app/lib/recent';
 import { useFavorites } from '@/app/lib/favorites';
 import { StationRow } from './StationRow';
+import { CollapsibleSection } from './CollapsibleSection';
 
 type Props = {
   selectedId: string | null;
@@ -17,10 +18,7 @@ export function RecentlyPlayed({ selectedId, onSelect }: Props) {
   if (recent.length === 0) return null;
 
   return (
-    <div>
-      <div className="text-[11px] tracking-[1.4px] text-[var(--color-warm)] font-extrabold uppercase mb-3.5">
-        ↻ Recently played
-      </div>
+    <CollapsibleSection title="↻ Recently played" count={recent.length} defaultCollapsed>
       {recent.map(s => (
         <StationRow
           key={s.id}
@@ -31,6 +29,6 @@ export function RecentlyPlayed({ selectedId, onSelect }: Props) {
           onToggleFavorite={() => toggle(s)}
         />
       ))}
-    </div>
+    </CollapsibleSection>
   );
 }

@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { Station } from '@/app/lib/stations';
-import { gradientForName } from '@/app/lib/colors';
 import { isNonTrack } from '@/app/lib/nonTrack';
+import { StationCover } from './StationCover';
 import type { PlayState } from './Player';
 
 type MetaState = 'waiting' | 'playing' | 'no-metadata';
@@ -171,7 +171,7 @@ export function NowPlaying({ station, playState }: Props) {
       <NowPlayingFrame
         stationName={station.name}
         headerExtras={headerExtras}
-        art={<div className="w-[200px] h-[200px] rounded-2xl opacity-50" style={{ background: gradientForName(station.name) }} />}
+        art={<StationCover name={station.name} favicon={station.favicon} size={200} dim />}
         title={<>Listening for song info <span className="dots"><span /><span /><span /></span></>}
         subtitle="Most stations announce the track within ~30 seconds"
         titleClassName="text-[var(--color-ink-3)]"
@@ -186,7 +186,7 @@ export function NowPlaying({ station, playState }: Props) {
       <NowPlayingFrame
         stationName={station.name}
         headerExtras={headerExtras}
-        art={<div className="w-[200px] h-[200px] rounded-2xl bg-gradient-to-br from-[#8a7a6e] to-[#4a3f37] flex items-center justify-center text-4xl">🎙️</div>}
+        art={<StationCover name={station.name} favicon={station.favicon} size={200} />}
         title={station.name}
         subtitle="Between tracks · DJ, news, or station ID"
         history={history}
@@ -200,7 +200,14 @@ export function NowPlaying({ station, playState }: Props) {
     <NowPlayingFrame
       stationName={station.name}
       headerExtras={headerExtras}
-      art={<div className="w-[220px] h-[220px] rounded-2xl shadow-[0_16px_48px_rgba(192,57,43,0.28)]" style={{ background: gradientForName(station.name) }} />}
+      art={
+        <StationCover
+          name={station.name}
+          favicon={station.favicon}
+          size={220}
+          className="shadow-[0_16px_48px_rgba(192,57,43,0.28)]"
+        />
+      }
       title={title}
       subtitle={artist}
       history={history}
@@ -254,11 +261,14 @@ function NowPlayingFrame({
         </div>
         {headerExtras}
       </div>
-      <div className="flex gap-8 items-end">
+      <div className="flex gap-8 items-end flex-wrap">
         {art}
-        <div className="flex-1 pb-2">
-          <div className={`text-[42px] font-extrabold tracking-[-1.2px] leading-[1.05] ${titleClassName}`}>{title}</div>
-          {subtitle && <div className="text-[22px] text-[var(--color-ink-2)] font-medium mt-1.5">{subtitle}</div>}
+        {/* basis-80 + flex-wrap: the text block keeps its own line beside the
+            art when there's room, and drops below it (full width) when the
+            panel is too narrow — no horizontal overflow from the big title. */}
+        <div className="flex-1 basis-80 min-w-0 pb-2">
+          <div className={`text-[clamp(28px,5vw,42px)] font-extrabold tracking-[-1.2px] leading-[1.05] break-words ${titleClassName}`}>{title}</div>
+          {subtitle && <div className="text-[clamp(16px,2.5vw,22px)] text-[var(--color-ink-2)] font-medium mt-1.5 break-words">{subtitle}</div>}
         </div>
       </div>
       {history.length > 0 && (

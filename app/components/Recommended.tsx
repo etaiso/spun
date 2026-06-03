@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import type { Station } from '@/app/lib/stations';
 import { useFavorites } from '@/app/lib/favorites';
 import { StationRow } from './StationRow';
+import { CollapsibleSection } from './CollapsibleSection';
 
 type Props = {
   selectedId: string | null;
@@ -45,10 +46,7 @@ export function Recommended({ selectedId, onSelect }: Props) {
   }, []);
 
   return (
-    <div>
-      <div className="text-[11px] tracking-[1.4px] text-[var(--color-warm)] font-extrabold uppercase mb-3.5">
-        ✦ Popular
-      </div>
+    <CollapsibleSection title="✦ Popular">
       {stations === null && !errored && (
         <>
           <SkeletonRow /><SkeletonRow /><SkeletonRow />
@@ -69,6 +67,6 @@ export function Recommended({ selectedId, onSelect }: Props) {
           onToggleFavorite={() => toggle(s)}
         />
       ))}
-    </div>
+    </CollapsibleSection>
   );
 }

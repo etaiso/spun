@@ -3,6 +3,7 @@
 import type { Station } from '@/app/lib/stations';
 import { useFavorites } from '@/app/lib/favorites';
 import { StationRow } from './StationRow';
+import { CollapsibleSection } from './CollapsibleSection';
 
 type Props = {
   selectedId: string | null;
@@ -13,10 +14,7 @@ export function FavoritesList({ selectedId, onSelect }: Props) {
   const { favorites, toggle } = useFavorites();
 
   return (
-    <div>
-      <div className="text-[11px] tracking-[1.4px] text-[var(--color-warm)] font-extrabold uppercase mb-3.5">
-        ★ Favorites
-      </div>
+    <CollapsibleSection title="★ Favorites" count={favorites.length}>
       {favorites.length === 0 ? (
         <div className="text-sm text-[var(--color-ink-3)] mb-4 px-1">
           Star a station below to pin it here.
@@ -33,6 +31,6 @@ export function FavoritesList({ selectedId, onSelect }: Props) {
           />
         ))
       )}
-    </div>
+    </CollapsibleSection>
   );
 }
