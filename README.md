@@ -10,15 +10,22 @@ falls back to **fingerprinting the live audio with Shazam** to identify it.
 
 ## Features
 
-- 🔎 **Command palette search** (`⌘K` / `Ctrl K`) with fuzzy matching, ranked
-  by your region, recently played, and favorites.
+- 🔎 **Command palette search** (`⌘K` / `Ctrl K`), Raycast-style with a glass
+  overlay, fuzzy matching, and results ranked by your region, recently played,
+  and favorites. Empty query shows Recently played.
 - ⭐ **Favorites**, **Recently played**, and a region-aware **Popular** list —
-  all persisted in the browser.
+  all persisted in the browser. Star the current station from the sidebar or
+  the stage.
 - 🎙️ **Now playing** with the current song, live session history, station
-  cover art, and a sidebar marquee.
+  cover art, a "Now playing" card, and a scrolling marquee in the sidebar.
+- 〰️ **Audio-reactive canvas** — concentric "radio wave" rings behind the
+  player that pulse to the live audio (Web Audio analyser), with a gentle
+  timed fallback when a stream can't be analysed.
 - ✦ **Shazam fallback** for stations that broadcast no song title.
-- ⌨️ Keyboard shortcuts, auto-play toggle, persisted volume, and a region
-  picker.
+- 🌍 **Region picker** that drives search/Popular ranking (defaults to your
+  locale, overridable, persisted).
+- ⌨️ Keyboard shortcuts (play/pause, mute, volume, prev/next favorite,
+  search, help), an auto-play toggle (off by default), and persisted volume.
 
 ## Requirements
 
@@ -75,13 +82,25 @@ Browser ── plays audio ─────────────────�
                                               └─► POST /recognize ─► Shazam recognizer (Python)
 ```
 
-- The browser plays the stream directly via `<audio>`.
-- A Next.js route opens its own connection with `Icy-MetaData: 1`, parses the
-  interleaved `StreamTitle`, and pushes track changes to the browser over
-  Server-Sent Events.
+- The browser plays the stream through `/api/stream`, a same-origin proxy.
+  This serves two purposes: it sidesteps mixed-content / playlist quirks, and
+  it lets the Web Audio API analyse the waveform to drive the reactive rings
+  (cross-origin streams can't be analysed).
+- A Next.js route (`/api/now-playing`) opens its own connection with
+  `Icy-MetaData: 1`, parses the interleaved `StreamTitle`, and pushes track
+  changes to the browser over Server-Sent Events.
 - When the metadata is empty or absent, the route asks the recognizer to
   fingerprint ~6 seconds of the live audio and returns the match (tagged
   "Identified by Shazam").
+
+### API routes
+
+| Route | Purpose |
+|-------|---------|
+| `GET /api/search?q=&region=` | radio-browser search proxy; region + global candidate pool, 60s cache |
+| `GET /api/popular?region=` | Top stations (region-first), 5-min cache |
+| `GET /api/now-playing?url=` | SSE stream of track changes (ICY metadata + Shazam fallback) |
+| `GET /api/stream?url=` | Same-origin audio proxy (enables Web Audio analysis) |
 
 ## Scripts
 
@@ -93,7 +112,29 @@ npm test         # unit tests (Vitest)
 npm run lint     # ESLint
 ```
 
-## Tech
+## Tech stack
 
-Next.js 16 (App Router) · React 19 · TypeScript · Tailwind v4 ·
-radio-browser.info · ShazamIO.
+- **Next.js 16** (App Router, Turbopack) · **React 19** · **TypeScript** (strict)
+- **Tailwind CSS v4**
+- **Web Audio API** — `AnalyserNode` for the audio-reactive visualiser
+- **Server-Sent Events** — live now-playing updates
+- **Vitest** — unit tests (ICY parser, ranking, station normalizer, …)
+- **[radio-browser.info](https://www.radio-browser.info/)** — station directory
+- **Recognizer sidecar:** Python · [FastAPI](https://fastapi.tiangolo.com/) ·
+  [Uvicorn](https://www.uvicorn.org/) · [ShazamIO](https://github.com/shazamio/ShazamIO) ·
+  `ffmpeg`
+
+State (favorites, recently played, volume, auto-play, region) is persisted in
+`localStorage`; there's no database or accounts.
+
+## Project layout
+
+```
+app/
+  api/{search,popular,now-playing,stream}/  route handlers
+  components/                               UI (player, sidebar, palette, …)
+  lib/                                      icy parser, ranking, stores, audio bus
+recognizer/                                 Python ShazamIO sidecar
+tests/                                      Vitest unit tests
+docs/superpowers/                           design spec + implementation plan
+```
