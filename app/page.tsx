@@ -13,9 +13,12 @@ export default function Home() {
   const [playState, setPlayState] = useState<PlayState>('idle');
   const { add: addRecent } = useRecent();
 
-  // Wrap selection so every station pick also lands in "Recently played".
+  // Wrap selection so every station pick also lands in "Recently played",
+  // and reset playState so the new station doesn't inherit the previous
+  // station's terminal state (e.g. 'connecting' would render a stale splash).
   const handleSelect = useCallback((s: Station) => {
     setSelected(s);
+    setPlayState('idle');
     addRecent(s);
   }, [addRecent]);
 
