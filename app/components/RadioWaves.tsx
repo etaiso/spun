@@ -25,10 +25,13 @@ export function RadioWaves({ playing }: { playing: boolean }) {
     const startedAt = performance.now();
 
     const tick = () => {
-      const energy = getEnergy(); // 0…1
-      // Ease toward the new value so the rings breathe rather than jitter.
-      smooth += (energy - smooth) * 0.25;
-      peak = Math.max(peak, energy);
+      const raw = getEnergy(); // 0…1 (bass-weighted)
+      peak = Math.max(peak, raw);
+      // Gain + curve so normal-level energy produces visible motion.
+      const target = Math.min(1, Math.pow(raw, 0.7) * 1.7);
+      // Fast attack on beats, slower release — gives the rings a punch.
+      const rate = target > smooth ? 0.55 : 0.12;
+      smooth += (target - smooth) * rate;
       el.style.setProperty('--wave', smooth.toFixed(3));
 
       // If a few seconds in we've seen no real signal, the stream isn't
