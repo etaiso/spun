@@ -13,16 +13,27 @@ import type { PlayState } from './components/Player';
 export default function Home() {
   const [selected, setSelected] = useState<Station | null>(null);
   const [playState, setPlayState] = useState<PlayState>('idle');
+  const [everPlayed, setEverPlayed] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const { add: addRecent } = useRecent();
   const { favorites } = useFavorites();
 
+  // Track play-state from Player. Also remember whether audio has ever played
+  // for the current station — NowPlaying uses that to avoid re-showing the
+  // "Connecting…" shimmer on pause/resume buffer underruns. Set from an event
+  // callback (not an effect), so no cascading-render lint issue.
+  const handlePlayState = useCallback((s: PlayState) => {
+    setPlayState(s);
+    if (s === 'playing') setEverPlayed(true);
+  }, []);
+
   // Wrap selection so every station pick also lands in "Recently played",
-  // and reset playState so the new station doesn't inherit the previous
-  // station's terminal state (e.g. 'connecting' would render a stale splash).
+  // and reset transient state so the new station doesn't inherit the previous
+  // one's (e.g. 'connecting' would render a stale splash).
   const handleSelect = useCallback((s: Station) => {
     setSelected(s);
     setPlayState('idle');
+    setEverPlayed(false);
     addRecent(s);
   }, [addRecent]);
 
@@ -67,8 +78,8 @@ export default function Home() {
             // the station changes. Short `<>` can't carry a key, and putting the
             // same key on both children produces React's duplicate-key error.
             <Fragment key={selected.id}>
-              <NowPlaying station={selected} playState={playState} />
-              <Player station={selected} onPlayStateChange={setPlayState} />
+              <NowPlaying station={selected} playState={playState} everPlayed={everPlayed} />
+              <Player station={selected} onPlayStateChange={handlePlayState} />
             </Fragment>
           ) : (
             <div className="flex-1 flex items-center justify-center text-center">

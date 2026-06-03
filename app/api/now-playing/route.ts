@@ -73,9 +73,16 @@ export async function GET(req: NextRequest) {
 
       try {
         for await (const event of parseIcy(upstream.body!, metaInt)) {
-          // Drop empty titles at the source — they're common between tracks
-          // and the client shouldn't have to repeat the filter.
-          if (event.title === '') continue;
+          // An empty StreamTitle means the station has a metadata channel but
+          // isn't naming a song right now (some stations, e.g. Galgalatz, send
+          // empty titles permanently). Forward it as a distinct 'no-song'
+          // signal so the client can stop "listening…" instead of spinning
+          // forever — but keep the connection open in case a real title
+          // arrives later.
+          if (event.title === '') {
+            controller.enqueue(encoder.encode(sseLine({ type: 'no-song' })));
+            continue;
+          }
           controller.enqueue(encoder.encode(sseLine({ type: 'track', title: event.title })));
         }
       } catch (e) {

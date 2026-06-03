@@ -6,7 +6,7 @@ import { isNonTrack } from '@/app/lib/nonTrack';
 import { StationCover } from './StationCover';
 import type { PlayState } from './Player';
 
-type MetaState = 'waiting' | 'playing' | 'no-metadata';
+type MetaState = 'waiting' | 'playing' | 'no-metadata' | 'no-song';
 
 type HistoryEntry = { time: string; title: string };
 
@@ -37,9 +37,13 @@ function splitArtistTitle(raw: string): { artist: string; title: string } {
 type Props = {
   station: Station;
   playState: PlayState;
+  // True once audio has actually played for this station (tracked in the
+  // parent from the play-state callback). Used to suppress the big
+  // "Connecting…" shimmer on later buffer underruns, which flickered.
+  everPlayed: boolean;
 };
 
-export function NowPlaying({ station, playState }: Props) {
+export function NowPlaying({ station, playState, everPlayed }: Props) {
   const [metaState, setMetaState] = useState<MetaState>('waiting');
   const [currentRaw, setCurrentRaw] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
@@ -65,12 +69,20 @@ export function NowPlaying({ station, playState }: Props) {
         const msg = JSON.parse(ev.data) as
           | { type: 'track'; title: string }
           | { type: 'no-metadata' }
+          | { type: 'no-song' }
           | { type: 'error'; message: string };
 
         if (msg.type === 'no-metadata') {
           setMetaState('no-metadata');
           setLastUpdate(nowHHMM());
           setRefreshing(false);
+        } else if (msg.type === 'no-song') {
+          // Station has a metadata channel but isn't naming a song. Only show
+          // the "no song info" state if we haven't already shown a real track
+          // (keep the last known song on screen if one was playing).
+          setLastUpdate(nowHHMM());
+          setRefreshing(false);
+          if (prevTitleRef.current === null) setMetaState('no-song');
         } else if (msg.type === 'track') {
           setMetaState('playing');
           setLastUpdate(nowHHMM());
@@ -121,10 +133,10 @@ export function NowPlaying({ station, playState }: Props) {
     );
   }
 
-  // ② Audio still connecting — but only show the full splash on initial
-  // connect. Once we've seen a track or have history, a mid-stream buffer
-  // underrun (which also fires 'connecting') shouldn't wipe the view.
-  if (playState === 'connecting' && currentRaw === null && history.length === 0) {
+  // ② Audio still connecting — but only on the FIRST connect. Once audio has
+  // ever played, a buffer underrun (pause/resume also fires 'connecting')
+  // must not re-show the shimmer splash — that swap caused a visible flicker.
+  if (playState === 'connecting' && !everPlayed && currentRaw === null && history.length === 0) {
     return (
       <div className="flex flex-col gap-5">
         <div className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-warm)]">
@@ -160,6 +172,23 @@ export function NowPlaying({ station, playState }: Props) {
         art={<div className="w-[200px] h-[200px] rounded-2xl bg-[var(--color-line)] flex items-center justify-center text-5xl text-[var(--color-ink-4)]">♪</div>}
         title="This station doesn't share song info"
         subtitle="Audio keeps playing — you just won't see track names."
+        history={history}
+      />
+    );
+  }
+
+  // Station has a metadata channel but is sending an empty song title — it
+  // simply isn't naming tracks right now (Galgalatz does this permanently).
+  // Tell the user instead of spinning forever; SSE stays open so a real
+  // title still updates live.
+  if (metaState === 'no-song') {
+    return (
+      <NowPlayingFrame
+        stationName={station.name}
+        headerExtras={headerExtras}
+        art={<StationCover name={station.name} favicon={station.favicon} size={200} />}
+        title="No song info right now"
+        subtitle="This station isn't sharing track names at the moment."
         history={history}
       />
     );
