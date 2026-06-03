@@ -17,12 +17,12 @@ export function Sidebar({ selected, onSelect, nowPlaying }: Props) {
   return (
     <aside className="bg-[var(--color-bg-2)] border-r border-[var(--color-line)] p-7 w-[360px] shrink-0 overflow-y-auto">
       {selected && <NowPlayingCard station={selected} nowPlaying={nowPlaying} />}
-      <FavoritesList selectedId={selectedId} onSelect={onSelect} />
+      <FavoritesList onSelect={onSelect} />
       <div className="mt-6">
         <RecentlyPlayed selectedId={selectedId} onSelect={onSelect} />
       </div>
       <div className="mt-6">
-        <Recommended selectedId={selectedId} onSelect={onSelect} />
+        <Recommended onSelect={onSelect} />
       </div>
     </aside>
   );

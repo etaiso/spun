@@ -8,7 +8,6 @@ import { StationRow } from './StationRow';
 import { CollapsibleSection } from './CollapsibleSection';
 
 type Props = {
-  selectedId: string | null;
   onSelect: (s: Station) => void;
 };
 
@@ -24,7 +23,7 @@ function SkeletonRow() {
   );
 }
 
-export function Recommended({ selectedId, onSelect }: Props) {
+export function Recommended({ onSelect }: Props) {
   const [stations, setStations] = useState<Station[] | null>(null);
   const [errored, setErrored] = useState(false);
   const { isFavorite, toggle } = useFavorites();
@@ -64,7 +63,7 @@ export function Recommended({ selectedId, onSelect }: Props) {
         <StationRow
           key={s.id}
           station={s}
-          isActive={s.id === selectedId}
+          isActive={false}
           isFavorite={isFavorite(s.id)}
           onSelect={() => onSelect(s)}
           onToggleFavorite={() => toggle(s)}
