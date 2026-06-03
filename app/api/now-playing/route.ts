@@ -18,7 +18,9 @@ function sseLine(obj: unknown): string {
   return `data: ${JSON.stringify(obj)}\n\n`;
 }
 
-async function fingerprint(streamUrl: string): Promise<string | null> {
+type Recognized = { raw: string; cover: string | null };
+
+async function fingerprint(streamUrl: string): Promise<Recognized | null> {
   try {
     const res = await fetch(`${RECOGNIZER_URL}/recognize`, {
       method: 'POST',
@@ -28,8 +30,8 @@ async function fingerprint(streamUrl: string): Promise<string | null> {
       signal: AbortSignal.timeout(25_000),
     });
     if (!res.ok) return null;
-    const data = (await res.json()) as { match?: boolean; raw?: string };
-    return data?.match && data?.raw ? data.raw : null;
+    const data = (await res.json()) as { match?: boolean; raw?: string; cover?: string };
+    return data?.match && data?.raw ? { raw: data.raw, cover: data.cover || null } : null;
   } catch {
     // Sidecar down / timeout — graceful no-op.
     return null;
@@ -97,13 +99,13 @@ export async function GET(req: NextRequest) {
         if (closed || haveMetaTitle || fpInFlight) return;
         fpInFlight = true;
         send({ type: 'recognizing' });
-        const title = await fingerprint(streamUrlStr);
+        const match = await fingerprint(streamUrlStr);
         fpInFlight = false;
         if (closed || haveMetaTitle) return;
-        if (title) {
-          if (title !== lastTitle) {
-            lastTitle = title;
-            send({ type: 'track', title, source: 'shazam' });
+        if (match) {
+          if (match.raw !== lastTitle) {
+            lastTitle = match.raw;
+            send({ type: 'track', title: match.raw, source: 'shazam', cover: match.cover ?? undefined });
           }
         } else {
           // Couldn't identify — report the honest "no song" state. Distinguish

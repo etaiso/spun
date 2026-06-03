@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchRadioBrowser } from '@/app/lib/radioBrowser';
 import { normalizeStation } from '@/app/lib/stations';
+import { dedupeStations } from '@/app/lib/dedupe';
 
 type CacheEntry = { at: number; data: unknown };
 const cache = new Map<string, CacheEntry>();
@@ -50,10 +51,9 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const stations = merged
-    .map(normalizeStation)
-    .filter(s => s.streamUrl && s.name)
-    .slice(0, 15);
+  const stations = dedupeStations(
+    merged.map(normalizeStation).filter(s => s.streamUrl && s.name),
+  ).slice(0, 15);
 
   cache.set(region, { at: Date.now(), data: stations });
   return NextResponse.json(stations);

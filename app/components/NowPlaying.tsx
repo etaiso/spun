@@ -6,12 +6,11 @@ import { isNonTrack } from '@/app/lib/nonTrack';
 import { useFavorites } from '@/app/lib/favorites';
 import { StationCover } from './StationCover';
 import { RadioWaves } from './RadioWaves';
+import { loadSession, saveSession } from '@/app/lib/session';
+import type { TrackSource, HistoryEntry } from '@/app/lib/nowPlayingTypes';
 import type { PlayState } from './Player';
 
 type MetaState = 'waiting' | 'playing' | 'no-metadata' | 'no-song' | 'recognizing';
-type TrackSource = 'metadata' | 'shazam';
-
-type HistoryEntry = { time: string; title: string };
 
 function nowHHMM() {
   const d = new Date();
@@ -51,22 +50,79 @@ type Props = {
 
 export function NowPlaying({ station, playState, everPlayed, onTrack }: Props) {
   const { isFavorite, toggle: toggleFavorite } = useFavorites();
-  const [metaState, setMetaState] = useState<MetaState>('waiting');
-  const [currentRaw, setCurrentRaw] = useState<string | null>(null);
-  const [currentSource, setCurrentSource] = useState<TrackSource>('metadata');
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
-  const [lastUpdate, setLastUpdate] = useState<string | null>(null);
+
+  // Restore a recent session for this station (current track + history) so a
+  // reload picks up where it left off — unless it's gone stale (>5 min), in
+  // which case we start fresh. Parent remounts per station id, so this runs
+  // once with the right station.
+  const [restored] = useState(() => loadSession(station.id));
+
+  const [metaState, setMetaState] = useState<MetaState>(restored?.current ? 'playing' : 'waiting');
+  const [currentRaw, setCurrentRaw] = useState<string | null>(restored?.current?.raw ?? null);
+  const [currentSource, setCurrentSource] = useState<TrackSource>(restored?.current?.source ?? 'metadata');
+  // Cover art for the current track (Shazam, or an iTunes lookup fallback).
+  const [currentCover, setCurrentCover] = useState<string | null>(restored?.current?.cover ?? null);
+  const [history, setHistory] = useState<HistoryEntry[]>(restored?.history ?? []);
+  const [lastUpdate, setLastUpdate] = useState<string | null>(restored?.lastUpdate ?? null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
 
   // Track previous title via a ref so we can avoid the React anti-pattern of
   // calling setHistory from inside a setCurrentRaw updater (which double-fires
-  // in StrictMode).
-  const prevTitleRef = useRef<string | null>(null);
+  // in StrictMode). Seed from the restored session so a re-broadcast of the
+  // same title doesn't duplicate it into history.
+  const prevTitleRef = useRef<string | null>(restored?.current?.raw ?? null);
 
   // Keep the onTrack callback in a ref so the SSE effect doesn't depend on it.
   const onTrackRef = useRef(onTrack);
   useEffect(() => { onTrackRef.current = onTrack; });
+
+  // Persist the session (current track + history) so a reload within 5 minutes
+  // can restore it. Re-stamps the freshness on every change.
+  useEffect(() => {
+    saveSession(station.id, {
+      current: currentRaw ? { raw: currentRaw, source: currentSource, cover: currentCover } : null,
+      history,
+      lastUpdate,
+    });
+  }, [station.id, currentRaw, currentSource, currentCover, history, lastUpdate]);
+
+  // Look up album art for the current track when we don't already have a cover
+  // from Shazam — broadcast metadata only gives a text title, so most songs
+  // would otherwise show no artwork. iTunes Search is free, keyless and
+  // CORS-enabled. We tag the result with the track it's for and only display it
+  // when it still matches, so stale art never flashes on the next song (and
+  // setState stays out of the effect body, avoiding cascading renders).
+  const [lookedUp, setLookedUp] = useState<{ key: string; url: string } | null>(null);
+  useEffect(() => {
+    if (!currentRaw || currentCover || isNonTrack(currentRaw, station.name)) return;
+    const { artist, title } = splitArtistTitle(currentRaw);
+    const term = [artist, title].filter(Boolean).join(' ').trim();
+    if (!term) return;
+
+    let cancelled = false;
+    const ctrl = new AbortController();
+    (async () => {
+      try {
+        const res = await fetch(
+          `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&media=music&entity=song&limit=1`,
+          { signal: ctrl.signal },
+        );
+        if (!res.ok) return;
+        const data = (await res.json()) as { results?: { artworkUrl100?: string }[] };
+        const art = data.results?.[0]?.artworkUrl100;
+        // Bump the default 100×100 thumbnail up to a crisp 600×600.
+        if (!cancelled && art) setLookedUp({ key: currentRaw, url: art.replace('100x100bb', '600x600bb') });
+      } catch {
+        // Network/abort — silently keep the station logo.
+      }
+    })();
+    return () => { cancelled = true; ctrl.abort(); };
+  }, [currentRaw, currentCover, station.name]);
+
+  // Effective cover: Shazam's art if present, else the looked-up art (only when
+  // it's for the song currently on screen).
+  const trackCover = currentCover ?? (lookedUp?.key === currentRaw ? lookedUp.url : null);
 
   // Parent keys this component by station.id, so a station change remounts
   // and all the useState initial values are fresh. No explicit reset needed.
@@ -80,7 +136,7 @@ export function NowPlaying({ station, playState, everPlayed, onTrack }: Props) {
     es.onmessage = (ev) => {
       try {
         const msg = JSON.parse(ev.data) as
-          | { type: 'track'; title: string; source?: TrackSource }
+          | { type: 'track'; title: string; source?: TrackSource; cover?: string }
           | { type: 'no-metadata' }
           | { type: 'no-song' }
           | { type: 'recognizing' }
@@ -104,6 +160,7 @@ export function NowPlaying({ station, playState, everPlayed, onTrack }: Props) {
           setLastUpdate(nowHHMM());
           setRefreshing(false);
           setCurrentSource(msg.source ?? 'metadata');
+          setCurrentCover(msg.cover ?? null);
           const prev = prevTitleRef.current;
           if (prev === msg.title) return;
           if (prev !== null && !isNonTrack(prev, station.name)) {
@@ -121,13 +178,28 @@ export function NowPlaying({ station, playState, everPlayed, onTrack }: Props) {
     return () => es.close();
   }, [station.id, station.streamUrl, station.name, refreshKey]);
 
+  // Seed the sidebar marquee + tab title from the restored session on mount so
+  // they reflect the cached track immediately (the SSE effect above resets to
+  // null, then delivers a live title a moment later). Mount-only per station —
+  // the component remounts on station change, so `restored` is always current.
+  useEffect(() => {
+    if (restored?.current && !isNonTrack(restored.current.raw, station.name)) {
+      onTrackRef.current?.(restored.current.raw);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function refresh() {
     setRefreshing(true);
-    // Optimistic timestamp: ICY only re-broadcasts StreamTitle when the song
-    // changes, so a refresh may not deliver a new event for minutes. Stamp
-    // "I checked now" immediately, then clear the spinner after a short
-    // window. If fresh metadata does arrive, both update naturally.
     setLastUpdate(nowHHMM());
+    // Reset the current-track tracking so the re-opened stream re-identifies
+    // from scratch and shows feedback (otherwise the server re-fingerprints but
+    // the client suppresses the "recognizing" state and ignores an identical
+    // result, so the reload looks like a no-op). History is left intact.
+    prevTitleRef.current = null;
+    setCurrentRaw(null);
+    setCurrentCover(null);
+    setMetaState('waiting');
     setRefreshKey(k => k + 1);
     setTimeout(() => setRefreshing(false), 1500);
   }
@@ -270,10 +342,12 @@ export function NowPlaying({ station, playState, everPlayed, onTrack }: Props) {
     <NowPlayingFrame
       stationName={station.name}
       headerExtras={headerExtras}
+      playing={playState === 'playing'}
       art={
         <StationCover
           name={station.name}
           favicon={station.favicon}
+          cover={trackCover ?? undefined}
           size={220}
           className="shadow-[0_16px_48px_rgba(192,57,43,0.28)]"
         />
@@ -282,8 +356,11 @@ export function NowPlaying({ station, playState, everPlayed, onTrack }: Props) {
       subtitle={artist}
       badge={
         currentSource === 'shazam' ? (
-          <span className="inline-flex items-center gap-1.5 text-[11px] tracking-[0.8px] uppercase font-bold text-[var(--color-warm)] bg-[rgba(210,105,30,0.1)] rounded-full px-2.5 py-1">
-            ✦ Identified by Shazam
+          <span className="inline-flex items-center gap-1.5 text-[11px] tracking-[0.8px] uppercase font-bold text-white bg-[#0088ff] rounded-full px-2.5 py-1 shadow-[0_2px_8px_rgba(0,136,255,0.35)]">
+            <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5" aria-hidden="true">
+              <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm3.9 7.36c-.3.41-.79.6-1.3.46-1.6-.45-3.06-.2-4.2.62-.36.26-.86.2-1.14-.15a.86.86 0 0 1 .16-1.22c1.55-1.12 3.52-1.47 5.65-.88.52.14.85.69.7 1.2a.85.85 0 0 1-.53.6Zm-.66 3.05c-.25.33-.67.48-1.06.36-1.06-.31-2-.18-2.74.36-.32.23-.77.16-1-.18a.74.74 0 0 1 .15-1.04c1.07-.78 2.45-.98 3.95-.55.42.12.66.57.5.99a.73.73 0 0 1-.04.06Zm-.86 2.86c-.2.27-.55.38-.85.27-.66-.2-1.2-.12-1.6.18-.27.2-.65.13-.84-.15a.62.62 0 0 1 .13-.87c.7-.5 1.6-.62 2.6-.32.34.1.53.46.42.8a.6.6 0 0 1-.06.31Z"/>
+            </svg>
+            Identified by Shazam
           </span>
         ) : undefined
       }
@@ -347,7 +424,7 @@ function NowPlayingFrame({
 }) {
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+      <div className="relative z-10 flex items-center justify-between gap-4 flex-wrap">
         <div className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-warm)]">
           Now playing on {stationName}
         </div>
@@ -362,15 +439,15 @@ function NowPlayingFrame({
         {/* basis-80 + flex-wrap: the text block keeps its own line beside the
             art when there's room, and drops below it (full width) when the
             panel is too narrow — no horizontal overflow from the big title. */}
-        <div className="flex-1 basis-80 min-w-0 pb-2">
+        <div className="relative z-10 flex-1 basis-80 min-w-0 pb-2">
           {badge && <div className="mb-2.5">{badge}</div>}
           <div className={`text-[clamp(28px,5vw,42px)] font-extrabold tracking-[-1.2px] leading-[1.05] break-words ${titleClassName}`}>{title}</div>
           {subtitle && <div className="text-[clamp(16px,2.5vw,22px)] text-[var(--color-ink-2)] font-medium mt-1.5 break-words">{subtitle}</div>}
         </div>
       </div>
       {history.length > 0 && (
-        <div className="mt-2">
-          <div className="text-[11px] tracking-[1.4px] uppercase font-extrabold text-[var(--color-warm)] mb-3.5">▾ Session history</div>
+        <div className="relative z-10 mt-6 bg-[var(--color-bg)] shadow-[0_-20px_36px_22px_var(--color-bg)]">
+          <div className="text-[11px] tracking-[1.4px] uppercase font-extrabold text-[var(--color-warm)] mb-3.5">▾ Playlist history</div>
           {history.map((h, i) => {
             const { artist, title } = splitArtistTitle(h.title);
             return (

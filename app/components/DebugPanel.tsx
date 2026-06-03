@@ -12,6 +12,9 @@ type Props = {
   station: Station | null;
   playState: PlayState;
   currentTrack: string | null;
+  // When false (e.g. Settings dialog closed), we skip the polling intervals
+  // so the panel doesn't cost anything while hidden.
+  active: boolean;
 };
 
 type Health = { up: boolean; url: string; ms: number } | null;
@@ -25,8 +28,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
-export function DebugPanel({ station, playState, currentTrack }: Props) {
-  const [open, setOpen] = useState(false);
+export function DebugPanel({ station, playState, currentTrack, active }: Props) {
   const [health, setHealth] = useState<Health>(null);
   const [audio, setAudio] = useState({ state: 'none', energy: 0 });
   const { region } = useRegion();
@@ -34,9 +36,9 @@ export function DebugPanel({ station, playState, currentTrack }: Props) {
   const { recent } = useRecent();
   const [detected] = useState(() => userRegion() ?? '—');
 
-  // Poll the recognizer health (only while the panel is open).
+  // Poll the recognizer health while the panel is visible.
   useEffect(() => {
-    if (!open) return;
+    if (!active) return;
     let alive = true;
     const ping = async () => {
       try {
@@ -50,35 +52,19 @@ export function DebugPanel({ station, playState, currentTrack }: Props) {
     ping();
     const id = setInterval(ping, 5000);
     return () => { alive = false; clearInterval(id); };
-  }, [open]);
+  }, [active]);
 
-  // Sample audio state/energy while open.
+  // Sample audio state/energy while visible.
   useEffect(() => {
-    if (!open) return;
+    if (!active) return;
     const id = setInterval(() => {
       setAudio({ state: getContextState(), energy: getEnergy() });
     }, 250);
     return () => clearInterval(id);
-  }, [open]);
-
-  if (!open) {
-    return (
-      <button
-        onClick={() => setOpen(true)}
-        title="Debug panel (dev only)"
-        className="fixed bottom-16 left-4 z-50 w-9 h-9 rounded-full bg-[var(--color-ink)] text-white text-base flex items-center justify-center shadow-lg cursor-pointer opacity-70 hover:opacity-100 transition-opacity"
-      >
-        🐞
-      </button>
-    );
-  }
+  }, [active]);
 
   return (
-    <div className="fixed bottom-16 left-4 z-50 w-[300px] rounded-xl bg-white/95 backdrop-blur border border-[var(--color-line)] shadow-[0_12px_40px_rgba(0,0,0,0.25)] p-3 text-[12px] font-mono leading-relaxed">
-      <div className="flex items-center justify-between mb-2">
-        <span className="font-bold tracking-wide text-[var(--color-warm)]">🐞 DEBUG</span>
-        <button onClick={() => setOpen(false)} aria-label="Close" className="cursor-pointer text-[var(--color-ink-3)] hover:text-[var(--color-ink)]">✕</button>
-      </div>
+    <div className="rounded-xl bg-[var(--color-bg)] border border-[var(--color-line)] p-3 text-[12px] font-mono leading-relaxed">
       <div className="flex flex-col gap-1">
         <Row label="Recognizer">
           {health == null ? (
