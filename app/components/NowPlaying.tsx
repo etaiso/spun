@@ -42,9 +42,12 @@ type Props = {
   // parent from the play-state callback). Used to suppress the big
   // "Connecting…" shimmer on later buffer underruns, which flickered.
   everPlayed: boolean;
+  // Reports the current real song (or null) up to the page so the sidebar can
+  // show a now-playing marquee on the active station's row.
+  onTrack?: (title: string | null) => void;
 };
 
-export function NowPlaying({ station, playState, everPlayed }: Props) {
+export function NowPlaying({ station, playState, everPlayed, onTrack }: Props) {
   const [metaState, setMetaState] = useState<MetaState>('waiting');
   const [currentRaw, setCurrentRaw] = useState<string | null>(null);
   const [currentSource, setCurrentSource] = useState<TrackSource>('metadata');
@@ -58,12 +61,17 @@ export function NowPlaying({ station, playState, everPlayed }: Props) {
   // in StrictMode).
   const prevTitleRef = useRef<string | null>(null);
 
+  // Keep the onTrack callback in a ref so the SSE effect doesn't depend on it.
+  const onTrackRef = useRef(onTrack);
+  useEffect(() => { onTrackRef.current = onTrack; });
+
   // Parent keys this component by station.id, so a station change remounts
   // and all the useState initial values are fresh. No explicit reset needed.
   // refreshKey bumps when the user clicks the manual refresh button, which
   // forces this effect to re-run (closing the old EventSource and opening a
   // fresh one — the server starts a new ICY parse).
   useEffect(() => {
+    onTrackRef.current?.(null); // reset the sidebar marquee for the new station
     const es = new EventSource(`/api/now-playing?url=${encodeURIComponent(station.streamUrl)}`);
 
     es.onmessage = (ev) => {
@@ -100,6 +108,8 @@ export function NowPlaying({ station, playState, everPlayed }: Props) {
           }
           prevTitleRef.current = msg.title;
           setCurrentRaw(msg.title);
+          // Report a real song up for the sidebar marquee (skip station IDs).
+          onTrackRef.current?.(isNonTrack(msg.title, station.name) ? null : msg.title);
         }
         // error events: ignore. EventSource auto-reconnects; do not disrupt listening.
       } catch {}

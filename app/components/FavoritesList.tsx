@@ -8,9 +8,10 @@ import { CollapsibleSection } from './CollapsibleSection';
 type Props = {
   selectedId: string | null;
   onSelect: (s: Station) => void;
+  nowPlaying: string | null;
 };
 
-export function FavoritesList({ selectedId, onSelect }: Props) {
+export function FavoritesList({ selectedId, onSelect, nowPlaying }: Props) {
   const { favorites, toggle } = useFavorites();
 
   return (
@@ -28,6 +29,7 @@ export function FavoritesList({ selectedId, onSelect }: Props) {
             isFavorite
             onSelect={() => onSelect(s)}
             onToggleFavorite={() => toggle(s)}
+            nowPlaying={s.id === selectedId ? nowPlaying : null}
           />
         ))
       )}

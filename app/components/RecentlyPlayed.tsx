@@ -9,16 +9,17 @@ import { CollapsibleSection } from './CollapsibleSection';
 type Props = {
   selectedId: string | null;
   onSelect: (s: Station) => void;
+  nowPlaying: string | null;
 };
 
-export function RecentlyPlayed({ selectedId, onSelect }: Props) {
+export function RecentlyPlayed({ selectedId, onSelect, nowPlaying }: Props) {
   const { recent } = useRecent();
   const { isFavorite, toggle } = useFavorites();
 
   if (recent.length === 0) return null;
 
   return (
-    <CollapsibleSection title="↻ Recently played" count={recent.length} defaultCollapsed>
+    <CollapsibleSection title="↻ Recently played" count={recent.length}>
       {recent.map(s => (
         <StationRow
           key={s.id}
@@ -27,6 +28,7 @@ export function RecentlyPlayed({ selectedId, onSelect }: Props) {
           isFavorite={isFavorite(s.id)}
           onSelect={() => onSelect(s)}
           onToggleFavorite={() => toggle(s)}
+          nowPlaying={s.id === selectedId ? nowPlaying : null}
         />
       ))}
     </CollapsibleSection>

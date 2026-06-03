@@ -8,17 +8,18 @@ import { Recommended } from './Recommended';
 type Props = {
   selectedId: string | null;
   onSelect: (s: Station) => void;
+  nowPlaying: string | null;
 };
 
-export function Sidebar({ selectedId, onSelect }: Props) {
+export function Sidebar({ selectedId, onSelect, nowPlaying }: Props) {
   return (
     <aside className="bg-[var(--color-bg-2)] border-r border-[var(--color-line)] p-7 w-[360px] shrink-0 overflow-y-auto">
-      <FavoritesList selectedId={selectedId} onSelect={onSelect} />
+      <FavoritesList selectedId={selectedId} onSelect={onSelect} nowPlaying={nowPlaying} />
       <div className="mt-6">
-        <RecentlyPlayed selectedId={selectedId} onSelect={onSelect} />
+        <RecentlyPlayed selectedId={selectedId} onSelect={onSelect} nowPlaying={nowPlaying} />
       </div>
       <div className="mt-6">
-        <Recommended selectedId={selectedId} onSelect={onSelect} />
+        <Recommended selectedId={selectedId} onSelect={onSelect} nowPlaying={nowPlaying} />
       </div>
     </aside>
   );

@@ -10,12 +10,14 @@ import { Player } from './components/Player';
 import { NowPlaying } from './components/NowPlaying';
 import { CommandPalette } from './components/CommandPalette';
 import { ShortcutsHelp } from './components/ShortcutsHelp';
+import { RegionPicker } from './components/RegionPicker';
 import type { PlayState } from './components/Player';
 
 export default function Home() {
   const [selected, setSelected] = useState<Station | null>(null);
   const [playState, setPlayState] = useState<PlayState>('idle');
   const [everPlayed, setEverPlayed] = useState(false);
+  const [currentTrack, setCurrentTrack] = useState<string | null>(null);
   const [showHelp, setShowHelp] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const { add: addRecent } = useRecent();
@@ -37,6 +39,7 @@ export default function Home() {
     setSelected(s);
     setPlayState('idle');
     setEverPlayed(false);
+    setCurrentTrack(null);
     addRecent(s);
   }, [addRecent]);
 
@@ -82,7 +85,7 @@ export default function Home() {
     <div className="flex flex-col h-screen">
       <TopBar onOpenSearch={() => setPaletteOpen(true)} />
       <div className="flex flex-1 min-h-0">
-        <Sidebar selectedId={selected?.id ?? null} onSelect={handleSelect} />
+        <Sidebar selectedId={selected?.id ?? null} onSelect={handleSelect} nowPlaying={currentTrack} />
         <main className="flex-1 p-10 bg-[var(--color-bg)] overflow-y-auto">
           {/* Centered, width-capped stage so the title + artwork sit in the
               middle of the panel instead of sprawling top-left. */}
@@ -92,7 +95,7 @@ export default function Home() {
               // when the station changes. Short `<>` can't carry a key, and
               // the same key on both children is a React duplicate-key error.
               <Fragment key={selected.id}>
-                <NowPlaying station={selected} playState={playState} everPlayed={everPlayed} />
+                <NowPlaying station={selected} playState={playState} everPlayed={everPlayed} onTrack={setCurrentTrack} />
                 <Player station={selected} onPlayStateChange={handlePlayState} />
               </Fragment>
             ) : (
@@ -111,6 +114,7 @@ export default function Home() {
           </div>
         </main>
       </div>
+      <RegionPicker />
       {paletteOpen && (
         <CommandPalette onClose={() => setPaletteOpen(false)} onSelect={handleSelect} />
       )}

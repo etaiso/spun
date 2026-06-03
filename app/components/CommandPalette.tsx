@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Station } from '@/app/lib/stations';
 import { useFavorites } from '@/app/lib/favorites';
 import { useRecent } from '@/app/lib/recent';
-import { userRegion } from '@/app/lib/region';
+import { useRegion } from '@/app/lib/region';
 import { rankStations } from '@/app/lib/rank';
 import { StationLogo } from './StationLogo';
 
@@ -24,8 +24,7 @@ export function CommandPalette({ onClose, onSelect }: Props) {
   const listRef = useRef<HTMLDivElement | null>(null);
   const { favorites, isFavorite, toggle } = useFavorites();
   const { recent } = useRecent();
-
-  const region = useMemo(() => userRegion(), []);
+  const { region } = useRegion();
 
   // Rank the candidate pool by region + recently-played + favorite + fuzzy
   // relevance + popularity. Recomputes when results or the user's lists change.
@@ -77,6 +76,11 @@ export function CommandPalette({ onClose, onSelect }: Props) {
     el?.scrollIntoView({ block: 'nearest' });
   }, [active]);
 
+  // With an empty query, the palette shows recently-played as a jumping-off
+  // point; once you type, it shows ranked search results.
+  const showingRecent = query.trim() === '';
+  const displayed = showingRecent ? recent : results;
+
   function choose(s: Station | undefined) {
     if (!s) return;
     onSelect(s);
@@ -86,13 +90,13 @@ export function CommandPalette({ onClose, onSelect }: Props) {
   function onKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setActive(a => Math.min(a + 1, Math.max(results.length - 1, 0)));
+      setActive(a => Math.min(a + 1, Math.max(displayed.length - 1, 0)));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setActive(a => Math.max(a - 1, 0));
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      choose(results[active]);
+      choose(displayed[active]);
     } else if (e.key === 'Escape') {
       e.preventDefault();
       onClose();
@@ -127,17 +131,22 @@ export function CommandPalette({ onClose, onSelect }: Props) {
 
         {/* Results */}
         <div ref={listRef} className="max-h-[50vh] overflow-y-auto py-2">
-          {query.trim() === '' && (
+          {showingRecent && recent.length > 0 && (
+            <div className="px-5 pt-1 pb-2 text-[11px] tracking-[1.4px] uppercase font-extrabold text-[var(--color-warm)]">
+              ↻ Recently played
+            </div>
+          )}
+          {showingRecent && recent.length === 0 && (
             <div className="px-5 py-10 text-center text-base text-[var(--color-ink-3)]">
               Type to search thousands of stations.
             </div>
           )}
-          {query.trim() !== '' && !loading && results.length === 0 && (
+          {!showingRecent && !loading && results.length === 0 && (
             <div className="px-5 py-10 text-center text-base text-[var(--color-ink-3)]">
               No stations found.
             </div>
           )}
-          {results.map((s, i) => (
+          {displayed.map((s, i) => (
             <div
               key={s.id}
               data-idx={i}
@@ -159,10 +168,9 @@ export function CommandPalette({ onClose, onSelect }: Props) {
                 onClick={(e) => { e.stopPropagation(); toggle(s); }}
                 aria-label={isFavorite(s.id) ? 'Unfavorite' : 'Favorite'}
                 className={[
-                  'shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-lg leading-none',
-                  'cursor-pointer border border-transparent transition-colors',
-                  'hover:border-[var(--color-warm)] hover:bg-[rgba(210,105,30,0.08)] hover:text-[var(--color-warm)]',
-                  isFavorite(s.id) ? 'text-[var(--color-warm)]' : 'text-[var(--color-ink-4)]',
+                  'shrink-0 w-8 h-8 flex items-center justify-center text-xl leading-none',
+                  'cursor-pointer transition-transform hover:scale-125',
+                  isFavorite(s.id) ? 'text-[var(--color-warm)]' : 'text-[var(--color-ink-4)] hover:text-[var(--color-warm)]',
                 ].join(' ')}
               >
                 {isFavorite(s.id) ? '★' : '☆'}
