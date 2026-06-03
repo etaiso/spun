@@ -6,7 +6,8 @@ import { isNonTrack } from '@/app/lib/nonTrack';
 import { StationCover } from './StationCover';
 import type { PlayState } from './Player';
 
-type MetaState = 'waiting' | 'playing' | 'no-metadata' | 'no-song';
+type MetaState = 'waiting' | 'playing' | 'no-metadata' | 'no-song' | 'recognizing';
+type TrackSource = 'metadata' | 'shazam';
 
 type HistoryEntry = { time: string; title: string };
 
@@ -46,6 +47,7 @@ type Props = {
 export function NowPlaying({ station, playState, everPlayed }: Props) {
   const [metaState, setMetaState] = useState<MetaState>('waiting');
   const [currentRaw, setCurrentRaw] = useState<string | null>(null);
+  const [currentSource, setCurrentSource] = useState<TrackSource>('metadata');
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [lastUpdate, setLastUpdate] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -67,26 +69,30 @@ export function NowPlaying({ station, playState, everPlayed }: Props) {
     es.onmessage = (ev) => {
       try {
         const msg = JSON.parse(ev.data) as
-          | { type: 'track'; title: string }
+          | { type: 'track'; title: string; source?: TrackSource }
           | { type: 'no-metadata' }
           | { type: 'no-song' }
+          | { type: 'recognizing' }
           | { type: 'error'; message: string };
 
         if (msg.type === 'no-metadata') {
-          setMetaState('no-metadata');
-          setLastUpdate(nowHHMM());
           setRefreshing(false);
+          if (prevTitleRef.current === null) setMetaState('no-metadata');
         } else if (msg.type === 'no-song') {
-          // Station has a metadata channel but isn't naming a song. Only show
-          // the "no song info" state if we haven't already shown a real track
-          // (keep the last known song on screen if one was playing).
-          setLastUpdate(nowHHMM());
+          // Station has a metadata channel but isn't naming a song, and Shazam
+          // couldn't identify it either. Only show the "no song info" state if
+          // we haven't already shown a real track.
           setRefreshing(false);
           if (prevTitleRef.current === null) setMetaState('no-song');
+        } else if (msg.type === 'recognizing') {
+          // Fingerprinting in progress (station gave no title). Don't disturb
+          // a song that's already on screen.
+          if (prevTitleRef.current === null) setMetaState('recognizing');
         } else if (msg.type === 'track') {
           setMetaState('playing');
           setLastUpdate(nowHHMM());
           setRefreshing(false);
+          setCurrentSource(msg.source ?? 'metadata');
           const prev = prevTitleRef.current;
           if (prev === msg.title) return;
           if (prev !== null && !isNonTrack(prev, station.name)) {
@@ -194,6 +200,21 @@ export function NowPlaying({ station, playState, everPlayed }: Props) {
     );
   }
 
+  // Fingerprinting in progress (broadcast metadata had no title; asking Shazam)
+  if (metaState === 'recognizing') {
+    return (
+      <NowPlayingFrame
+        stationName={station.name}
+        headerExtras={headerExtras}
+        art={<StationCover name={station.name} favicon={station.favicon} size={200} dim />}
+        title={<>Identifying song <span className="dots"><span /><span /><span /></span></>}
+        subtitle="Fingerprinting the audio with Shazam…"
+        titleClassName="text-[var(--color-ink-3)]"
+        history={history}
+      />
+    );
+  }
+
   // ③ Audio playing, no first track yet
   if (metaState === 'waiting' || currentRaw === null) {
     return (
@@ -239,6 +260,13 @@ export function NowPlaying({ station, playState, everPlayed }: Props) {
       }
       title={title}
       subtitle={artist}
+      badge={
+        currentSource === 'shazam' ? (
+          <span className="inline-flex items-center gap-1.5 text-[11px] tracking-[0.8px] uppercase font-bold text-[var(--color-warm)] bg-[rgba(210,105,30,0.1)] rounded-full px-2.5 py-1">
+            ✦ Identified by Shazam
+          </span>
+        ) : undefined
+      }
       history={history}
     />
   );
@@ -272,13 +300,14 @@ function NowPlayingHeaderControls({
 }
 
 function NowPlayingFrame({
-  stationName, headerExtras, art, title, subtitle, history, titleClassName = '',
+  stationName, headerExtras, art, title, subtitle, badge, history, titleClassName = '',
 }: {
   stationName: string;
   headerExtras?: React.ReactNode;
   art: React.ReactNode;
   title: React.ReactNode;
   subtitle?: React.ReactNode;
+  badge?: React.ReactNode;
   history: HistoryEntry[];
   titleClassName?: string;
 }) {
@@ -296,6 +325,7 @@ function NowPlayingFrame({
             art when there's room, and drops below it (full width) when the
             panel is too narrow — no horizontal overflow from the big title. */}
         <div className="flex-1 basis-80 min-w-0 pb-2">
+          {badge && <div className="mb-2.5">{badge}</div>}
           <div className={`text-[clamp(28px,5vw,42px)] font-extrabold tracking-[-1.2px] leading-[1.05] break-words ${titleClassName}`}>{title}</div>
           {subtitle && <div className="text-[clamp(16px,2.5vw,22px)] text-[var(--color-ink-2)] font-medium mt-1.5 break-words">{subtitle}</div>}
         </div>

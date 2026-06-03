@@ -1,0 +1,5 @@
+shazamio>=0.5
+fastapi>=0.110
+uvicorn>=0.29
+aiohttp>=3.9
+certifi>=2024.0
