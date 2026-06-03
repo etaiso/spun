@@ -89,6 +89,50 @@ export function Player({ station, onPlayStateChange }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Global media keyboard shortcuts for the audio it owns: Space/K play-pause,
+  // M mute, Up/Down volume. Skips when the user is typing in a field and when
+  // a modifier is held (so browser shortcuts still work).
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const a = audioRef.current;
+      switch (e.key) {
+        case ' ':
+        case 'k':
+        case 'K':
+          e.preventDefault();
+          if (!a) return;
+          if (a.paused) {
+            setPaused(false);
+            cbRef.current('connecting');
+            a.play().catch(() => cbRef.current('error'));
+          } else {
+            a.pause();
+            setPaused(true);
+          }
+          break;
+        case 'm':
+        case 'M':
+          e.preventDefault();
+          setMuted(m => !m);
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          setMuted(false);
+          setVolume(v => Math.min(1, +(v + 0.05).toFixed(2)));
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          setVolume(v => Math.max(0, +(v - 0.05).toFixed(2)));
+          break;
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   function handlePlay() { setPaused(false); cbRef.current('playing'); }
   function handlePause() { setPaused(true); }
   function handleWaiting() { cbRef.current('connecting'); }
