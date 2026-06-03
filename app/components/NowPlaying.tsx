@@ -286,7 +286,7 @@ function NowPlayingHeaderControls({
         disabled={refreshing}
         aria-label="Check for song update"
         title="Check for song update"
-        className="w-7 h-7 rounded-full border border-[var(--color-line)] flex items-center justify-center text-[13px] text-[var(--color-ink-3)] hover:text-[var(--color-ink)] hover:border-[var(--color-warm)] hover:bg-white transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+        className="w-7 h-7 rounded-full border border-[var(--color-line)] flex items-center justify-center text-[13px] text-[var(--color-ink-3)] hover:text-[var(--color-ink)] hover:border-[var(--color-warm)] hover:bg-white transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
       >
         {refreshing ? <span className="spin-warm" /> : <span aria-hidden="true">↻</span>}
       </button>

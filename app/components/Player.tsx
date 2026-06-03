@@ -169,7 +169,7 @@ export function Player({ station, onPlayStateChange }: Props) {
       />
       <button
         onClick={togglePlay}
-        className="w-14 h-14 rounded-full bg-[var(--color-ink)] text-white text-xl flex items-center justify-center shadow-[0_8px_20px_rgba(0,0,0,0.2)]"
+        className="w-14 h-14 rounded-full bg-[var(--color-ink)] text-white text-xl flex items-center justify-center shadow-[0_8px_20px_rgba(0,0,0,0.2)] cursor-pointer"
         aria-label={paused ? 'Play' : 'Pause'}
       >
         {paused ? '▶' : '⏸'}
@@ -177,7 +177,7 @@ export function Player({ station, onPlayStateChange }: Props) {
       <div className="flex items-center gap-3 max-w-[280px] text-[var(--color-ink-3)]">
         <button
           onClick={() => setMuted(m => !m)}
-          className="text-base leading-none hover:text-[var(--color-ink)] transition-colors"
+          className="text-base leading-none hover:text-[var(--color-ink)] transition-colors cursor-pointer"
           aria-label={muted ? 'Unmute' : 'Mute'}
           title={muted ? 'Unmute' : 'Mute'}
         >
@@ -190,7 +190,7 @@ export function Player({ station, onPlayStateChange }: Props) {
           step={0.01}
           value={volume}
           onChange={(e) => setVolume(parseFloat(e.target.value))}
-          className="flex-1 w-40 accent-[var(--color-warm)]"
+          className="flex-1 w-40 accent-[var(--color-warm)] cursor-pointer"
           aria-label="Volume"
         />
       </div>
@@ -200,7 +200,7 @@ export function Player({ station, onPlayStateChange }: Props) {
         aria-pressed={autoplay}
         title="Start audio automatically when you pick a station"
         className={[
-          'text-[11px] tracking-[1px] uppercase font-bold px-3 py-1.5 rounded-full border transition-colors',
+          'text-[11px] tracking-[1px] uppercase font-bold px-3 py-1.5 rounded-full border transition-colors cursor-pointer',
           autoplay
             ? 'bg-[var(--color-warm)] text-white border-[var(--color-warm)] shadow-[0_2px_6px_rgba(210,105,30,0.3)]'
             : 'text-[var(--color-ink-3)] border-[var(--color-line)] hover:border-[var(--color-warm)] hover:text-[var(--color-ink)]',
