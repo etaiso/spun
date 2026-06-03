@@ -1,29 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { fetchRadioBrowser } from '@/app/lib/radioBrowser';
 import { normalizeStation } from '@/app/lib/stations';
-
-const UA = 'TripPlannerRadioPOC/0.1 (etai87@gmail.com)'; // radio-browser requires a User-Agent
-
-const UPSTREAM_TIMEOUT_MS = 5_000;
-
-let mirrorPromise: Promise<string> | null = null;
-async function getMirror(): Promise<string> {
-  if (!mirrorPromise) {
-    mirrorPromise = (async () => {
-      const res = await fetch('https://all.api.radio-browser.info/json/servers', {
-        headers: { 'User-Agent': UA },
-        signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
-      });
-      const servers = (await res.json()) as unknown;
-      if (!Array.isArray(servers) || servers.length === 0) {
-        throw new Error('no radio-browser mirrors available');
-      }
-      // pick the first one; spec accepts this for MVP
-      return `https://${(servers[0] as { name: string }).name}`;
-    })();
-    mirrorPromise.catch(() => { mirrorPromise = null; }); // allow retry on next request
-  }
-  return mirrorPromise;
-}
 
 type CacheEntry = { at: number; data: unknown };
 const cache = new Map<string, CacheEntry>();
@@ -51,26 +28,14 @@ export async function GET(req: NextRequest) {
   const cached = getCached(q);
   if (cached) return NextResponse.json(cached);
 
-  let mirror: string;
+  let raw: unknown;
   try {
-    mirror = await getMirror();
+    raw = await fetchRadioBrowser(
+      `/json/stations/search?name=${encodeURIComponent(q)}&limit=20&hidebroken=true&order=clickcount&reverse=true`,
+    );
   } catch {
     return NextResponse.json([], { status: 502 });
   }
-
-  const url = `${mirror}/json/stations/search?name=${encodeURIComponent(q)}&limit=20&hidebroken=true&order=clickcount&reverse=true`;
-  let res: Response;
-  try {
-    res = await fetch(url, {
-      headers: { 'User-Agent': UA },
-      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
-    });
-  } catch {
-    return NextResponse.json([], { status: 502 });
-  }
-  if (!res.ok) return NextResponse.json([], { status: 502 });
-
-  const raw = (await res.json()) as unknown;
   if (!Array.isArray(raw)) return NextResponse.json([], { status: 502 });
 
   // Drop rows missing a stream URL OR a name. normalizeStation's null-name
