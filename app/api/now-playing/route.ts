@@ -16,7 +16,14 @@ function sseLine(obj: unknown): string {
   return `data: ${JSON.stringify(obj)}\n\n`;
 }
 
-type Recognized = { raw: string; cover: string | null };
+type Recognized = {
+  raw: string;
+  cover: string | null;
+  shazamUrl: string;
+  appleMusicUrl: string;
+  previewUrl: string;
+  key: string;
+};
 
 async function fingerprint(streamUrl: string, external?: AbortSignal): Promise<Recognized | null> {
   // Own controller aborted by either a timeout (capture ~6s + recognition +
@@ -37,8 +44,20 @@ async function fingerprint(streamUrl: string, external?: AbortSignal): Promise<R
       signal: ctrl.signal,
     });
     if (!res.ok) return null;
-    const data = (await res.json()) as { match?: boolean; raw?: string; cover?: string };
-    return data?.match && data?.raw ? { raw: data.raw, cover: data.cover || null } : null;
+    const data = (await res.json()) as {
+      match?: boolean; raw?: string; cover?: string;
+      shazamUrl?: string; appleMusicUrl?: string; previewUrl?: string; key?: string;
+    };
+    return data?.match && data?.raw
+      ? {
+          raw: data.raw,
+          cover: data.cover || null,
+          shazamUrl: data.shazamUrl || '',
+          appleMusicUrl: data.appleMusicUrl || '',
+          previewUrl: data.previewUrl || '',
+          key: data.key || '',
+        }
+      : null;
   } catch {
     // Sidecar down / timeout / aborted — graceful no-op.
     return null;
@@ -121,7 +140,14 @@ export async function GET(req: NextRequest) {
         if (match) {
           if (match.raw !== lastTitle) {
             lastTitle = match.raw;
-            send({ type: 'track', title: match.raw, source: 'shazam', cover: match.cover ?? undefined });
+            send({
+              type: 'track', title: match.raw, source: 'shazam',
+              cover: match.cover ?? undefined,
+              shazamUrl: match.shazamUrl || undefined,
+              appleMusicUrl: match.appleMusicUrl || undefined,
+              previewUrl: match.previewUrl || undefined,
+              key: match.key || undefined,
+            });
           }
         } else {
           // Couldn't identify — report the honest "no song" state. Distinguish
