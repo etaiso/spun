@@ -201,7 +201,7 @@ export function Player({ station, onPlayStateChange }: Props) {
   }
 
   return (
-    <div className="relative z-10 flex items-center gap-5 pt-2 flex-wrap bg-[var(--color-bg)]">
+    <div className="relative z-10 flex items-center gap-5 pt-2 flex-wrap">
       <audio
         ref={audioRef}
         // Inner key guards against streamUrl swaps within a single station

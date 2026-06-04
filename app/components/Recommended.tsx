@@ -50,7 +50,9 @@ export function Recommended({ onSelect }: Props) {
     return () => { cancelled = true; };
   }, [region]);
 
-  const shown = filterHidden(filterByRegion(stations ?? []));
+  // Drop favorites — they already have their own sidebar section, so showing
+  // them in Popular too would be a duplicate. (Updates live as you star/unstar.)
+  const shown = filterHidden(filterByRegion(stations ?? [])).filter(s => !isFavorite(s.id));
 
   return (
     <CollapsibleSection title="✦ Popular">

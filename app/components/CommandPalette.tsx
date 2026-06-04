@@ -8,6 +8,7 @@ import { useRegion, useRegionFilter } from '@/app/lib/region';
 import { useHiddenFilter } from '@/app/lib/hidden';
 import { rankStations } from '@/app/lib/rank';
 import { StationLogo } from './StationLogo';
+import { StationContextMenu } from './StationContextMenu';
 
 type Props = {
   onClose: () => void;
@@ -21,6 +22,8 @@ export function CommandPalette({ onClose, onSelect }: Props) {
   const [raw, setRaw] = useState<Station[]>([]); // candidate pool from the API
   const [loading, setLoading] = useState(false);
   const [active, setActive] = useState(0);
+  // Right-clicked result row: which station + where to anchor the menu.
+  const [ctx, setCtx] = useState<{ station: Station; x: number; y: number } | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   const { favorites, isFavorite, toggle } = useFavorites();
@@ -156,6 +159,7 @@ export function CommandPalette({ onClose, onSelect }: Props) {
               key={s.id}
               data-idx={i}
               onClick={() => choose(s)}
+              onContextMenu={(e) => { e.preventDefault(); setActive(i); setCtx({ station: s, x: e.clientX, y: e.clientY }); }}
               onMouseMove={() => setActive(i)}
               className={[
                 'flex items-center gap-3 mx-2 px-3 py-2.5 rounded-xl cursor-pointer',
@@ -191,6 +195,14 @@ export function CommandPalette({ onClose, onSelect }: Props) {
           <span className="ml-auto flex items-center gap-1.5"><kbd className="px-1.5 py-1 rounded-md border border-[var(--color-line)] bg-white font-semibold text-[12px]">esc</kbd> close</span>
         </div>
       </div>
+
+      {ctx && (
+        <StationContextMenu
+          station={ctx.station}
+          position={{ x: ctx.x, y: ctx.y }}
+          onClose={() => setCtx(null)}
+        />
+      )}
     </div>
   );
 }

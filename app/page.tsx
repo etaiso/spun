@@ -10,16 +10,21 @@ import { TopBar } from './components/TopBar';
 import { Sidebar } from './components/Sidebar';
 import { Player } from './components/Player';
 import { NowPlaying } from './components/NowPlaying';
+import { PlaylistHistory } from './components/PlaylistHistory';
 import { CommandPalette } from './components/CommandPalette';
 import { ShortcutsHelp } from './components/ShortcutsHelp';
 import { SettingsDialog } from './components/SettingsDialog';
 import type { PlayState } from './components/Player';
+import type { HistoryEntry } from './lib/nowPlayingTypes';
 
 export default function Home() {
   const [selected, setSelected] = useState<Station | null>(null);
   const [playState, setPlayState] = useState<PlayState>('idle');
   const [everPlayed, setEverPlayed] = useState(false);
   const [currentTrack, setCurrentTrack] = useState<string | null>(null);
+  // Playlist history, lifted out of NowPlaying so it renders below the player
+  // controls — the controls stay anchored near the cover as history grows.
+  const [playlistHistory, setPlaylistHistory] = useState<HistoryEntry[]>([]);
   const [showHelp, setShowHelp] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -66,6 +71,9 @@ export default function Home() {
     setPlayState('idle');
     setEverPlayed(false);
     setCurrentTrack(null);
+    // playlistHistory isn't reset here: NowPlaying reports the new station's
+    // history on mount (the restored list, or []), which keeps this in sync.
+    // Clearing it here would desync when the same station is re-selected.
     addRecent(s);
   }, [addRecent]);
 
@@ -125,8 +133,9 @@ export default function Home() {
               // when the station changes. Short `<>` can't carry a key, and
               // the same key on both children is a React duplicate-key error.
               <Fragment key={currentStation.id}>
-                <NowPlaying station={currentStation} playState={playState} everPlayed={everPlayed} onTrack={setCurrentTrack} />
+                <NowPlaying station={currentStation} playState={playState} everPlayed={everPlayed} onTrack={setCurrentTrack} onHistory={setPlaylistHistory} />
                 <Player station={currentStation} onPlayStateChange={handlePlayState} />
+                <PlaylistHistory history={playlistHistory} />
               </Fragment>
             ) : (
               <div className="flex items-center justify-center text-center">

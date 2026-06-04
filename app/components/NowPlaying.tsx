@@ -7,6 +7,7 @@ import { useFavorites } from '@/app/lib/favorites';
 import { StationCover } from './StationCover';
 import { RadioWaves } from './RadioWaves';
 import { loadSession, saveSession } from '@/app/lib/session';
+import { splitArtistTitle } from '@/app/lib/track';
 import type { TrackSource, HistoryEntry } from '@/app/lib/nowPlayingTypes';
 import type { PlayState } from './Player';
 
@@ -15,25 +16,6 @@ type MetaState = 'waiting' | 'playing' | 'no-metadata' | 'no-song' | 'recognizin
 function nowHHMM() {
   const d = new Date();
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-}
-
-function splitArtistTitle(raw: string): { artist: string; title: string } {
-  // Try separators in order of confidence: em-dash and en-dash are
-  // unambiguous; ASCII hyphen is only used if the left side has no hyphen
-  // (avoids miscategorizing titles like "Song - Live Version").
-  for (const sep of [' — ', ' – '] as const) {
-    if (raw.includes(sep)) {
-      const [artist, ...rest] = raw.split(sep);
-      return { artist: artist.trim(), title: rest.join(sep).trim() };
-    }
-  }
-  const hyphenIdx = raw.indexOf(' - ');
-  if (hyphenIdx > 0 && !raw.slice(0, hyphenIdx).includes('-')) {
-    const artist = raw.slice(0, hyphenIdx);
-    const title = raw.slice(hyphenIdx + 3);
-    return { artist: artist.trim(), title: title.trim() };
-  }
-  return { artist: '', title: raw };
 }
 
 type Props = {
@@ -46,9 +28,12 @@ type Props = {
   // Reports the current real song (or null) up to the page so the sidebar can
   // show a now-playing marquee on the active station's row.
   onTrack?: (title: string | null) => void;
+  // Reports the playlist history up to the page, which renders it below the
+  // player controls (so the controls stay put as history grows).
+  onHistory?: (history: HistoryEntry[]) => void;
 };
 
-export function NowPlaying({ station, playState, everPlayed, onTrack }: Props) {
+export function NowPlaying({ station, playState, everPlayed, onTrack, onHistory }: Props) {
   const { isFavorite, toggle: toggleFavorite } = useFavorites();
 
   // Restore a recent session for this station (current track + history) so a
@@ -76,6 +61,11 @@ export function NowPlaying({ station, playState, everPlayed, onTrack }: Props) {
   // Keep the onTrack callback in a ref so the SSE effect doesn't depend on it.
   const onTrackRef = useRef(onTrack);
   useEffect(() => { onTrackRef.current = onTrack; });
+
+  // Report the playlist history up to the page for rendering below the player.
+  const onHistoryRef = useRef(onHistory);
+  useEffect(() => { onHistoryRef.current = onHistory; });
+  useEffect(() => { onHistoryRef.current?.(history); }, [history]);
 
   // Persist the session (current track + history) so a reload within 5 minutes
   // can restore it. Re-stamps the freshness on every change.
@@ -266,7 +256,6 @@ export function NowPlaying({ station, playState, everPlayed, onTrack }: Props) {
         art={<div className="w-[200px] h-[200px] rounded-2xl bg-[var(--color-line)] flex items-center justify-center text-5xl text-[var(--color-ink-4)]">♪</div>}
         title="This station doesn't share song info"
         subtitle="Audio keeps playing — you just won't see track names."
-        history={history}
       />
     );
   }
@@ -284,7 +273,6 @@ export function NowPlaying({ station, playState, everPlayed, onTrack }: Props) {
         art={<StationCover name={station.name} favicon={station.favicon} size={200} />}
         title="No song info right now"
         subtitle="This station isn't sharing track names at the moment."
-        history={history}
       />
     );
   }
@@ -300,7 +288,6 @@ export function NowPlaying({ station, playState, everPlayed, onTrack }: Props) {
         title={<>Identifying song <span className="dots"><span /><span /><span /></span></>}
         subtitle="Fingerprinting the audio with Shazam…"
         titleClassName="text-[var(--color-ink-3)]"
-        history={history}
       />
     );
   }
@@ -316,7 +303,6 @@ export function NowPlaying({ station, playState, everPlayed, onTrack }: Props) {
         title={<>Listening for song info <span className="dots"><span /><span /><span /></span></>}
         subtitle="Most stations announce the track within ~30 seconds"
         titleClassName="text-[var(--color-ink-3)]"
-        history={history}
       />
     );
   }
@@ -331,7 +317,6 @@ export function NowPlaying({ station, playState, everPlayed, onTrack }: Props) {
         art={<StationCover name={station.name} favicon={station.favicon} size={200} />}
         title={station.name}
         subtitle="Between tracks · DJ, news, or station ID"
-        history={history}
       />
     );
   }
@@ -364,7 +349,6 @@ export function NowPlaying({ station, playState, everPlayed, onTrack }: Props) {
           </span>
         ) : undefined
       }
-      history={history}
     />
   );
 }
@@ -410,7 +394,7 @@ function NowPlayingHeaderControls({
 }
 
 function NowPlayingFrame({
-  stationName, headerExtras, art, title, subtitle, badge, history, titleClassName = '', playing = false,
+  stationName, headerExtras, art, title, subtitle, badge, titleClassName = '', playing = false,
 }: {
   stationName: string;
   headerExtras?: React.ReactNode;
@@ -418,7 +402,6 @@ function NowPlayingFrame({
   title: React.ReactNode;
   subtitle?: React.ReactNode;
   badge?: React.ReactNode;
-  history: HistoryEntry[];
   titleClassName?: string;
   playing?: boolean;
 }) {
@@ -445,22 +428,6 @@ function NowPlayingFrame({
           {subtitle && <div className="text-[clamp(16px,2.5vw,22px)] text-[var(--color-ink-2)] font-medium mt-1.5 break-words">{subtitle}</div>}
         </div>
       </div>
-      {history.length > 0 && (
-        <div className="relative z-10 mt-6 bg-[var(--color-bg)] shadow-[0_-20px_36px_22px_var(--color-bg)]">
-          <div className="text-[11px] tracking-[1.4px] uppercase font-extrabold text-[var(--color-warm)] mb-3.5">▾ Playlist history</div>
-          {history.map((h, i) => {
-            const { artist, title } = splitArtistTitle(h.title);
-            return (
-              <div key={i} className="grid grid-cols-[64px_1fr] gap-4 py-3 border-b border-[var(--color-line)] items-baseline last:border-none">
-                <div className="text-[13px] text-[var(--color-ink-4)] font-semibold tracking-[0.5px] tabular-nums">{h.time}</div>
-                <div className="text-base text-[var(--color-ink-2)]">
-                  {artist ? <><b className="text-[var(--color-ink)] font-bold">{artist}</b> — {title}</> : title}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 }
