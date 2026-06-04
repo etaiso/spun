@@ -88,6 +88,13 @@ Opened from a **new top-bar button** (music-note/♥ icon, beside the settings
 control). New component `app/components/SavedSongsDialog.tsx` (same modal shell /
 Esc-to-close as `SettingsDialog`).
 
+**Visual direction (chosen): the Settings-style white modal with a vertical
+list** — i.e. the same dimmed-backdrop + white `rounded-2xl` modal as
+`SettingsDialog`/`HiddenStationsSettings`, a `★ Saved songs` warm uppercase
+header, a rounded-full search input (like the region picker), then calm,
+scannable rows separated by hairlines. Not the glass/command-palette look and
+not a cover grid — keep it consistent with the existing dialogs.
+
 Each row (newest first): cover, **artist — title**, "heard on {station} ·
 {HH:MM}", a **▶ preview** (only when `previewUrl`), **Shazam** + **Apple Music**
 links (Apple hidden when `appleMusicUrl === ''`), and a ✕ to remove. Empty state:
