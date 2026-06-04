@@ -12,7 +12,9 @@ talks to this over plain HTTP on localhost.
 Run:  ./recognizer/run.sh   (creates a venv, installs deps, starts uvicorn)
 API:  POST /recognize  { "url": "<stream url>", "seconds": 6 }
       -> 200 { "match": true, "artist": "...", "title": "...",
-               "raw": "Artist - Title", "cover": "<art url|>" }
+               "raw": "Artist - Title", "cover": "<art url|>",
+               "shazamUrl": "<shazam track url|>", "appleMusicUrl": "<apple music url|>",
+               "previewUrl": "<~30s .m4a clip|>", "key": "<shazam track id|>" }
       -> 200 { "match": false }            (no song identified)
       -> 503 { "error": "..." }            (capture/recognition failed)
 """
