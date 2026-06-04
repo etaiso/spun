@@ -90,7 +90,7 @@ export function NowPlaying({ station, playState, everPlayed, onTrack, onHistory 
   // CORS-enabled. We tag the result with the track it's for and only display it
   // when it still matches, so stale art never flashes on the next song (and
   // setState stays out of the effect body, avoiding cascading renders).
-  const [lookedUp, setLookedUp] = useState<{ key: string; url: string; appleUrl: string } | null>(null);
+  const [lookedUp, setLookedUp] = useState<{ key: string; url: string; appleUrl: string; previewUrl: string } | null>(null);
   useEffect(() => {
     if (!currentRaw || currentCover || isNonTrack(currentRaw, station.name)) return;
     const { artist, title } = splitArtistTitle(currentRaw);
@@ -106,15 +106,17 @@ export function NowPlaying({ station, playState, everPlayed, onTrack, onHistory 
           { signal: ctrl.signal },
         );
         if (!res.ok) return;
-        const data = (await res.json()) as { results?: { artworkUrl100?: string; trackViewUrl?: string }[] };
+        const data = (await res.json()) as { results?: { artworkUrl100?: string; trackViewUrl?: string; previewUrl?: string }[] };
         const r = data.results?.[0];
-        // Capture cover (bumped 100→600) AND the direct Apple Music URL, so a
-        // metadata-only track gets a real link instead of a search fallback.
-        if (!cancelled && r && (r.artworkUrl100 || r.trackViewUrl)) {
+        // Capture cover (bumped 100→600), the direct Apple Music URL, AND the
+        // ~30s preview clip — so a metadata-only track (no Shazam fingerprint)
+        // still gets art, a real link, and a playable preview when saved.
+        if (!cancelled && r && (r.artworkUrl100 || r.trackViewUrl || r.previewUrl)) {
           setLookedUp({
             key: currentRaw,
             url: r.artworkUrl100 ? r.artworkUrl100.replace('100x100bb', '600x600bb') : '',
             appleUrl: r.trackViewUrl ?? '',
+            previewUrl: r.previewUrl ?? '',
           });
         }
       } catch {
@@ -377,7 +379,7 @@ export function NowPlaying({ station, playState, everPlayed, onTrack, onHistory 
                 raw: currentRaw ?? '', artist, title, cover: trackCover ?? undefined,
                 shazamUrl: links.shazamUrl || undefined,
                 appleMusicUrl: (links.appleMusicUrl || matchedLookup?.appleUrl) || undefined,
-                previewUrl: links.previewUrl || undefined, key: links.key || undefined,
+                previewUrl: (links.previewUrl || matchedLookup?.previewUrl) || undefined, key: links.key || undefined,
                 stationName: station.name,
               });
             }}
