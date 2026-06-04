@@ -8,6 +8,7 @@ import { StationCover } from './StationCover';
 import { RadioWaves } from './RadioWaves';
 import { loadSession, saveSession } from '@/app/lib/session';
 import { splitArtistTitle } from '@/app/lib/track';
+import { lookupITunesSong } from '@/app/lib/itunes';
 import type { TrackSource, HistoryEntry } from '@/app/lib/nowPlayingTypes';
 import type { PlayState } from './Player';
 import { useSavedSongs } from '@/app/lib/savedSongs';
@@ -100,27 +101,12 @@ export function NowPlaying({ station, playState, everPlayed, onTrack, onHistory 
     let cancelled = false;
     const ctrl = new AbortController();
     (async () => {
-      try {
-        const res = await fetch(
-          `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&media=music&entity=song&limit=1`,
-          { signal: ctrl.signal },
-        );
-        if (!res.ok) return;
-        const data = (await res.json()) as { results?: { artworkUrl100?: string; trackViewUrl?: string; previewUrl?: string }[] };
-        const r = data.results?.[0];
-        // Capture cover (bumped 100→600), the direct Apple Music URL, AND the
-        // ~30s preview clip — so a metadata-only track (no Shazam fingerprint)
-        // still gets art, a real link, and a playable preview when saved.
-        if (!cancelled && r && (r.artworkUrl100 || r.trackViewUrl || r.previewUrl)) {
-          setLookedUp({
-            key: currentRaw,
-            url: r.artworkUrl100 ? r.artworkUrl100.replace('100x100bb', '600x600bb') : '',
-            appleUrl: r.trackViewUrl ?? '',
-            previewUrl: r.previewUrl ?? '',
-          });
-        }
-      } catch {
-        // Network/abort — silently keep the station logo.
+      // Cover (bumped 100→600), direct Apple Music URL, AND the ~30s preview
+      // clip — so a metadata-only track (no Shazam fingerprint) still gets art,
+      // a real link, and a playable preview when saved.
+      const m = await lookupITunesSong(term, ctrl.signal);
+      if (!cancelled && m && (m.cover || m.appleUrl || m.previewUrl)) {
+        setLookedUp({ key: currentRaw, url: m.cover, appleUrl: m.appleUrl, previewUrl: m.previewUrl });
       }
     })();
     return () => { cancelled = true; ctrl.abort(); };

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSavedSongs, searchSavedSongs } from '@/app/lib/savedSongs';
 import { pauseRadio } from '@/app/lib/playbackBus';
 import { readStoredVolume } from '@/app/lib/volume';
+import { lookupITunesSong } from '@/app/lib/itunes';
 import { StationLogo } from './StationLogo';
 
 type Props = { open: boolean; onOpenChange: (open: boolean) => void };
@@ -14,13 +15,37 @@ function hhmm(ts: number): string {
 }
 
 export function SavedSongsDialog({ open, onOpenChange }: Props) {
-  const { saved, remove } = useSavedSongs();
+  const { saved, remove, update } = useSavedSongs();
   const [query, setQuery] = useState('');
   const [previewId, setPreviewId] = useState<string | null>(null);
   // The preview <audio> stays mounted regardless of `open` so this ref is always
   // valid — letting us explicitly stop the preview when the dialog closes
   // (rather than relying on the element being unmounted).
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  // Ids we've already tried to backfill a preview for this session (incl. ones
+  // iTunes had no match for) so we don't re-query them on every open.
+  const previewTried = useRef<Set<string>>(new Set());
+
+  // Backfill missing previews from iTunes when the dialog opens. Songs saved
+  // before previews were captured (or metadata tracks) have no previewUrl; the
+  // same iTunes lookup that yielded their Apple Music link also has a ~30s
+  // clip, so fetch it and persist so the ▶ appears (and sticks next time).
+  useEffect(() => {
+    if (!open) return;
+    const ctrl = new AbortController();
+    for (const s of saved) {
+      if (s.previewUrl || previewTried.current.has(s.id)) continue;
+      previewTried.current.add(s.id);
+      const term = ([s.artist, s.title].filter(Boolean).join(' ').trim()) || s.raw;
+      lookupITunesSong(term, ctrl.signal).then(m => {
+        if (!ctrl.signal.aborted && m?.previewUrl) update(s.id, { previewUrl: m.previewUrl });
+      });
+    }
+    return () => ctrl.abort();
+    // Run per open; `saved`/`update` are read fresh but excluded so persisting
+    // a found preview (which changes `saved`) doesn't restart the sweep.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;

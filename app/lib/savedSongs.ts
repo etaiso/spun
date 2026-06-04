@@ -60,6 +60,17 @@ export function removeSong(list: SavedSong[], id: string): SavedSong[] {
   return list.filter(s => s.id !== id);
 }
 
+/** Patch a saved song in place (preserves order; no-op if id not found). */
+export function updateSong(list: SavedSong[], id: string, patch: Partial<SavedSong>): SavedSong[] {
+  let changed = false;
+  const next = list.map(s => {
+    if (s.id !== id) return s;
+    changed = true;
+    return { ...s, ...patch };
+  });
+  return changed ? next : list;
+}
+
 /** Fuzzy filter by "Artist - Title". Empty query → original list unchanged. */
 export function searchSavedSongs(list: SavedSong[], query: string): SavedSong[] {
   const q = query.trim();
@@ -112,5 +123,8 @@ export function useSavedSongs() {
     write(addSong(read(), buildSavedSong({ ...input, savedAt: Date.now() })));
   }, []);
   const remove = useCallback((id: string) => { write(removeSong(read(), id)); }, []);
-  return { saved, isSaved, save, remove };
+  const update = useCallback((id: string, patch: Partial<SavedSong>) => {
+    write(updateSong(read(), id, patch));
+  }, []);
+  return { saved, isSaved, save, remove, update };
 }
