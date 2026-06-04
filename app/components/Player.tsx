@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Station } from '@/app/lib/stations';
 import { resumeAudio, connectIfRunning, disconnectElement } from '@/app/lib/audioBus';
 import { subscribePauseRadio } from '@/app/lib/playbackBus';
+import { VOLUME_KEY, readStoredVolume } from '@/app/lib/volume';
 
 export type PlayState = 'idle' | 'connecting' | 'playing' | 'error';
 
@@ -12,22 +13,8 @@ type Props = {
   onPlayStateChange: (s: PlayState) => void;
 };
 
-const VOLUME_KEY = 'radio:volume';
-const DEFAULT_VOLUME = 0.65;
 const AUTOPLAY_KEY = 'radio:autoplay';
 const DEFAULT_AUTOPLAY = false;
-
-function readStoredVolume(): number {
-  if (typeof window === 'undefined') return DEFAULT_VOLUME;
-  try {
-    const raw = window.localStorage.getItem(VOLUME_KEY);
-    if (raw === null) return DEFAULT_VOLUME;
-    const v = parseFloat(raw);
-    return Number.isFinite(v) && v >= 0 && v <= 1 ? v : DEFAULT_VOLUME;
-  } catch {
-    return DEFAULT_VOLUME;
-  }
-}
 
 function readStoredAutoplay(): boolean {
   if (typeof window === 'undefined') return DEFAULT_AUTOPLAY;

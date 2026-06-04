@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSavedSongs, searchSavedSongs } from '@/app/lib/savedSongs';
 import { pauseRadio } from '@/app/lib/playbackBus';
+import { readStoredVolume } from '@/app/lib/volume';
 import { StationLogo } from './StationLogo';
 
 type Props = { open: boolean; onOpenChange: (open: boolean) => void };
@@ -43,6 +44,7 @@ export function SavedSongsDialog({ open, onOpenChange }: Props) {
     if (!a) return;
     if (previewId === id) { a.pause(); setPreviewId(null); return; }
     pauseRadio();           // never overlap the live stream
+    a.volume = readStoredVolume(); // match the player's volume setting
     a.src = url;
     a.play().catch(() => {});
     setPreviewId(id);
