@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useSyncExternalStore } from 'react';
+import { persistSet } from './persist';
 
 /**
  * Best-guess ISO 3166 alpha-2 region for the current user, derived from their
@@ -54,7 +55,7 @@ export function useRegion(): { region: string; setRegion: (r: string) => void } 
   const region = useSyncExternalStore(subscribe, read, () => '');
   const setRegion = useCallback((r: string) => {
     cache = r;
-    try { window.localStorage.setItem(KEY, r); } catch { /* ignore */ }
+    persistSet(KEY, r);
     for (const cb of listeners) cb();
   }, []);
   return { region, setRegion };
@@ -151,7 +152,7 @@ export function useRegionLock(): { locked: boolean; setLocked: (v: boolean) => v
   const locked = useSyncExternalStore(subscribeLock, readLock, () => false);
   const setLocked = useCallback((v: boolean) => {
     lockCache = v;
-    try { window.localStorage.setItem(LOCK_KEY, v ? '1' : '0'); } catch { /* ignore */ }
+    persistSet(LOCK_KEY, v ? '1' : '0');
     for (const cb of lockListeners) cb();
   }, []);
   return { locked, setLocked };

@@ -7,6 +7,7 @@ import { RegionPicker } from './RegionPicker';
 import { HiddenStationsSettings } from './HiddenStationsSettings';
 import { DebugPanel } from './DebugPanel';
 import { useRingsEnabled } from '@/app/lib/visualizer';
+import { persistSet } from '@/app/lib/persist';
 
 type Props = {
   open: boolean;
@@ -45,7 +46,7 @@ export function SettingsDialog({ open, onOpenChange, station, playState, current
   const toggleDebug = () => {
     setShowDebug(v => {
       const next = !v;
-      try { window.localStorage.setItem(DEBUG_KEY, next ? '1' : '0'); } catch { /* ignore */ }
+      persistSet(DEBUG_KEY, next ? '1' : '0');
       return next;
     });
   };

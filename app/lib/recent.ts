@@ -2,6 +2,7 @@
 
 import { useCallback, useSyncExternalStore } from 'react';
 import type { Station } from './stations';
+import { persistSet } from './persist';
 
 const KEY = 'radio:recent';
 const MAX_RECENT = 5;
@@ -46,11 +47,7 @@ function subscribe(cb: () => void): () => void {
 
 function write(next: Station[]) {
   snapshot = next;
-  try {
-    window.localStorage.setItem(KEY, JSON.stringify(next));
-  } catch {
-    // best-effort persistence; in-memory snapshot still correct
-  }
+  persistSet(KEY, JSON.stringify(next));
   emit();
 }
 

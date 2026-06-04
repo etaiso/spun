@@ -2,6 +2,7 @@
 
 import { useCallback, useSyncExternalStore } from 'react';
 import type { Station } from './stations';
+import { persistSet } from './persist';
 
 // Hidden stations: ones the user has chosen to banish from every list (search,
 // favorites, popular, recent). We keep the full Station objects (not just ids)
@@ -41,7 +42,7 @@ function subscribe(cb: () => void): () => void {
 
 function write(next: Station[]) {
   snapshot = next;
-  try { window.localStorage.setItem(KEY, JSON.stringify(next)); } catch { /* best-effort */ }
+  persistSet(KEY, JSON.stringify(next));
   emit();
 }
 

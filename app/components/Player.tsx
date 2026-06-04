@@ -5,6 +5,7 @@ import type { Station } from '@/app/lib/stations';
 import { resumeAudio, connectIfRunning, disconnectElement } from '@/app/lib/audioBus';
 import { subscribePauseRadio } from '@/app/lib/playbackBus';
 import { VOLUME_KEY, readStoredVolume } from '@/app/lib/volume';
+import { persistSet } from '@/app/lib/persist';
 
 export type PlayState = 'idle' | 'connecting' | 'playing' | 'error';
 
@@ -40,19 +41,11 @@ export function Player({ station, onPlayStateChange }: Props) {
   const [paused, setPaused] = useState<boolean>(!autoplay);
 
   useEffect(() => {
-    try {
-      window.localStorage.setItem(VOLUME_KEY, String(volume));
-    } catch {
-      // Safari private mode / quota — best-effort persistence.
-    }
+    persistSet(VOLUME_KEY, String(volume));
   }, [volume]);
 
   useEffect(() => {
-    try {
-      window.localStorage.setItem(AUTOPLAY_KEY, String(autoplay));
-    } catch {
-      // best-effort
-    }
+    persistSet(AUTOPLAY_KEY, String(autoplay));
   }, [autoplay]);
 
   // Stash the callback in a ref so the on-mount effect can call it without
