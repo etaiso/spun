@@ -25,6 +25,9 @@ falls back to **fingerprinting the live audio with Shazam** to identify it.
   player that pulse to the live audio (Web Audio analyser), with a gentle
   timed fallback when a stream can't be analysed.
 - ✦ **Shazam fallback** for stations that broadcast no song title.
+- 💾 **Saved songs** — save any recognized track to a personal, persisted
+  playlist (top-bar button). Each entry links to Shazam and Apple Music, plays a
+  ~30s preview (pausing the radio), and is fuzzy-searchable.
 - ⚙️ **Settings** (gear in the top bar): **localization**, **region-only mode**
   (filter every list to a single country), and **hidden stations**.
 - 🙈 **Hide stations** — right-click any station in the sidebar to banish it
