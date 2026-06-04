@@ -815,7 +815,7 @@ git commit -m "feat(lib): useFavorites hook over localStorage"
 import { NextRequest, NextResponse } from 'next/server';
 import { normalizeStation } from '@/app/lib/stations';
 
-const UA = 'TripPlannerRadioPOC/0.1 (etai87@gmail.com)'; // radio-browser requires a User-Agent
+const UA = 'TripPlannerRadioPOC/0.1'; // radio-browser requires a User-Agent
 
 let mirrorPromise: Promise<string> | null = null;
 async function getMirror(): Promise<string> {
@@ -906,7 +906,7 @@ git commit -m "feat(api): /api/search proxies radio-browser with 60s cache"
 import { NextRequest } from 'next/server';
 import { parseIcy } from '@/app/lib/icy';
 
-const UA = 'TripPlannerRadioPOC/0.1 (etai87@gmail.com)';
+const UA = 'TripPlannerRadioPOC/0.1';
 
 function sseLine(obj: unknown): string {
   return `data: ${JSON.stringify(obj)}\n\n`;
