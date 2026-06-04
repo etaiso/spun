@@ -10,22 +10,32 @@ import { TopBar } from './components/TopBar';
 import { Sidebar } from './components/Sidebar';
 import { Player } from './components/Player';
 import { NowPlaying } from './components/NowPlaying';
+import { PlaylistHistory } from './components/PlaylistHistory';
 import { CommandPalette } from './components/CommandPalette';
+import { TrackingPanel } from './components/TrackingPanel';
+import { useTracking } from './lib/tracking';
 import { ShortcutsHelp } from './components/ShortcutsHelp';
 import { SettingsDialog } from './components/SettingsDialog';
+import { SavedSongsDialog } from './components/SavedSongsDialog';
 import type { PlayState } from './components/Player';
+import type { HistoryEntry } from './lib/nowPlayingTypes';
 
 export default function Home() {
   const [selected, setSelected] = useState<Station | null>(null);
   const [playState, setPlayState] = useState<PlayState>('idle');
   const [everPlayed, setEverPlayed] = useState(false);
   const [currentTrack, setCurrentTrack] = useState<string | null>(null);
+  // Playlist history, lifted out of NowPlaying so it renders below the player
+  // controls — the controls stay anchored near the cover as history grows.
+  const [playlistHistory, setPlaylistHistory] = useState<HistoryEntry[]>([]);
   const [showHelp, setShowHelp] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [savedOpen, setSavedOpen] = useState(false);
   const { recent, add: addRecent } = useRecent();
   const { favorites } = useFavorites();
   const { isHidden } = useHidden();
+  const { tracked } = useTracking();
 
   // Refine the search region from the user's IP (physical location), unless
   // they've manually chosen one in Settings.
@@ -62,16 +72,23 @@ export default function Home() {
   // and reset transient state so the new station doesn't inherit the previous
   // one's (e.g. 'connecting' would render a stale splash).
   const handleSelect = useCallback((s: Station) => {
+    // Re-selecting the station that's already current would reset its
+    // now-playing state (clearing the sidebar marquee until the next SSE
+    // update) even though nothing changed — treat it as a no-op.
+    if (s.id === currentStation?.id) return;
     setSelected(s);
     setPlayState('idle');
     setEverPlayed(false);
     setCurrentTrack(null);
+    // playlistHistory isn't reset here: NowPlaying reports the new station's
+    // history on mount (the restored list, or []), which keeps this in sync.
+    // Clearing it here would desync when the same station is re-selected.
     addRecent(s);
-  }, [addRecent]);
+  }, [addRecent, currentStation]);
 
   // Page-level shortcuts. ⌘K / Ctrl+K opens the command palette (handled
-  // before the modifier bail). ←/→ cycle favorites, ? toggles help, Esc
-  // closes. Audio shortcuts (Space/M/↑/↓) live in Player.
+  // before the modifier bail). ←/→ cycle favorites, ? toggles help, S toggles
+  // saved songs, Esc closes. Audio shortcuts (Space/M/↑/↓) live in Player.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
@@ -89,6 +106,9 @@ export default function Home() {
       if (e.key === '?') {
         e.preventDefault();
         setShowHelp(s => !s);
+      } else if (e.key === 's' || e.key === 'S') {
+        e.preventDefault();
+        setSavedOpen(o => !o);
       } else if (e.key === 'Escape') {
         setShowHelp(false);
       } else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
@@ -112,34 +132,51 @@ export default function Home() {
       <TopBar
         onOpenSearch={() => setPaletteOpen(true)}
         onOpenSettings={() => setSettingsOpen(true)}
+        onOpenSaved={() => setSavedOpen(true)}
         settingsActive={settingsOpen}
       />
       <div className="flex flex-1 min-h-0">
         <Sidebar selected={currentStation} onSelect={handleSelect} nowPlaying={currentTrack} />
         <main className="flex-1 p-10 bg-[var(--color-bg)] overflow-y-auto overflow-x-hidden">
-          {/* Centered, width-capped stage so the title + artwork sit in the
-              middle of the panel instead of sprawling top-left. */}
-          <div className="max-w-4xl w-full mx-auto flex flex-col gap-6 min-h-full justify-center">
-            {currentStation ? (
-              // Single key on the Fragment so both children remount together
-              // when the station changes. Short `<>` can't carry a key, and
-              // the same key on both children is a React duplicate-key error.
-              <Fragment key={currentStation.id}>
-                <NowPlaying station={currentStation} playState={playState} everPlayed={everPlayed} onTrack={setCurrentTrack} />
-                <Player station={currentStation} onPlayStateChange={handlePlayState} />
-              </Fragment>
-            ) : (
-              <div className="flex items-center justify-center text-center">
-                <div>
-                  <div className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-warm)] mb-3">
-                    Radio
+          {/* Full-width stage so the Tracking monitor hugs the right edge.
+              When stations are tracked it splits into the player column + the
+              aside (stacks below on narrow screens); the player content is
+              capped + centered within its own column for readability. */}
+          <div className="w-full flex flex-col lg:flex-row gap-8 min-h-full">
+            <div className="flex-1 min-w-0 flex flex-col justify-center">
+              <div className="w-full max-w-4xl mx-auto flex flex-col gap-6">
+                {currentStation ? (
+                  // Single key on the Fragment so both children remount together
+                  // when the station changes. Short `<>` can't carry a key, and
+                  // the same key on both children is a React duplicate-key error.
+                  <Fragment key={currentStation.id}>
+                    <NowPlaying station={currentStation} playState={playState} everPlayed={everPlayed} onTrack={setCurrentTrack} onHistory={setPlaylistHistory} />
+                    <Player station={currentStation} onPlayStateChange={handlePlayState} />
+                    <PlaylistHistory history={playlistHistory} />
+                  </Fragment>
+                ) : (
+                  <div className="flex items-center justify-center text-center">
+                    <div>
+                      <div className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-warm)] mb-3">
+                        Radio
+                      </div>
+                      <div className="text-[32px] font-bold tracking-tight">Pick a station to begin</div>
+                      <div className="text-base text-[var(--color-ink-3)] mt-3 max-w-md mx-auto">
+                        Press <kbd className="px-1.5 py-0.5 rounded border border-[var(--color-line)] bg-white text-[12px] font-semibold">⌘K</kbd> to search, or browse the popular list in the sidebar. Star what you love to pin it to the top.
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-[32px] font-bold tracking-tight">Pick a station to begin</div>
-                  <div className="text-base text-[var(--color-ink-3)] mt-3 max-w-md mx-auto">
-                    Press <kbd className="px-1.5 py-0.5 rounded border border-[var(--color-line)] bg-white text-[12px] font-semibold">⌘K</kbd> to search, or browse the popular list in the sidebar. Star what you love to pin it to the top.
-                  </div>
-                </div>
+                )}
               </div>
+            </div>
+            {tracked.length > 0 && (
+              <aside className="shrink-0 self-stretch lg:w-[320px] lg:border-l lg:border-[var(--color-line)] lg:pl-8 pt-2">
+                <TrackingPanel
+                  onSelect={handleSelect}
+                  activeStationId={currentStation?.id ?? null}
+                  activeTrack={currentTrack}
+                />
+              </aside>
             )}
           </div>
         </main>
@@ -155,6 +192,7 @@ export default function Home() {
         playState={playState}
         currentTrack={currentTrack}
       />
+      <SavedSongsDialog open={savedOpen} onOpenChange={setSavedOpen} />
     </div>
   );
 }

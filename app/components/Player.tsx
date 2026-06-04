@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { Station } from '@/app/lib/stations';
-import { resumeAudio, connectIfRunning } from '@/app/lib/audioBus';
+import { resumeAudio, connectIfRunning, disconnectElement } from '@/app/lib/audioBus';
+import { subscribePauseRadio } from '@/app/lib/playbackBus';
+import { VOLUME_KEY, readStoredVolume } from '@/app/lib/volume';
 
 export type PlayState = 'idle' | 'connecting' | 'playing' | 'error';
 
@@ -11,22 +13,8 @@ type Props = {
   onPlayStateChange: (s: PlayState) => void;
 };
 
-const VOLUME_KEY = 'radio:volume';
-const DEFAULT_VOLUME = 0.65;
 const AUTOPLAY_KEY = 'radio:autoplay';
 const DEFAULT_AUTOPLAY = false;
-
-function readStoredVolume(): number {
-  if (typeof window === 'undefined') return DEFAULT_VOLUME;
-  try {
-    const raw = window.localStorage.getItem(VOLUME_KEY);
-    if (raw === null) return DEFAULT_VOLUME;
-    const v = parseFloat(raw);
-    return Number.isFinite(v) && v >= 0 && v <= 1 ? v : DEFAULT_VOLUME;
-  } catch {
-    return DEFAULT_VOLUME;
-  }
-}
 
 function readStoredAutoplay(): boolean {
   if (typeof window === 'undefined') return DEFAULT_AUTOPLAY;
@@ -39,6 +27,7 @@ function readStoredAutoplay(): boolean {
 
 export function Player({ station, onPlayStateChange }: Props) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const volWrapRef = useRef<HTMLDivElement | null>(null);
   // Lazy init: Player is only rendered after a user gesture (selectedStation
   // starts null), so no SSR happens here — safe to read localStorage on
   // first render without a hydration mismatch.
@@ -126,6 +115,57 @@ export function Player({ station, onPlayStateChange }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Pause the live stream when something else (a saved-song preview) starts.
+  useEffect(() => {
+    return subscribePauseRadio(() => {
+      const a = audioRef.current;
+      if (a && !a.paused) { a.pause(); setPaused(true); }
+    });
+  }, []);
+
+  // Adjust volume by scrolling the wheel over the volume control. Registered as
+  // a non-passive native listener because React's synthetic onWheel is passive,
+  // so preventDefault() there wouldn't stop the page from scrolling.
+  useEffect(() => {
+    const el = volWrapRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const dir = e.deltaY < 0 ? 1 : -1; // wheel up = louder
+      setMuted(false);
+      // Small step per wheel event — trackpads/mice fire many events per
+      // scroll, so a large step races to the ends too fast.
+      setVolume(v => Math.min(1, Math.max(0, +(v + dir * 0.02).toFixed(2))));
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
+
+  // On unmount (station switch), explicitly tear down the audio element so its
+  // proxied connection is released immediately. Without this, rapid switching
+  // leaves stale streaming connections open; in dev (HTTP/1.1, ~6 connections
+  // per origin) they pile up until new requests can't connect — playback gets
+  // stuck with no sound. Also drop the Web Audio node so the graph doesn't leak.
+  //
+  // Guard on `a.isConnected`: React Strict Mode (dev) simulates an
+  // unmount+remount on mount WITHOUT removing the DOM node, so this cleanup
+  // would otherwise strip the src of the still-live element (leaving it silent,
+  // since the component doesn't re-render to re-apply src). On a real unmount
+  // the passive cleanup runs after the node has left the DOM, so isConnected is
+  // false and we tear down for real.
+  useEffect(() => {
+    const a = audioRef.current;
+    return () => {
+      if (!a || a.isConnected) return;
+      disconnectElement(a);
+      try {
+        a.pause();
+        a.removeAttribute('src');
+        a.load(); // forces the browser to abort the in-flight stream request
+      } catch { /* best-effort teardown */ }
+    };
+  }, []);
+
   // Global media keyboard shortcuts for the audio it owns: Space/K play-pause,
   // M mute, Up/Down volume. Skips when the user is typing in a field and when
   // a modifier is held (so browser shortcuts still work).
@@ -201,7 +241,7 @@ export function Player({ station, onPlayStateChange }: Props) {
   }
 
   return (
-    <div className="relative z-10 flex items-center gap-5 pt-2 flex-wrap bg-[var(--color-bg)]">
+    <div className="relative z-10 flex items-center gap-5 pt-2 flex-wrap">
       <audio
         ref={audioRef}
         // Inner key guards against streamUrl swaps within a single station
@@ -229,7 +269,7 @@ export function Player({ station, onPlayStateChange }: Props) {
       >
         {paused ? '▶' : '⏸'}
       </button>
-      <div className="flex items-center gap-3 max-w-[280px] text-[var(--color-ink-3)]">
+      <div ref={volWrapRef} className="flex items-center gap-3 max-w-[280px] text-[var(--color-ink-3)]" title="Scroll to change volume">
         <button
           onClick={() => setMuted(m => !m)}
           className="shrink-0 hover:text-[var(--color-ink)] transition-colors cursor-pointer"

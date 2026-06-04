@@ -23,17 +23,28 @@ falls back to **fingerprinting the live audio with Shazam** to identify it.
   browser tab title.
 - 〰️ **Audio-reactive canvas** — concentric "radio wave" rings behind the
   player that pulse to the live audio (Web Audio analyser), with a gentle
-  timed fallback when a stream can't be analysed.
+  timed fallback when a stream can't be analysed (toggle off in Settings).
 - ✦ **Shazam fallback** for stations that broadcast no song title.
+- 📡 **Background tracking** — track multiple stations at once and watch what's
+  playing on each in a live monitor panel beside the player (recognised in the
+  background, no audio). The station you're listening to stays in the list,
+  highlighted as "Playing". Add/remove from a station's right-click menu.
+- 💾 **Saved songs** — save any recognized track to a personal, persisted
+  playlist (top-bar button, or the `S` shortcut). Each entry links to **Apple
+  Music**, plays a ~30s preview (at the player's volume, pausing the radio), and
+  is fuzzy-searchable. Previews come from Shazam or an iTunes lookup, backfilled
+  for older entries when the list is opened.
 - ⚙️ **Settings** (gear in the top bar): **localization**, **region-only mode**
-  (filter every list to a single country), and **hidden stations**.
+  (filter every list to a single country), a **pulse-rings** toggle, and
+  **hidden stations**.
 - 🙈 **Hide stations** — right-click any station in the sidebar to banish it
   from search, favorites, popular and recent; restore it from Settings.
 - 🌍 **Region detection** from your IP (with a browser-locale fallback), shown
   in the top bar and overridable in Settings — drives search/Popular ranking.
 - 🔁 Reopens your **last played station** on reload.
-- ⌨️ Keyboard shortcuts (play/pause, mute, volume, prev/next favorite,
-  search, help), an auto-play toggle (off by default), and persisted volume.
+- ⌨️ Keyboard shortcuts (play/pause, mute, volume, prev/next favorite, search,
+  saved songs, help), scroll-to-change-volume over the slider, an auto-play
+  toggle (off by default), and persisted volume.
 
 ## Requirements
 

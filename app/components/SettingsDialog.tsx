@@ -6,6 +6,7 @@ import type { PlayState } from './Player';
 import { RegionPicker } from './RegionPicker';
 import { HiddenStationsSettings } from './HiddenStationsSettings';
 import { DebugPanel } from './DebugPanel';
+import { useRingsEnabled } from '@/app/lib/visualizer';
 
 type Props = {
   open: boolean;
@@ -18,6 +19,9 @@ type Props = {
 const DEBUG_KEY = 'radio:showDebug';
 
 export function SettingsDialog({ open, onOpenChange, station, playState, currentTrack }: Props) {
+  // Audio-reactive rings toggle (persisted, on by default).
+  const { enabled: ringsOn, toggle: toggleRings } = useRingsEnabled();
+
   // Whether to show the debug readout (dev only). Persisted, default off.
   const [showDebug, setShowDebug] = useState(() => {
     if (typeof window === 'undefined') return false;
@@ -77,6 +81,33 @@ export function SettingsDialog({ open, onOpenChange, station, playState, current
           <section className="flex flex-col gap-3">
             <h3 className="text-sm font-bold text-[var(--color-ink)]">Localization</h3>
             <RegionPicker />
+          </section>
+
+          <section className="mt-7 flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-[var(--color-ink)]">Pulse rings</h3>
+                <p className="text-xs text-[var(--color-ink-3)] mt-0.5">Audio-reactive rings behind the cover.</p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={ringsOn}
+                aria-label="Pulse rings"
+                onClick={toggleRings}
+                className={[
+                  'relative h-5 w-9 rounded-full transition-colors cursor-pointer shrink-0',
+                  ringsOn ? 'bg-[var(--color-warm)]' : 'bg-[var(--color-line)]',
+                ].join(' ')}
+              >
+                <span
+                  className={[
+                    'absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all',
+                    ringsOn ? 'left-[18px]' : 'left-0.5',
+                  ].join(' ')}
+                />
+              </button>
+            </div>
           </section>
 
           <section className="mt-7 flex flex-col gap-3">

@@ -8,6 +8,7 @@ const SHORTCUTS: Shortcut[] = [
   { keys: ['M'], label: 'Mute / unmute' },
   { keys: ['↑', '↓'], label: 'Volume up / down' },
   { keys: ['←', '→'], label: 'Previous / next favorite' },
+  { keys: ['S'], label: 'Saved songs' },
   { keys: ['?'], label: 'Show this help' },
 ];
 

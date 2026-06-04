@@ -55,10 +55,18 @@ export function RegionPicker() {
 
       <label
         className={[
-          'mt-2 flex items-start gap-3 cursor-pointer select-none',
-          region ? '' : 'opacity-50 cursor-not-allowed',
+          'mt-2 flex items-center justify-between gap-3 select-none',
+          region ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed',
         ].join(' ')}
       >
+        <span className="flex flex-col">
+          <span className="text-sm font-medium text-[var(--color-ink)]">Region-only mode</span>
+          <span className="text-xs text-[var(--color-ink-4)]">
+            {region
+              ? 'Show only stations from this region everywhere — search, favorites, popular and recent.'
+              : 'Pick a region above to enable this.'}
+          </span>
+        </span>
         <button
           type="button"
           role="switch"
@@ -66,7 +74,7 @@ export function RegionPicker() {
           disabled={!region}
           onClick={() => setLocked(!locked)}
           className={[
-            'mt-0.5 shrink-0 relative h-5 w-9 rounded-full transition-colors',
+            'shrink-0 relative h-5 w-9 rounded-full transition-colors',
             locked && region ? 'bg-[var(--color-warm)]' : 'bg-[var(--color-line)]',
             region ? 'cursor-pointer' : 'cursor-not-allowed',
           ].join(' ')}
@@ -78,14 +86,6 @@ export function RegionPicker() {
             ].join(' ')}
           />
         </button>
-        <span className="flex flex-col">
-          <span className="text-sm font-medium text-[var(--color-ink)]">Region-only mode</span>
-          <span className="text-xs text-[var(--color-ink-4)]">
-            {region
-              ? 'Show only stations from this region everywhere — search, favorites, popular and recent.'
-              : 'Pick a region above to enable this.'}
-          </span>
-        </span>
       </label>
     </div>
   );
