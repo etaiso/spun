@@ -31,6 +31,10 @@ export function StationRow({ station, isActive, isFavorite, onSelect, onToggleFa
             onSelect();
           }
         }}
+        // Keep the hover highlight while this row's right-click menu is open
+        // (the cursor has moved off the row onto the menu). Inline so it wins
+        // over the hover utility regardless of pointer position.
+        style={menu && !isActive ? { backgroundColor: 'rgba(210, 105, 30, 0.12)' } : undefined}
         className={[
           'flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-colors mb-1 outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-warm)]',
           isActive
