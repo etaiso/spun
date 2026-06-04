@@ -1,0 +1,34 @@
+appId: com.shazamradio.app
+productName: Shazam Radio
+# Only the Electron glue lives in the asar; the Next server, recognizer, and
+# ffmpeg ride along as unpacked extraResources (native bins can't run from asar).
+files:
+  - electron/**
+  - package.json
+extraResources:
+  - from: .next/standalone
+    to: app
+  - from: .next/static
+    to: app/.next/static
+  - from: public
+    to: app/public
+  - from: dist-recognizer
+    to: recognizer
+    filter: ["**/*"]
+  - from: dist-ffmpeg
+    to: ffmpeg
+    filter: ["**/*"]
+mac:
+  category: public.app-category.music
+  target: [dmg]
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: electron/entitlements.mac.plist
+  entitlementsInherit: electron/entitlements.mac.plist
+win:
+  target: [nsis]
+publish:
+  provider: github
+  owner: etaiso
+  repo: shazam-radio
+afterSign: electron/notarize.js
