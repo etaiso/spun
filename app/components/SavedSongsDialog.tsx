@@ -107,7 +107,6 @@ export function SavedSongsDialog({ open, onOpenChange }: Props) {
                                 {previewId === s.id ? '⏸' : '▶'}
                               </button>
                             )}
-                            <a href={s.shazamUrl} target="_blank" rel="noreferrer" className="text-[11px] font-bold rounded-full px-2.5 py-1 bg-[#0088ff] text-white">Shazam</a>
                             {s.appleMusicUrl && (
                               <a href={s.appleMusicUrl} target="_blank" rel="noreferrer" className="text-[11px] font-bold rounded-full px-2.5 py-1 bg-[var(--color-ink)] text-white">Apple Music</a>
                             )}
