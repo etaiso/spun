@@ -4,8 +4,15 @@ import { useEffect, useState } from 'react';
 import type { Station } from '@/app/lib/stations';
 import { useTracking } from '@/app/lib/tracking';
 import { isNonTrack } from '@/app/lib/nonTrack';
+import { loadSession, saveSession } from '@/app/lib/session';
+import type { TrackSource } from '@/app/lib/nowPlayingTypes';
 import { StationLogo } from './StationLogo';
 import { CollapsibleSection } from './CollapsibleSection';
+
+function nowHHMM() {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
 
 type Props = {
   onSelect: (s: Station) => void;
@@ -65,13 +72,27 @@ function TrackedStationRow({
     es.onmessage = (ev) => {
       try {
         const msg = JSON.parse(ev.data) as
-          | { type: 'track'; title: string }
+          | { type: 'track'; title: string; source?: TrackSource; cover?: string }
           | { type: 'no-metadata' }
           | { type: 'no-song' }
           | { type: 'recognizing' }
           | { type: 'error' };
         if (msg.type === 'track') {
-          setStatus(isNonTrack(msg.title, station.name) ? { kind: 'idle' } : { kind: 'track', title: msg.title });
+          if (isNonTrack(msg.title, station.name)) {
+            setStatus({ kind: 'idle' });
+          } else {
+            setStatus({ kind: 'track', title: msg.title });
+            // Seed the session cache so selecting this station shows the song
+            // immediately — NowPlaying restores from the same store on mount
+            // (≤5-min staleness), no re-fetch/re-recognize flash. Preserve any
+            // existing history for the station.
+            const prev = loadSession(station.id);
+            saveSession(station.id, {
+              current: { raw: msg.title, source: msg.source ?? 'metadata', cover: msg.cover ?? null },
+              history: prev?.history ?? [],
+              lastUpdate: nowHHMM(),
+            });
+          }
         } else if (msg.type === 'recognizing') {
           setStatus(prev => (prev.kind === 'track' ? prev : { kind: 'recognizing' }));
         } else if (msg.type === 'no-song' || msg.type === 'no-metadata') {
@@ -84,7 +105,7 @@ function TrackedStationRow({
     // fires when the station is untracked OR becomes the currently-playing one
     // (filtered out of this panel), so it never double-recognizes.
     return () => es.close();
-  }, [station.streamUrl, station.name]);
+  }, [station.streamUrl, station.name, station.id]);
 
   const subtitle =
     status.kind === 'track' ? status.title
