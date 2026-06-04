@@ -12,7 +12,7 @@
     "test:watch": "vitest",
     "electron:dev": "concurrently -k \"npm:dev\" \"wait-on tcp:127.0.0.1:3000 && electron .\"",
     "electron:rebuild": "electron-rebuild -f -w better-sqlite3",
-    "electron:build": "npm run electron:rebuild && npm run build && electron-builder"
+    "electron:build": "mkdir -p dist-recognizer dist-ffmpeg && npm run electron:rebuild && npm run build && electron-builder"
   },
   "dependencies": {
     "better-sqlite3": "^12.10.0",
