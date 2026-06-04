@@ -69,6 +69,10 @@ export default function Home() {
   // and reset transient state so the new station doesn't inherit the previous
   // one's (e.g. 'connecting' would render a stale splash).
   const handleSelect = useCallback((s: Station) => {
+    // Re-selecting the station that's already current would reset its
+    // now-playing state (clearing the sidebar marquee until the next SSE
+    // update) even though nothing changed — treat it as a no-op.
+    if (s.id === currentStation?.id) return;
     setSelected(s);
     setPlayState('idle');
     setEverPlayed(false);
@@ -77,7 +81,7 @@ export default function Home() {
     // history on mount (the restored list, or []), which keeps this in sync.
     // Clearing it here would desync when the same station is re-selected.
     addRecent(s);
-  }, [addRecent]);
+  }, [addRecent, currentStation]);
 
   // Page-level shortcuts. ⌘K / Ctrl+K opens the command palette (handled
   // before the modifier bail). ←/→ cycle favorites, ? toggles help, S toggles
