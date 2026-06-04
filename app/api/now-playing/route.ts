@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { parseIcy } from '@/app/lib/icy';
+import { isJunkMetadata } from '@/app/lib/nonTrack';
 
 const UA = 'TripPlannerRadioPOC/0.1 (etai87@gmail.com)';
 
@@ -167,9 +168,10 @@ export async function GET(req: NextRequest) {
       try {
         if (hasMeta) {
           for await (const event of parseIcy(upstream.body!, metaInt)) {
-            if (event.title === '') {
-              // Station isn't naming the song — let the fingerprint fallback
-              // try (fire-and-forget; it debounces via fpInFlight).
+            if (event.title === '' || isJunkMetadata(event.title)) {
+              // Station isn't naming the song (empty, or just CDN/station
+              // branding like "Powered By … CDN") — let the fingerprint
+              // fallback try (fire-and-forget; it debounces via fpInFlight).
               tryFingerprint();
               continue;
             }

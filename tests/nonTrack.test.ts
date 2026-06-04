@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isNonTrack } from '../app/lib/nonTrack';
+import { isNonTrack, isJunkMetadata } from '../app/lib/nonTrack';
 
 describe('isNonTrack', () => {
   it('flags empty title', () => {
@@ -24,5 +24,29 @@ describe('isNonTrack', () => {
 
   it('does NOT flag a longer title even without a dash', () => {
     expect(isNonTrack('Loose Ends Loose Ends', 'Jazz FM')).toBe(false);
+  });
+
+  it('flags CDN / station branding as a non-track', () => {
+    expect(isNonTrack('Powered By Multix Technologies CDN', 'Radios 100FM')).toBe(true);
+    expect(isNonTrack('CDN - Powered By Multix Technologies', 'Radios 100FM')).toBe(true);
+  });
+});
+
+describe('isJunkMetadata', () => {
+  it('flags empty / whitespace', () => {
+    expect(isJunkMetadata('')).toBe(true);
+    expect(isJunkMetadata('   ')).toBe(true);
+  });
+
+  it('flags CDN / branding / filler markers (case-insensitive)', () => {
+    expect(isJunkMetadata('Powered By Multix Technologies')).toBe(true);
+    expect(isJunkMetadata('powered by some cdn')).toBe(true);
+    expect(isJunkMetadata('Advertisement')).toBe(true);
+    expect(isJunkMetadata('Commercial Break')).toBe(true);
+  });
+
+  it('does NOT flag real song titles', () => {
+    expect(isJunkMetadata('Miles Davis - So What')).toBe(false);
+    expect(isJunkMetadata('Daft Punk - Around the World')).toBe(false);
   });
 });
