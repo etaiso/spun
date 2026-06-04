@@ -20,6 +20,15 @@ let win = null;
 let serverProc = null;
 let recognizerProc = null;
 
+// Diagnostics log — a Finder-launched app has no terminal, so child stdio and
+// our own messages go here: <userData>/desktop.log.
+let logFd = null;
+function log(msg) {
+  const line = `[${new Date().toISOString()}] ${msg}\n`;
+  try { if (logFd !== null) fs.writeSync(logFd, line); } catch { /* ignore */ }
+  console.log(msg);
+}
+
 function getFreePort() {
   return new Promise((resolve, reject) => {
     const srv = net.createServer();
@@ -52,26 +61,32 @@ async function startRecognizer() {
   const port = await getFreePort();
   const bin = process.platform === 'win32' ? 'recognizer.exe' : 'recognizer';
   const recognizerBin = path.join(process.resourcesPath, 'recognizer', bin);
+  log(`recognizer: path=${recognizerBin} exists=${fs.existsSync(recognizerBin)} port=${port}`);
   if (!fs.existsSync(recognizerBin)) {
-    console.warn('recognizer binary not bundled; Shazam fallback disabled');
+    log('recognizer: binary not bundled; Shazam fallback disabled');
     return port;
   }
   const ffmpegDir = path.join(process.resourcesPath, 'ffmpeg');
+  const out = logFd !== null ? logFd : 'ignore';
   recognizerProc = spawn(recognizerBin, [], {
     env: {
       ...process.env,
       RECOGNIZER_PORT: String(port),
       PATH: `${ffmpegDir}${path.delimiter}${process.env.PATH ?? ''}`,
     },
-    stdio: 'inherit',
+    stdio: ['ignore', out, out],
   });
-  recognizerProc.on('error', (e) => console.error('recognizer failed to start:', e));
+  recognizerProc.on('spawn', () => log(`recognizer: spawned pid=${recognizerProc.pid}`));
+  recognizerProc.on('error', (e) => log(`recognizer: failed to start: ${e}`));
+  recognizerProc.on('exit', (code, signal) => log(`recognizer: exited code=${code} signal=${signal}`));
   return port;
 }
 
 async function startNextServer(recognizerPort) {
   const port = await getFreePort();
   const serverJs = path.join(process.resourcesPath, 'app', 'server.js');
+  log(`server: ${serverJs} port=${port} recognizer=http://127.0.0.1:${recognizerPort}`);
+  const out = logFd !== null ? logFd : 'ignore';
   serverProc = spawn(process.execPath, [serverJs], {
     env: {
       ...process.env,
@@ -82,10 +97,12 @@ async function startNextServer(recognizerPort) {
       APP_DB_PATH: path.join(app.getPath('userData'), 'app_state.db'),
       RECOGNIZER_URL: `http://127.0.0.1:${recognizerPort}`,
     },
-    stdio: 'inherit',
+    stdio: ['ignore', out, out],
   });
-  serverProc.on('error', (e) => console.error('next server failed to start:', e));
+  serverProc.on('error', (e) => log(`server: failed to start: ${e}`));
+  serverProc.on('exit', (code, signal) => log(`server: exited code=${code} signal=${signal}`));
   await waitForHttp(port);
+  log(`server: ready on :${port}`);
   return port;
 }
 
@@ -118,13 +135,17 @@ async function createWindow() {
 }
 
 app.whenReady().then(async () => {
+  try {
+    logFd = fs.openSync(path.join(app.getPath('userData'), 'desktop.log'), 'a');
+  } catch { /* logging is best-effort */ }
+  log(`--- launch (packaged=${app.isPackaged}, platform=${process.platform}) ---`);
   await createWindow();
   if (!isDev) {
     try {
       const { autoUpdater } = require('electron-updater');
       autoUpdater.checkForUpdatesAndNotify();
     } catch (e) {
-      console.error('updater init failed:', e);
+      log(`updater init failed: ${e}`);
     }
   }
   app.on('activate', () => {

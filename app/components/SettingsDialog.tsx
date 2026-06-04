@@ -41,7 +41,11 @@ export function SettingsDialog({ open, onOpenChange, station, playState, current
 
   if (!open) return null;
 
-  const isDev = process.env.NODE_ENV === 'development';
+  // Show the diagnostics panel in dev AND in the desktop (Electron) build —
+  // both are "power" contexts. It stays hidden in the plain production web build.
+  const isDev =
+    process.env.NODE_ENV === 'development' ||
+    (typeof navigator !== 'undefined' && /electron/i.test(navigator.userAgent));
 
   const toggleDebug = () => {
     setShowDebug(v => {
@@ -120,7 +124,7 @@ export function SettingsDialog({ open, onOpenChange, station, playState, current
             <section className="mt-7 flex flex-col gap-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-bold text-[var(--color-ink)]">
-                  Debug <span className="text-[var(--color-ink-4)] font-normal">· dev only</span>
+                  Debug <span className="text-[var(--color-ink-4)] font-normal">· diagnostics</span>
                 </h3>
                 <button
                   type="button"
