@@ -14,6 +14,7 @@ import { PlaylistHistory } from './components/PlaylistHistory';
 import { CommandPalette } from './components/CommandPalette';
 import { ShortcutsHelp } from './components/ShortcutsHelp';
 import { SettingsDialog } from './components/SettingsDialog';
+import { SavedSongsDialog } from './components/SavedSongsDialog';
 import type { PlayState } from './components/Player';
 import type { HistoryEntry } from './lib/nowPlayingTypes';
 
@@ -28,6 +29,7 @@ export default function Home() {
   const [showHelp, setShowHelp] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [savedOpen, setSavedOpen] = useState(false);
   const { recent, add: addRecent } = useRecent();
   const { favorites } = useFavorites();
   const { isHidden } = useHidden();
@@ -120,6 +122,7 @@ export default function Home() {
       <TopBar
         onOpenSearch={() => setPaletteOpen(true)}
         onOpenSettings={() => setSettingsOpen(true)}
+        onOpenSaved={() => setSavedOpen(true)}
         settingsActive={settingsOpen}
       />
       <div className="flex flex-1 min-h-0">
@@ -164,6 +167,7 @@ export default function Home() {
         playState={playState}
         currentTrack={currentTrack}
       />
+      <SavedSongsDialog open={savedOpen} onOpenChange={setSavedOpen} />
     </div>
   );
 }
