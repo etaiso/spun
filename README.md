@@ -21,9 +21,10 @@ falls back to **fingerprinting the live audio with Shazam** to identify it.
   **playlist history** that's restored when you reload or switch back to a
   station (within 5 minutes). The active station + song also appear in the
   browser tab title.
-- 〰️ **Audio-reactive canvas** — concentric "radio wave" rings behind the
-  player that pulse to the live audio (Web Audio analyser), with a gentle
-  timed fallback when a stream can't be analysed.
+- 〰️ **Audio-reactive canvas** — "sonar" rings that emanate from the cover and
+  expand outward, driven by the live audio (Web Audio analyser) with auto-gain
+  so quiet streams still move, and a baseline cadence so the visual never
+  freezes when a stream can't be analysed.
 - ✦ **Shazam fallback** for stations that broadcast no song title.
 - 💾 **Saved songs** — save any recognized track to a personal, persisted
   playlist (top-bar button). Each entry links to Shazam and Apple Music, plays a
