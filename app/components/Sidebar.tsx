@@ -2,7 +2,6 @@
 
 import type { Station } from '@/app/lib/stations';
 import { NowPlayingCard } from './NowPlayingCard';
-import { TrackingPanel } from './TrackingPanel';
 import { FavoritesList } from './FavoritesList';
 import { Recommended } from './Recommended';
 
@@ -17,7 +16,6 @@ export function Sidebar({ selected, onSelect, nowPlaying }: Props) {
   return (
     <aside className="bg-[var(--color-bg-2)] border-r border-[var(--color-line)] p-7 w-[360px] shrink-0 overflow-y-auto">
       {selected && <NowPlayingCard station={selected} nowPlaying={nowPlaying} />}
-      <TrackingPanel onSelect={onSelect} activeStationId={selected?.id ?? null} />
       <FavoritesList onSelect={onSelect} />
       <div className="mt-6">
         <Recommended onSelect={onSelect} />

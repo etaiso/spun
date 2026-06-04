@@ -7,40 +7,49 @@ import { isNonTrack } from '@/app/lib/nonTrack';
 import { loadSession, saveSession } from '@/app/lib/session';
 import type { TrackSource } from '@/app/lib/nowPlayingTypes';
 import { StationLogo } from './StationLogo';
-import { CollapsibleSection } from './CollapsibleSection';
-
-function nowHHMM() {
-  const d = new Date();
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-}
 
 type Props = {
   onSelect: (s: Station) => void;
-  // The currently-playing station. It's shown in "Now Playing", so we hide it
-  // from this panel while it plays — but keep it tracked, so it reappears (and
-  // resumes background recognition) once you switch to another station.
+  // The currently-playing station. It stays in the list (highlighted as
+  // "Playing") instead of disappearing, but doesn't open its own SSE — the
+  // NowPlaying panel already recognises it, so this avoids double-recognition.
   activeStationId: string | null;
+  // Live now-playing title for the active station (from NowPlaying), shown on
+  // its highlighted row.
+  activeTrack: string | null;
 };
 
-// Sidebar section listing the stations being tracked in the background. Hidden
-// when nothing (other than the currently-playing station) is being tracked.
-export function TrackingPanel({ onSelect, activeStationId }: Props) {
+// A monitor panel (lives in the main area beside the player) listing every
+// station being tracked in the background. Hidden entirely when nothing is
+// tracked.
+export function TrackingPanel({ onSelect, activeStationId, activeTrack }: Props) {
   const { tracked, untrack } = useTracking();
-  const shown = tracked.filter(s => s.id !== activeStationId);
-  if (shown.length === 0) return null;
+  if (tracked.length === 0) return null;
 
   return (
-    <div className="mb-6">
-      <CollapsibleSection title="📡 Tracking" count={shown.length}>
-        {shown.map(s => (
-          <TrackedStationRow
-            key={s.id}
-            station={s}
-            onSelect={() => onSelect(s)}
-            onUntrack={() => untrack(s.id)}
-          />
-        ))}
-      </CollapsibleSection>
+    <div>
+      <div className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-warm)] mb-3 flex items-center gap-2">
+        <span>📡 Tracking</span>
+        <span className="text-[var(--color-ink-4)] font-bold">{tracked.length}</span>
+      </div>
+      <div className="flex flex-col gap-1">
+        {tracked.map(s => {
+          const active = s.id === activeStationId;
+          return (
+            <TrackedStationRow
+              // Re-key on active so flipping it remounts the row, re-seeding
+              // status from the (NowPlaying-refreshed) session cache with no
+              // stale flash, and opening/closing the SSE accordingly.
+              key={`${s.id}:${active}`}
+              station={s}
+              active={active}
+              activeTrack={active ? activeTrack : null}
+              onSelect={() => onSelect(s)}
+              onUntrack={() => untrack(s.id)}
+            />
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -51,25 +60,31 @@ type Status =
   | { kind: 'track'; title: string }
   | { kind: 'idle' }; // no song info
 
-// One tracked station. Opens its own /api/now-playing SSE for the lifetime of
-// the row — the server fingerprints / reads ICY metadata in the background, no
-// audio playback needed. Closing the EventSource on unmount (i.e. when the
-// station is untracked) aborts the upstream connection server-side, so a
-// removed station consumes nothing.
+function nowHHMM() {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+// One tracked station. When it's NOT the active station it opens its own
+// /api/now-playing SSE (the server fingerprints / reads ICY metadata in the
+// background, no audio playback needed). The active station opens no SSE and
+// shows the live title passed down from NowPlaying.
 function TrackedStationRow({
   station,
+  active,
+  activeTrack,
   onSelect,
   onUntrack,
 }: {
   station: Station;
+  active: boolean;
+  activeTrack: string | null;
   onSelect: () => void;
   onUntrack: () => void;
 }) {
-  // Seed from the session cache so a station returning to the panel (e.g. you
-  // switched away from playing it) shows its last-known song immediately instead
-  // of flashing "Connecting…" while it re-recognizes — symmetric with how
-  // NowPlaying restores when you switch *to* a tracked station. The SSE below
-  // still opens to keep it current.
+  // Seed from the session cache so a station shows its last-known song
+  // immediately instead of flashing "Connecting…" while it (re)recognises —
+  // symmetric with how NowPlaying restores. The SSE below keeps it current.
   const [status, setStatus] = useState<Status>(() => {
     const s = loadSession(station.id);
     return s?.current && !isNonTrack(s.current.raw, station.name)
@@ -78,6 +93,9 @@ function TrackedStationRow({
   });
 
   useEffect(() => {
+    // The active station is recognised by NowPlaying; don't open a second SSE.
+    if (active) return;
+
     const es = new EventSource(`/api/now-playing?url=${encodeURIComponent(station.streamUrl)}`);
     es.onmessage = (ev) => {
       try {
@@ -93,9 +111,7 @@ function TrackedStationRow({
           } else {
             setStatus({ kind: 'track', title: msg.title });
             // Seed the session cache so selecting this station shows the song
-            // immediately — NowPlaying restores from the same store on mount
-            // (≤5-min staleness), no re-fetch/re-recognize flash. Preserve any
-            // existing history for the station.
+            // immediately (NowPlaying restores from the same store on mount).
             const prev = loadSession(station.id);
             saveSession(station.id, {
               current: { raw: msg.title, source: msg.source ?? 'metadata', cover: msg.cover ?? null },
@@ -110,19 +126,16 @@ function TrackedStationRow({
         }
       } catch { /* ignore malformed frames */ }
     };
-    // EventSource auto-reconnects on error; nothing to do. Cleanup closes it,
-    // which aborts the server-side stream (no lingering background work) — this
-    // fires when the station is untracked OR becomes the currently-playing one
-    // (filtered out of this panel), so it never double-recognizes.
     return () => es.close();
-  }, [station.streamUrl, station.name, station.id]);
+  }, [active, station.streamUrl, station.name, station.id]);
 
-  const subtitle =
-    status.kind === 'track' ? status.title
+  const subtitle = active
+    ? (activeTrack || 'Playing now')
+    : status.kind === 'track' ? status.title
     : status.kind === 'recognizing' ? 'Identifying…'
     : status.kind === 'connecting' ? 'Connecting…'
     : 'No song info';
-  const hasTrack = status.kind === 'track';
+  const showGreen = active || status.kind === 'track';
 
   return (
     <div
@@ -130,30 +143,42 @@ function TrackedStationRow({
       tabIndex={0}
       onClick={onSelect}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(); } }}
-      className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-colors mb-1 outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-warm)] hover:bg-[rgba(210,105,30,0.12)]"
+      className={[
+        'group flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-warm)]',
+        active
+          ? 'bg-[rgba(210,105,30,0.12)] ring-1 ring-[var(--color-warm)]'
+          : 'hover:bg-[rgba(210,105,30,0.12)]',
+      ].join(' ')}
     >
       <StationLogo name={station.name} favicon={station.favicon} />
       <div className="flex-1 min-w-0">
-        <div className="text-[15px] font-semibold tracking-tight truncate">{station.name}</div>
+        <div className="text-[15px] font-semibold tracking-tight truncate flex items-center gap-2">
+          <span className="truncate">{station.name}</span>
+          {active && (
+            <span className="shrink-0 text-[9px] uppercase tracking-[1px] font-bold text-[var(--color-warm)]">● Playing</span>
+          )}
+        </div>
         <div className="text-xs text-[var(--color-ink-3)] truncate flex items-center gap-1.5">
           <span
             className={[
               'inline-block w-1.5 h-1.5 rounded-full shrink-0',
-              hasTrack ? 'bg-green-500' : 'bg-[var(--color-warm)] animate-pulse',
+              showGreen ? 'bg-green-500' : 'bg-[var(--color-warm)] animate-pulse',
             ].join(' ')}
             aria-hidden="true"
           />
           <span className="truncate">{subtitle}</span>
         </div>
       </div>
-      <button
-        onClick={(e) => { e.stopPropagation(); onUntrack(); }}
-        aria-label={`Stop tracking ${station.name}`}
-        title="Stop tracking"
-        className="shrink-0 w-7 h-7 flex items-center justify-center text-base leading-none rounded-full text-[var(--color-ink-4)] hover:text-[var(--color-accent)] hover:bg-[rgba(192,57,43,0.08)] cursor-pointer transition-colors"
-      >
-        ✕
-      </button>
+      {!active && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onUntrack(); }}
+          aria-label={`Stop tracking ${station.name}`}
+          title="Stop tracking"
+          className="shrink-0 w-7 h-7 flex items-center justify-center text-base leading-none rounded-full text-[var(--color-ink-4)] hover:text-[var(--color-accent)] hover:bg-[rgba(192,57,43,0.08)] cursor-pointer transition-colors"
+        >
+          ✕
+        </button>
+      )}
     </div>
   );
 }

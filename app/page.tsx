@@ -12,6 +12,8 @@ import { Player } from './components/Player';
 import { NowPlaying } from './components/NowPlaying';
 import { PlaylistHistory } from './components/PlaylistHistory';
 import { CommandPalette } from './components/CommandPalette';
+import { TrackingPanel } from './components/TrackingPanel';
+import { useTracking } from './lib/tracking';
 import { ShortcutsHelp } from './components/ShortcutsHelp';
 import { SettingsDialog } from './components/SettingsDialog';
 import { SavedSongsDialog } from './components/SavedSongsDialog';
@@ -33,6 +35,7 @@ export default function Home() {
   const { recent, add: addRecent } = useRecent();
   const { favorites } = useFavorites();
   const { isHidden } = useHidden();
+  const { tracked } = useTracking();
 
   // Refine the search region from the user's IP (physical location), unless
   // they've manually chosen one in Settings.
@@ -135,30 +138,42 @@ export default function Home() {
       <div className="flex flex-1 min-h-0">
         <Sidebar selected={currentStation} onSelect={handleSelect} nowPlaying={currentTrack} />
         <main className="flex-1 p-10 bg-[var(--color-bg)] overflow-y-auto overflow-x-hidden">
-          {/* Centered, width-capped stage so the title + artwork sit in the
-              middle of the panel instead of sprawling top-left. */}
-          <div className="max-w-4xl w-full mx-auto flex flex-col gap-6 min-h-full justify-center">
-            {currentStation ? (
-              // Single key on the Fragment so both children remount together
-              // when the station changes. Short `<>` can't carry a key, and
-              // the same key on both children is a React duplicate-key error.
-              <Fragment key={currentStation.id}>
-                <NowPlaying station={currentStation} playState={playState} everPlayed={everPlayed} onTrack={setCurrentTrack} onHistory={setPlaylistHistory} />
-                <Player station={currentStation} onPlayStateChange={handlePlayState} />
-                <PlaylistHistory history={playlistHistory} />
-              </Fragment>
-            ) : (
-              <div className="flex items-center justify-center text-center">
-                <div>
-                  <div className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-warm)] mb-3">
-                    Radio
-                  </div>
-                  <div className="text-[32px] font-bold tracking-tight">Pick a station to begin</div>
-                  <div className="text-base text-[var(--color-ink-3)] mt-3 max-w-md mx-auto">
-                    Press <kbd className="px-1.5 py-0.5 rounded border border-[var(--color-line)] bg-white text-[12px] font-semibold">⌘K</kbd> to search, or browse the popular list in the sidebar. Star what you love to pin it to the top.
+          {/* Width-capped stage. When stations are tracked it splits into the
+              player column + a Tracking monitor aside (stacks below on narrow
+              screens). */}
+          <div className="max-w-6xl w-full mx-auto flex flex-col lg:flex-row gap-8 min-h-full">
+            <div className="flex-1 min-w-0 flex flex-col gap-6 justify-center">
+              {currentStation ? (
+                // Single key on the Fragment so both children remount together
+                // when the station changes. Short `<>` can't carry a key, and
+                // the same key on both children is a React duplicate-key error.
+                <Fragment key={currentStation.id}>
+                  <NowPlaying station={currentStation} playState={playState} everPlayed={everPlayed} onTrack={setCurrentTrack} onHistory={setPlaylistHistory} />
+                  <Player station={currentStation} onPlayStateChange={handlePlayState} />
+                  <PlaylistHistory history={playlistHistory} />
+                </Fragment>
+              ) : (
+                <div className="flex items-center justify-center text-center">
+                  <div>
+                    <div className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-warm)] mb-3">
+                      Radio
+                    </div>
+                    <div className="text-[32px] font-bold tracking-tight">Pick a station to begin</div>
+                    <div className="text-base text-[var(--color-ink-3)] mt-3 max-w-md mx-auto">
+                      Press <kbd className="px-1.5 py-0.5 rounded border border-[var(--color-line)] bg-white text-[12px] font-semibold">⌘K</kbd> to search, or browse the popular list in the sidebar. Star what you love to pin it to the top.
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
+            </div>
+            {tracked.length > 0 && (
+              <aside className="shrink-0 self-stretch lg:w-[320px] lg:border-l lg:border-[var(--color-line)] lg:pl-8 pt-2">
+                <TrackingPanel
+                  onSelect={handleSelect}
+                  activeStationId={currentStation?.id ?? null}
+                  activeTrack={currentTrack}
+                />
+              </aside>
             )}
           </div>
         </main>
