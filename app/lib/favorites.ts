@@ -2,6 +2,7 @@
 
 import { useCallback, useSyncExternalStore } from 'react';
 import type { Station } from './stations';
+import { persistSet } from './persist';
 
 const KEY = 'radio:favorites';
 const EMPTY: Station[] = [];
@@ -45,12 +46,7 @@ function subscribe(cb: () => void): () => void {
 
 function write(next: Station[]) {
   snapshot = next;
-  try {
-    window.localStorage.setItem(KEY, JSON.stringify(next));
-  } catch {
-    // Safari private mode / quota exceeded — keep in-memory state correct
-    // so the UI still reflects the toggle; persistence is best-effort.
-  }
+  persistSet(KEY, JSON.stringify(next));
   emit();
 }
 
