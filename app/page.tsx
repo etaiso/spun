@@ -80,8 +80,8 @@ export default function Home() {
   }, [addRecent]);
 
   // Page-level shortcuts. ⌘K / Ctrl+K opens the command palette (handled
-  // before the modifier bail). ←/→ cycle favorites, ? toggles help, Esc
-  // closes. Audio shortcuts (Space/M/↑/↓) live in Player.
+  // before the modifier bail). ←/→ cycle favorites, ? toggles help, S toggles
+  // saved songs, Esc closes. Audio shortcuts (Space/M/↑/↓) live in Player.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
@@ -99,6 +99,9 @@ export default function Home() {
       if (e.key === '?') {
         e.preventDefault();
         setShowHelp(s => !s);
+      } else if (e.key === 's' || e.key === 'S') {
+        e.preventDefault();
+        setSavedOpen(o => !o);
       } else if (e.key === 'Escape') {
         setShowHelp(false);
       } else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {

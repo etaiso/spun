@@ -68,7 +68,7 @@ export function TopBar({ onOpenSearch, onOpenSettings, onOpenSaved, settingsActi
       <button
         onClick={onOpenSaved}
         aria-label="Saved songs"
-        title="Saved songs"
+        title="Saved songs (S)"
         className="w-10 h-10 rounded-full border border-[var(--color-line)] bg-white text-[var(--color-ink-3)] hover:text-[var(--color-ink)] hover:border-[var(--color-warm)] transition-colors cursor-pointer flex items-center justify-center shrink-0"
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
