@@ -51,8 +51,10 @@ export function SavedSongsDialog({ open, onOpenChange }: Props) {
   return (
     <>
       <audio ref={audioRef} onEnded={() => setPreviewId(null)} className="hidden" />
+      {/* Modal anchored near the top (not vertically centered) so the header +
+          search bar stay put as the filtered list grows/shrinks below them. */}
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-6" onClick={() => onOpenChange(false)}>
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/30 px-6 pt-[12vh] pb-6" onClick={() => onOpenChange(false)}>
           <div
             role="dialog"
             aria-modal="true"
