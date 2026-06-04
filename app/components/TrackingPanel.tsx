@@ -65,7 +65,17 @@ function TrackedStationRow({
   onSelect: () => void;
   onUntrack: () => void;
 }) {
-  const [status, setStatus] = useState<Status>({ kind: 'connecting' });
+  // Seed from the session cache so a station returning to the panel (e.g. you
+  // switched away from playing it) shows its last-known song immediately instead
+  // of flashing "Connecting…" while it re-recognizes — symmetric with how
+  // NowPlaying restores when you switch *to* a tracked station. The SSE below
+  // still opens to keep it current.
+  const [status, setStatus] = useState<Status>(() => {
+    const s = loadSession(station.id);
+    return s?.current && !isNonTrack(s.current.raw, station.name)
+      ? { kind: 'track', title: s.current.raw }
+      : { kind: 'connecting' };
+  });
 
   useEffect(() => {
     const es = new EventSource(`/api/now-playing?url=${encodeURIComponent(station.streamUrl)}`);
