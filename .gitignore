@@ -47,3 +47,6 @@ next-env.d.ts
 recognizer/.venv/
 __pycache__/
 *.pyc
+
+# Local SQLite DB (dev)
+/data/
