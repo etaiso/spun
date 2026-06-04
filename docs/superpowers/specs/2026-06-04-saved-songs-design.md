@@ -93,6 +93,14 @@ Each row (newest first): cover, **artist — title**, "heard on {station} ·
 links (Apple hidden when `appleMusicUrl === ''`), and a ✕ to remove. Empty state:
 "No saved songs yet — tap the heart on a recognized song to save it here."
 
+**Search / fuzzy find.** A search input at the top of the modal filters the
+list as you type, reusing the existing `fuzzyScore` from `app/lib/rank.ts`
+(matched against each song's `raw`, i.e. "Artist - Title"). Empty query → full
+list, newest first. Non-empty → keep entries with `fuzzyScore > 0`, sorted by
+score descending (ties broken by `savedAt`, newest first). A "no matches" empty
+state when nothing matches. Shown only when there are ≥ a few saved songs (so a
+tiny list isn't cluttered by a search box).
+
 ## Preview ↔ radio coordination
 
 New `app/lib/playbackBus.ts` — a tiny pub/sub:
@@ -131,7 +139,8 @@ playing entry).
 ## Testing
 
 - Unit: `savedSongs` store (add/dedup/remove/persist), the Apple Music URL
-  parser, and the metadata-fallback URL construction.
+  parser, the metadata-fallback URL construction, and the fuzzy search
+  filter/ordering (reusing `fuzzyScore`).
 - Manual: save a Shazam-recognized song → appears in the modal with working
   Shazam/Apple links + preview; preview pauses the radio; save a metadata-only
   song → search-URL links, no preview; remove; reload → persists; cross-tab.
