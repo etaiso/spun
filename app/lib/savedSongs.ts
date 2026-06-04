@@ -1,5 +1,6 @@
 'use client';
 
+import { useCallback, useSyncExternalStore } from 'react';
 import { fuzzyScore } from './rank';
 
 export type SavedSong = {
@@ -68,4 +69,48 @@ export function searchSavedSongs(list: SavedSong[], query: string): SavedSong[] 
     .filter(x => x.score > 0)
     .sort((a, b) => b.score - a.score || b.s.savedAt - a.s.savedAt)
     .map(x => x.s);
+}
+
+const KEY = 'radio:savedSongs';
+const EMPTY: SavedSong[] = [];
+
+function load(): SavedSong[] {
+  if (typeof window === 'undefined') return EMPTY;
+  try {
+    const raw = window.localStorage.getItem(KEY);
+    return raw ? (JSON.parse(raw) as SavedSong[]) : EMPTY;
+  } catch {
+    return EMPTY;
+  }
+}
+
+let snapshot: SavedSong[] | null = null;
+function read(): SavedSong[] {
+  if (snapshot === null) snapshot = load();
+  return snapshot;
+}
+
+const listeners = new Set<() => void>();
+function subscribe(cb: () => void): () => void {
+  listeners.add(cb);
+  const onStorage = (e: StorageEvent) => { if (e.key === KEY) { snapshot = load(); cb(); } };
+  window.addEventListener('storage', onStorage);
+  return () => { listeners.delete(cb); window.removeEventListener('storage', onStorage); };
+}
+
+function write(next: SavedSong[]) {
+  snapshot = next;
+  try { window.localStorage.setItem(KEY, JSON.stringify(next)); } catch { /* best-effort */ }
+  for (const cb of listeners) cb();
+}
+
+export function useSavedSongs() {
+  const saved = useSyncExternalStore(subscribe, read, () => EMPTY);
+  const isSaved = useCallback((id: string) => saved.some(s => s.id === id), [saved]);
+  // Stamp savedAt at call time; build + de-dupe via the pure helpers.
+  const save = useCallback((input: Omit<BuildInput, 'savedAt'>) => {
+    write(addSong(read(), buildSavedSong({ ...input, savedAt: Date.now() })));
+  }, []);
+  const remove = useCallback((id: string) => { write(removeSong(read(), id)); }, []);
+  return { saved, isSaved, save, remove };
 }
