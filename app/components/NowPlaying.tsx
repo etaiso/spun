@@ -10,6 +10,7 @@ import { loadSession, saveSession } from '@/app/lib/session';
 import { splitArtistTitle } from '@/app/lib/track';
 import type { TrackSource, HistoryEntry } from '@/app/lib/nowPlayingTypes';
 import type { PlayState } from './Player';
+import { useSavedSongs } from '@/app/lib/savedSongs';
 
 type MetaState = 'waiting' | 'playing' | 'no-metadata' | 'no-song' | 'recognizing';
 
@@ -47,6 +48,12 @@ export function NowPlaying({ station, playState, everPlayed, onTrack, onHistory 
   const [currentSource, setCurrentSource] = useState<TrackSource>(restored?.current?.source ?? 'metadata');
   // Cover art for the current track (Shazam, or an iTunes lookup fallback).
   const [currentCover, setCurrentCover] = useState<string | null>(restored?.current?.cover ?? null);
+  // Outbound links for the current track (Shazam-recognized only; metadata
+  // tracks get search-URL fallbacks at save time). Reset per track.
+  const [links, setLinks] = useState<{ shazamUrl: string; appleMusicUrl: string; previewUrl: string; key: string }>(
+    { shazamUrl: '', appleMusicUrl: '', previewUrl: '', key: '' },
+  );
+  const { isSaved, save, remove } = useSavedSongs();
   const [history, setHistory] = useState<HistoryEntry[]>(restored?.history ?? []);
   const [lastUpdate, setLastUpdate] = useState<string | null>(restored?.lastUpdate ?? null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -126,7 +133,7 @@ export function NowPlaying({ station, playState, everPlayed, onTrack, onHistory 
     es.onmessage = (ev) => {
       try {
         const msg = JSON.parse(ev.data) as
-          | { type: 'track'; title: string; source?: TrackSource; cover?: string }
+          | { type: 'track'; title: string; source?: TrackSource; cover?: string; shazamUrl?: string; appleMusicUrl?: string; previewUrl?: string; key?: string }
           | { type: 'no-metadata' }
           | { type: 'no-song' }
           | { type: 'recognizing' }
@@ -151,6 +158,10 @@ export function NowPlaying({ station, playState, everPlayed, onTrack, onHistory 
           setRefreshing(false);
           setCurrentSource(msg.source ?? 'metadata');
           setCurrentCover(msg.cover ?? null);
+          setLinks({
+            shazamUrl: msg.shazamUrl ?? '', appleMusicUrl: msg.appleMusicUrl ?? '',
+            previewUrl: msg.previewUrl ?? '', key: msg.key ?? '',
+          });
           const prev = prevTitleRef.current;
           if (prev === msg.title) return;
           if (prev !== null && !isNonTrack(prev, station.name)) {
@@ -340,14 +351,29 @@ export function NowPlaying({ station, playState, everPlayed, onTrack, onHistory 
       title={title}
       subtitle={artist}
       badge={
-        currentSource === 'shazam' ? (
-          <span className="inline-flex items-center gap-1.5 text-[11px] tracking-[0.8px] uppercase font-bold text-white bg-[#0088ff] rounded-full px-2.5 py-1 shadow-[0_2px_8px_rgba(0,136,255,0.35)]">
-            <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5" aria-hidden="true">
-              <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm3.9 7.36c-.3.41-.79.6-1.3.46-1.6-.45-3.06-.2-4.2.62-.36.26-.86.2-1.14-.15a.86.86 0 0 1 .16-1.22c1.55-1.12 3.52-1.47 5.65-.88.52.14.85.69.7 1.2a.85.85 0 0 1-.53.6Zm-.66 3.05c-.25.33-.67.48-1.06.36-1.06-.31-2-.18-2.74.36-.32.23-.77.16-1-.18a.74.74 0 0 1 .15-1.04c1.07-.78 2.45-.98 3.95-.55.42.12.66.57.5.99a.73.73 0 0 1-.04.06Zm-.86 2.86c-.2.27-.55.38-.85.27-.66-.2-1.2-.12-1.6.18-.27.2-.65.13-.84-.15a.62.62 0 0 1 .13-.87c.7-.5 1.6-.62 2.6-.32.34.1.53.46.42.8a.6.6 0 0 1-.06.31Z"/>
-            </svg>
-            Identified by Shazam
-          </span>
-        ) : undefined
+        <div className="flex items-center gap-2 flex-wrap">
+          {currentSource === 'shazam' && (
+            <span className="inline-flex items-center gap-1.5 text-[11px] tracking-[0.8px] uppercase font-bold text-white bg-[#0088ff] rounded-full px-2.5 py-1 shadow-[0_2px_8px_rgba(0,136,255,0.35)]">
+              <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5" aria-hidden="true">
+                <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm3.9 7.36c-.3.41-.79.6-1.3.46-1.6-.45-3.06-.2-4.2.62-.36.26-.86.2-1.14-.15a.86.86 0 0 1 .16-1.22c1.55-1.12 3.52-1.47 5.65-.88.52.14.85.69.7 1.2a.85.85 0 0 1-.53.6Zm-.66 3.05c-.25.33-.67.48-1.06.36-1.06-.31-2-.18-2.74.36-.32.23-.77.16-1-.18a.74.74 0 0 1 .15-1.04c1.07-.78 2.45-.98 3.95-.55.42.12.66.57.5.99a.73.73 0 0 1-.04.06Zm-.86 2.86c-.2.27-.55.38-.85.27-.66-.2-1.2-.12-1.6.18-.27.2-.65.13-.84-.15a.62.62 0 0 1 .13-.87c.7-.5 1.6-.62 2.6-.32.34.1.53.46.42.8a.6.6 0 0 1-.06.31Z"/>
+              </svg>
+              Identified by Shazam
+            </span>
+          )}
+          <SaveSongButton
+            saved={isSaved(links.key || `${artist.trim().toLowerCase()}|${title.trim().toLowerCase()}`)}
+            onToggle={() => {
+              const id = links.key || `${artist.trim().toLowerCase()}|${title.trim().toLowerCase()}`;
+              if (isSaved(id)) { remove(id); return; }
+              save({
+                raw: currentRaw ?? '', artist, title, cover: trackCover ?? undefined,
+                shazamUrl: links.shazamUrl || undefined, appleMusicUrl: links.appleMusicUrl || undefined,
+                previewUrl: links.previewUrl || undefined, key: links.key || undefined,
+                stationName: station.name,
+              });
+            }}
+          />
+        </div>
       }
     />
   );
@@ -390,6 +416,25 @@ function NowPlayingHeaderControls({
         </span>
       )}
     </div>
+  );
+}
+
+function SaveSongButton({ saved, onToggle }: { saved: boolean; onToggle: () => void }) {
+  return (
+    <button
+      onClick={onToggle}
+      aria-label={saved ? 'Remove from saved songs' : 'Save song'}
+      title={saved ? 'Saved — click to remove' : 'Save this song'}
+      className={[
+        'inline-flex items-center gap-1.5 text-[11px] tracking-[0.8px] uppercase font-bold rounded-full px-2.5 py-1 cursor-pointer transition-colors border',
+        saved
+          ? 'bg-[var(--color-warm)] text-white border-[var(--color-warm)]'
+          : 'text-[var(--color-warm)] border-[var(--color-line)] hover:border-[var(--color-warm)]',
+      ].join(' ')}
+    >
+      <span aria-hidden="true">{saved ? '♥' : '♡'}</span>
+      {saved ? 'Saved' : 'Save'}
+    </button>
   );
 }
 
