@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Electron main/preload are plain CommonJS Node glue, not Next app source.
+    "electron/**",
   ]),
 ]);
 
