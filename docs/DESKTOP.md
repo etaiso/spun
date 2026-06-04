@@ -48,6 +48,12 @@ npm run electron:build     # electron:rebuild → next build → electron-builde
 > npm rebuild better-sqlite3
 > ```
 
+> **Electron version is pinned (`^35`) on purpose.** `better-sqlite3@12.10.0`
+> doesn't compile against the V8 in Electron 37+ (the mandatory external-pointer
+> "tag" API: `External::New(isolate, value, tag)`). Don't bump Electron past what
+> `better-sqlite3` supports without checking that `npm run electron:rebuild`
+> still compiles — otherwise the packaged app crashes on launch.
+
 ## Code signing + notarization (macOS) — required for distribution
 
 Auto-update and a warning-free install need a Developer ID cert + notarization.
