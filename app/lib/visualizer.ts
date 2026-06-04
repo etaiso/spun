@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useSyncExternalStore } from 'react';
+import { persistSet } from './persist';
 
 // Whether the audio-reactive "radio wave" rings render behind the now-playing
 // cover. Persisted, on by default. Same useSyncExternalStore pattern as the
@@ -38,7 +39,7 @@ function subscribe(cb: () => void): () => void {
 
 function write(next: boolean) {
   snapshot = next;
-  try { window.localStorage.setItem(KEY, next ? '1' : '0'); } catch { /* best-effort */ }
+  persistSet(KEY, next ? '1' : '0');
   emit();
 }
 
