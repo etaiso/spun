@@ -18,6 +18,8 @@ API:  POST /recognize  { "url": "<stream url>", "seconds": 6 }
 """
 
 import contextlib
+import json
+import re
 import ssl
 
 import aiohttp
@@ -25,6 +27,22 @@ import certifi
 from fastapi import FastAPI
 from pydantic import BaseModel
 from shazamio import Shazam
+
+def extract_apple_music_url(hub: dict | None) -> str:
+    """First https://music.apple.com/... link found in the hub deep links, or ''."""
+    blob = json.dumps(hub or {})
+    m = re.search(r"music\.apple\.com[^\"#\\]*", blob)
+    return ("https://" + m.group(0)) if m else ""
+
+
+def extract_preview_url(hub: dict | None) -> str:
+    """The ~30s AAC preview clip (.m4a) from the hub actions, or ''."""
+    for a in (hub or {}).get("actions") or []:
+        uri = a.get("uri") or ""
+        if ".m4a" in uri:
+            return uri
+    return ""
+
 
 # macOS python.org builds don't use the system trust store, so HTTPS to the
 # stream CDNs (and Shazam) fails cert verification. Pin certifi's CA bundle.
@@ -92,9 +110,6 @@ async def recognize(req: RecognizeRequest):
     title = track.get("title") or ""
     raw = f"{artist} - {title}".strip(" -") if artist else title
 
-    # Album/track cover art. Shazam returns several image fields; prefer the
-    # high-res cover, then the standard cover, then the share image. May be
-    # absent for some tracks — return "" and let the client fall back.
     images = track.get("images") or {}
     cover = (
         images.get("coverarthq")
@@ -102,8 +117,20 @@ async def recognize(req: RecognizeRequest):
         or (track.get("share") or {}).get("image")
         or ""
     )
+    hub = track.get("hub") or {}
+    shazam_url = (track.get("share") or {}).get("href") or track.get("url") or ""
 
-    return {"match": True, "artist": artist, "title": title, "raw": raw, "cover": cover}
+    return {
+        "match": True,
+        "artist": artist,
+        "title": title,
+        "raw": raw,
+        "cover": cover,
+        "shazamUrl": shazam_url,
+        "appleMusicUrl": extract_apple_music_url(hub),
+        "previewUrl": extract_preview_url(hub),
+        "key": str(track.get("key") or ""),
+    }
 
 
 def _error(message: str):
