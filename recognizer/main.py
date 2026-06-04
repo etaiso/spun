@@ -141,9 +141,13 @@ def _error(message: str):
     return JSONResponse(status_code=503, content={"error": message})
 
 
-# Allow `python main.py` for convenience (run.sh uses uvicorn directly).
+# Allow `python main.py` (and the PyInstaller-frozen binary) to run directly.
+# run.sh uses the uvicorn CLI with its own --port; here we honour RECOGNIZER_PORT
+# so the Electron shell can place the sidecar on a free port.
 if __name__ == "__main__":
+    import os
     import uvicorn
 
+    port = int(os.environ.get("RECOGNIZER_PORT", "8755"))
     with contextlib.suppress(KeyboardInterrupt):
-        uvicorn.run(app, host="127.0.0.1", port=8755)
+        uvicorn.run(app, host="127.0.0.1", port=port)
