@@ -90,7 +90,7 @@ export function NowPlaying({ station, playState, everPlayed, onTrack, onHistory 
   // CORS-enabled. We tag the result with the track it's for and only display it
   // when it still matches, so stale art never flashes on the next song (and
   // setState stays out of the effect body, avoiding cascading renders).
-  const [lookedUp, setLookedUp] = useState<{ key: string; url: string } | null>(null);
+  const [lookedUp, setLookedUp] = useState<{ key: string; url: string; appleUrl: string } | null>(null);
   useEffect(() => {
     if (!currentRaw || currentCover || isNonTrack(currentRaw, station.name)) return;
     const { artist, title } = splitArtistTitle(currentRaw);
@@ -106,10 +106,17 @@ export function NowPlaying({ station, playState, everPlayed, onTrack, onHistory 
           { signal: ctrl.signal },
         );
         if (!res.ok) return;
-        const data = (await res.json()) as { results?: { artworkUrl100?: string }[] };
-        const art = data.results?.[0]?.artworkUrl100;
-        // Bump the default 100×100 thumbnail up to a crisp 600×600.
-        if (!cancelled && art) setLookedUp({ key: currentRaw, url: art.replace('100x100bb', '600x600bb') });
+        const data = (await res.json()) as { results?: { artworkUrl100?: string; trackViewUrl?: string }[] };
+        const r = data.results?.[0];
+        // Capture cover (bumped 100→600) AND the direct Apple Music URL, so a
+        // metadata-only track gets a real link instead of a search fallback.
+        if (!cancelled && r && (r.artworkUrl100 || r.trackViewUrl)) {
+          setLookedUp({
+            key: currentRaw,
+            url: r.artworkUrl100 ? r.artworkUrl100.replace('100x100bb', '600x600bb') : '',
+            appleUrl: r.trackViewUrl ?? '',
+          });
+        }
       } catch {
         // Network/abort — silently keep the station logo.
       }
@@ -119,7 +126,8 @@ export function NowPlaying({ station, playState, everPlayed, onTrack, onHistory 
 
   // Effective cover: Shazam's art if present, else the looked-up art (only when
   // it's for the song currently on screen).
-  const trackCover = currentCover ?? (lookedUp?.key === currentRaw ? lookedUp.url : null);
+  const matchedLookup = lookedUp?.key === currentRaw ? lookedUp : null;
+  const trackCover = currentCover ?? (matchedLookup?.url || null);
 
   // Parent keys this component by station.id, so a station change remounts
   // and all the useState initial values are fresh. No explicit reset needed.
@@ -367,7 +375,8 @@ export function NowPlaying({ station, playState, everPlayed, onTrack, onHistory 
               if (isSaved(id)) { remove(id); return; }
               save({
                 raw: currentRaw ?? '', artist, title, cover: trackCover ?? undefined,
-                shazamUrl: links.shazamUrl || undefined, appleMusicUrl: links.appleMusicUrl || undefined,
+                shazamUrl: links.shazamUrl || undefined,
+                appleMusicUrl: (links.appleMusicUrl || matchedLookup?.appleUrl) || undefined,
                 previewUrl: links.previewUrl || undefined, key: links.key || undefined,
                 stationName: station.name,
               });

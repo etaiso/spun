@@ -58,7 +58,7 @@ export function SavedSongsDialog({ open, onOpenChange }: Props) {
             aria-modal="true"
             aria-label="Saved songs"
             onClick={(e) => e.stopPropagation()}
-            className="bg-white rounded-2xl shadow-[0_24px_64px_rgba(0,0,0,0.25)] max-w-lg w-full max-h-[85vh] overflow-hidden flex flex-col"
+            className="bg-white rounded-2xl shadow-[0_24px_64px_rgba(0,0,0,0.25)] max-w-2xl w-full max-h-[85vh] overflow-hidden flex flex-col"
           >
             <div className="overflow-y-auto p-7">
               <div className="flex items-center justify-between mb-5">
@@ -72,17 +72,15 @@ export function SavedSongsDialog({ open, onOpenChange }: Props) {
                 </p>
               ) : (
                 <>
-                  {saved.length >= 5 && (
-                    <div className="flex items-center gap-2 border border-[var(--color-line)] rounded-full px-3.5 py-2 mb-4 bg-[var(--color-bg)]">
-                      <span aria-hidden="true" className="text-[var(--color-ink-4)]">🔍</span>
-                      <input
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        placeholder="Search saved songs…"
-                        className="flex-1 bg-transparent outline-none text-sm text-[var(--color-ink)] placeholder:text-[var(--color-ink-4)]"
-                      />
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2 border border-[var(--color-line)] rounded-full px-3.5 py-2 mb-4 bg-[var(--color-bg)]">
+                    <span aria-hidden="true" className="text-[var(--color-ink-4)]">🔍</span>
+                    <input
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      placeholder="Search saved songs…"
+                      className="flex-1 bg-transparent outline-none text-sm text-[var(--color-ink)] placeholder:text-[var(--color-ink-4)]"
+                    />
+                  </div>
 
                   {shown.length === 0 ? (
                     <p className="text-sm text-[var(--color-ink-3)]">No matches.</p>
