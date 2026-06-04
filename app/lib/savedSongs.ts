@@ -2,6 +2,7 @@
 
 import { useCallback, useSyncExternalStore } from 'react';
 import { fuzzyScore } from './rank';
+import { persistSet } from './persist';
 
 export type SavedSong = {
   id: string;            // Shazam key, else normalized `${artist}|${title}`
@@ -111,7 +112,7 @@ function subscribe(cb: () => void): () => void {
 
 function write(next: SavedSong[]) {
   snapshot = next;
-  try { window.localStorage.setItem(KEY, JSON.stringify(next)); } catch { /* best-effort */ }
+  persistSet(KEY, JSON.stringify(next));
   for (const cb of listeners) cb();
 }
 
