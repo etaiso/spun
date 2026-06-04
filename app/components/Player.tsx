@@ -133,7 +133,9 @@ export function Player({ station, onPlayStateChange }: Props) {
       e.preventDefault();
       const dir = e.deltaY < 0 ? 1 : -1; // wheel up = louder
       setMuted(false);
-      setVolume(v => Math.min(1, Math.max(0, +(v + dir * 0.05).toFixed(2))));
+      // Small step per wheel event — trackpads/mice fire many events per
+      // scroll, so a large step races to the ends too fast.
+      setVolume(v => Math.min(1, Math.max(0, +(v + dir * 0.02).toFixed(2))));
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
