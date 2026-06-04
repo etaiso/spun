@@ -51,10 +51,10 @@ body {
 .marquee:hover .marquee-inner { animation-play-state: paused; }
 
 /* Radio waves — faint concentric broadcast rings behind the now-playing
-   canvas. Thin warm outlines fading outward. While audio plays they scale
+   cover. Thin warm outlines fading outward. While audio plays they scale
    with the live bass energy (--wave, set per-frame by the analyser); inner
    rings react more (--k). Falls back to a gentle timed pulse when the audio
-   can't be analysed. */
+   can't be analysed. Can be toggled off in Settings (handled in React). */
 .radio-waves span {
   --k: 0.20;
   position: absolute; left: 50%; top: 50%; border-radius: 50%;

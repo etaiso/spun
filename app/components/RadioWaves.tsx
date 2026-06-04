@@ -2,18 +2,20 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { getEnergy } from '@/app/lib/audioBus';
+import { useRingsEnabled } from '@/app/lib/visualizer';
 
 // Decorative broadcast rings that radiate from the station avatar. Rendered as
 // an absolute layer centred on its (relatively-positioned) parent; the rings
 // scale to the live bass energy while audio plays, with a gentle timed pulse
-// fallback when a stream can't be analysed.
+// fallback when a stream can't be analysed. Can be turned off in Settings.
 export function RadioWaves({ playing }: { playing: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const [fallback, setFallback] = useState(false);
+  const { enabled } = useRingsEnabled();
 
   useEffect(() => {
     const el = ref.current;
-    if (!playing || !el) {
+    if (!playing || !enabled || !el) {
       el?.style.setProperty('--wave', '0');
       setFallback(false);
       return;
@@ -39,7 +41,9 @@ export function RadioWaves({ playing }: { playing: boolean }) {
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [playing, fallback]);
+  }, [playing, enabled, fallback]);
+
+  if (!enabled) return null;
 
   return (
     <div
