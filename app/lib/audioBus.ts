@@ -10,6 +10,9 @@ let ctx: AudioContext | null = null;
 let analyser: AnalyserNode | null = null;
 let freq: Uint8Array<ArrayBuffer> | null = null;
 const wired = new WeakSet<HTMLMediaElement>();
+// Keep the source node per element so we can disconnect it when the element is
+// torn down (on station switch), instead of leaking a graph node per switch.
+const sources = new WeakMap<HTMLMediaElement, MediaElementAudioSourceNode>();
 
 function ensure(): boolean {
   if (typeof window === 'undefined') return false;
@@ -47,10 +50,25 @@ export function connectIfRunning(el: HTMLMediaElement): boolean {
     const source = ctx.createMediaElementSource(el);
     source.connect(analyser!);
     wired.add(el);
+    sources.set(el, source);
     return true;
   } catch {
     return false; // already connected elsewhere, or not allowed
   }
+}
+
+/**
+ * Tear an element out of the audio graph when it's discarded (station switch /
+ * unmount). Without this, every switch leaves an orphaned source node wired to
+ * the analyser. Safe to call on an element that was never connected.
+ */
+export function disconnectElement(el: HTMLMediaElement): void {
+  const source = sources.get(el);
+  if (source) {
+    try { source.disconnect(); } catch { /* already gone */ }
+    sources.delete(el);
+  }
+  wired.delete(el);
 }
 
 /** AudioContext state for debugging: 'none' | 'suspended' | 'running' | … */

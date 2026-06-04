@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { Station } from '@/app/lib/stations';
-import { resumeAudio, connectIfRunning } from '@/app/lib/audioBus';
+import { resumeAudio, connectIfRunning, disconnectElement } from '@/app/lib/audioBus';
 import { subscribePauseRadio } from '@/app/lib/playbackBus';
 
 export type PlayState = 'idle' | 'connecting' | 'playing' | 'error';
@@ -40,6 +40,7 @@ function readStoredAutoplay(): boolean {
 
 export function Player({ station, onPlayStateChange }: Props) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const volWrapRef = useRef<HTMLDivElement | null>(null);
   // Lazy init: Player is only rendered after a user gesture (selectedStation
   // starts null), so no SSR happens here — safe to read localStorage on
   // first render without a hydration mismatch.
@@ -133,6 +134,40 @@ export function Player({ station, onPlayStateChange }: Props) {
       const a = audioRef.current;
       if (a && !a.paused) { a.pause(); setPaused(true); }
     });
+  }, []);
+
+  // Adjust volume by scrolling the wheel over the volume control. Registered as
+  // a non-passive native listener because React's synthetic onWheel is passive,
+  // so preventDefault() there wouldn't stop the page from scrolling.
+  useEffect(() => {
+    const el = volWrapRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const dir = e.deltaY < 0 ? 1 : -1; // wheel up = louder
+      setMuted(false);
+      setVolume(v => Math.min(1, Math.max(0, +(v + dir * 0.05).toFixed(2))));
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
+
+  // On unmount (station switch), explicitly tear down the audio element so its
+  // proxied connection is released immediately. Without this, rapid switching
+  // leaves stale streaming connections open; in dev (HTTP/1.1, ~6 connections
+  // per origin) they pile up until new requests can't connect — playback gets
+  // stuck with no sound. Also drop the Web Audio node so the graph doesn't leak.
+  useEffect(() => {
+    const a = audioRef.current;
+    return () => {
+      if (!a) return;
+      disconnectElement(a);
+      try {
+        a.pause();
+        a.removeAttribute('src');
+        a.load(); // forces the browser to abort the in-flight stream request
+      } catch { /* best-effort teardown */ }
+    };
   }, []);
 
   // Global media keyboard shortcuts for the audio it owns: Space/K play-pause,
@@ -238,7 +273,7 @@ export function Player({ station, onPlayStateChange }: Props) {
       >
         {paused ? '▶' : '⏸'}
       </button>
-      <div className="flex items-center gap-3 max-w-[280px] text-[var(--color-ink-3)]">
+      <div ref={volWrapRef} className="flex items-center gap-3 max-w-[280px] text-[var(--color-ink-3)]" title="Scroll to change volume">
         <button
           onClick={() => setMuted(m => !m)}
           className="shrink-0 hover:text-[var(--color-ink)] transition-colors cursor-pointer"
