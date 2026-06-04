@@ -1,15 +1,25 @@
 appId: com.shazamradio.app
 productName: Shazam Radio
+# We rebuild better-sqlite3 for Electron (electron:rebuild) and let `next build`
+# trace it into .next/standalone before packaging, so electron-builder must NOT
+# run its own native rebuild — doing so creates a dangling hashed symlink under
+# the bundled standalone that breaks code signing.
+npmRebuild: false
 # Only the Electron glue lives in the asar; the Next server, recognizer, and
 # ffmpeg ride along as unpacked extraResources (native bins can't run from asar).
 files:
   - electron/**
   - package.json
 extraResources:
+  # filter ["**/*"] is required, else electron-builder's default filter drops
+  # node_modules from the copy — leaving the standalone server without its deps
+  # (and a dangling better-sqlite3 symlink under .next/ that breaks signing).
   - from: .next/standalone
     to: app
+    filter: ["**/*"]
   - from: .next/static
     to: app/.next/static
+    filter: ["**/*"]
   - from: public
     to: app/public
   - from: dist-recognizer
@@ -31,4 +41,5 @@ publish:
   provider: github
   owner: etaiso
   repo: shazam-radio
+afterPack: electron/afterPack.js
 afterSign: electron/notarize.js
