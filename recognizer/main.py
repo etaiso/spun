@@ -23,6 +23,7 @@ import contextlib
 import json
 import re
 import ssl
+import sys
 
 import aiohttp
 import certifi
@@ -141,6 +142,37 @@ def _error(message: str):
     return JSONResponse(status_code=503, content={"error": message})
 
 
+def _suppress_macos_dock_icon() -> None:
+    """Keep the bundled sidecar out of the macOS Dock.
+
+    When the Electron app spawns this frozen binary, it inherits the GUI (Aqua)
+    session and — being a plain executable with no Info.plist — gets its own
+    generic Dock tile. Set the app's activation policy to "prohibited" (a
+    background/agent app) so no tile appears. Best-effort; no-op off macOS or if
+    the ObjC runtime calls fail.
+    """
+    if sys.platform != "darwin":
+        return
+    try:
+        import ctypes
+
+        ctypes.cdll.LoadLibrary("/System/Library/Frameworks/AppKit.framework/AppKit")
+        objc = ctypes.cdll.LoadLibrary("/usr/lib/libobjc.dylib")
+        objc.objc_getClass.restype = ctypes.c_void_p
+        objc.sel_registerName.restype = ctypes.c_void_p
+        objc.objc_msgSend.restype = ctypes.c_void_p
+        objc.objc_msgSend.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+        ns_app = objc.objc_msgSend(
+            objc.objc_getClass(b"NSApplication"),
+            objc.sel_registerName(b"sharedApplication"),
+        )
+        # setActivationPolicy: NSApplicationActivationPolicyProhibited (2)
+        objc.objc_msgSend.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_long]
+        objc.objc_msgSend(ns_app, objc.sel_registerName(b"setActivationPolicy:"), 2)
+    except Exception:  # noqa: BLE001 — purely cosmetic; never block startup
+        pass
+
+
 # Allow `python main.py` (and the PyInstaller-frozen binary) to run directly.
 # run.sh uses the uvicorn CLI with its own --port; here we honour RECOGNIZER_PORT
 # so the Electron shell can place the sidecar on a free port.
@@ -148,6 +180,7 @@ if __name__ == "__main__":
     import os
     import uvicorn
 
+    _suppress_macos_dock_icon()
     port = int(os.environ.get("RECOGNIZER_PORT", "8755"))
     with contextlib.suppress(KeyboardInterrupt):
         uvicorn.run(app, host="127.0.0.1", port=port)
