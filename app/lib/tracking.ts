@@ -2,6 +2,7 @@
 
 import { useCallback, useSyncExternalStore } from 'react';
 import type { Station } from './stations';
+import { persistSet } from './persist';
 
 // Stations the user is "tracking" — the app watches what each is playing in the
 // background (via a per-station /api/now-playing SSE, same mechanism as the
@@ -40,7 +41,7 @@ function subscribe(cb: () => void): () => void {
 
 function write(next: Station[]) {
   snapshot = next;
-  try { window.localStorage.setItem(KEY, JSON.stringify(next)); } catch { /* best-effort */ }
+  persistSet(KEY, JSON.stringify(next));
   emit();
 }
 
