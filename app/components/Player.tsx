@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Station } from '@/app/lib/stations';
 import { resumeAudio, connectIfRunning } from '@/app/lib/audioBus';
+import { subscribePauseRadio } from '@/app/lib/playbackBus';
 
 export type PlayState = 'idle' | 'connecting' | 'playing' | 'error';
 
@@ -124,6 +125,14 @@ export function Player({ station, onPlayStateChange }: Props) {
 
     return () => { cancelled = true; disarm?.(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Pause the live stream when something else (a saved-song preview) starts.
+  useEffect(() => {
+    return subscribePauseRadio(() => {
+      const a = audioRef.current;
+      if (a && !a.paused) { a.pause(); setPaused(true); }
+    });
   }, []);
 
   // Global media keyboard shortcuts for the audio it owns: Space/K play-pause,
