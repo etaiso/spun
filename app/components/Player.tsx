@@ -157,10 +157,17 @@ export function Player({ station, onPlayStateChange }: Props) {
   // leaves stale streaming connections open; in dev (HTTP/1.1, ~6 connections
   // per origin) they pile up until new requests can't connect — playback gets
   // stuck with no sound. Also drop the Web Audio node so the graph doesn't leak.
+  //
+  // Guard on `a.isConnected`: React Strict Mode (dev) simulates an
+  // unmount+remount on mount WITHOUT removing the DOM node, so this cleanup
+  // would otherwise strip the src of the still-live element (leaving it silent,
+  // since the component doesn't re-render to re-apply src). On a real unmount
+  // the passive cleanup runs after the node has left the DOM, so isConnected is
+  // false and we tear down for real.
   useEffect(() => {
     const a = audioRef.current;
     return () => {
-      if (!a) return;
+      if (!a || a.isConnected) return;
       disconnectElement(a);
       try {
         a.pause();
