@@ -138,33 +138,36 @@ export default function Home() {
       <div className="flex flex-1 min-h-0">
         <Sidebar selected={currentStation} onSelect={handleSelect} nowPlaying={currentTrack} />
         <main className="flex-1 p-10 bg-[var(--color-bg)] overflow-y-auto overflow-x-hidden">
-          {/* Width-capped stage. When stations are tracked it splits into the
-              player column + a Tracking monitor aside (stacks below on narrow
-              screens). */}
-          <div className="max-w-6xl w-full mx-auto flex flex-col lg:flex-row gap-8 min-h-full">
-            <div className="flex-1 min-w-0 flex flex-col gap-6 justify-center">
-              {currentStation ? (
-                // Single key on the Fragment so both children remount together
-                // when the station changes. Short `<>` can't carry a key, and
-                // the same key on both children is a React duplicate-key error.
-                <Fragment key={currentStation.id}>
-                  <NowPlaying station={currentStation} playState={playState} everPlayed={everPlayed} onTrack={setCurrentTrack} onHistory={setPlaylistHistory} />
-                  <Player station={currentStation} onPlayStateChange={handlePlayState} />
-                  <PlaylistHistory history={playlistHistory} />
-                </Fragment>
-              ) : (
-                <div className="flex items-center justify-center text-center">
-                  <div>
-                    <div className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-warm)] mb-3">
-                      Radio
-                    </div>
-                    <div className="text-[32px] font-bold tracking-tight">Pick a station to begin</div>
-                    <div className="text-base text-[var(--color-ink-3)] mt-3 max-w-md mx-auto">
-                      Press <kbd className="px-1.5 py-0.5 rounded border border-[var(--color-line)] bg-white text-[12px] font-semibold">⌘K</kbd> to search, or browse the popular list in the sidebar. Star what you love to pin it to the top.
+          {/* Full-width stage so the Tracking monitor hugs the right edge.
+              When stations are tracked it splits into the player column + the
+              aside (stacks below on narrow screens); the player content is
+              capped + centered within its own column for readability. */}
+          <div className="w-full flex flex-col lg:flex-row gap-8 min-h-full">
+            <div className="flex-1 min-w-0 flex flex-col justify-center">
+              <div className="w-full max-w-4xl mx-auto flex flex-col gap-6">
+                {currentStation ? (
+                  // Single key on the Fragment so both children remount together
+                  // when the station changes. Short `<>` can't carry a key, and
+                  // the same key on both children is a React duplicate-key error.
+                  <Fragment key={currentStation.id}>
+                    <NowPlaying station={currentStation} playState={playState} everPlayed={everPlayed} onTrack={setCurrentTrack} onHistory={setPlaylistHistory} />
+                    <Player station={currentStation} onPlayStateChange={handlePlayState} />
+                    <PlaylistHistory history={playlistHistory} />
+                  </Fragment>
+                ) : (
+                  <div className="flex items-center justify-center text-center">
+                    <div>
+                      <div className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-warm)] mb-3">
+                        Radio
+                      </div>
+                      <div className="text-[32px] font-bold tracking-tight">Pick a station to begin</div>
+                      <div className="text-base text-[var(--color-ink-3)] mt-3 max-w-md mx-auto">
+                        Press <kbd className="px-1.5 py-0.5 rounded border border-[var(--color-line)] bg-white text-[12px] font-semibold">⌘K</kbd> to search, or browse the popular list in the sidebar. Star what you love to pin it to the top.
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
             {tracked.length > 0 && (
               <aside className="shrink-0 self-stretch lg:w-[320px] lg:border-l lg:border-[var(--color-line)] lg:pl-8 pt-2">
