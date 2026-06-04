@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-02
 **Status:** Approved (visual + scope), pending written-spec review
-**Author:** etai87@gmail.com (with Claude)
+**Author:** Claude
 
 ## Goal
 

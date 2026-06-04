@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 
-const UA = 'TripPlannerRadioPOC/0.1 (etai87@gmail.com)';
+const UA = 'ShazamRadioPOC/0.1';
 
 // Audio proxy. Re-streams a station from our own origin so the browser's Web
 // Audio API can analyse the waveform (cross-origin streams are otherwise
