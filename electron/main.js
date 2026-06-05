@@ -111,9 +111,13 @@ async function startRecognizer() {
   }
 
   // Windows / Linux: spawn the onedir binary directly (no Dock concern).
+  // windowsHide passes CREATE_NO_WINDOW so the console-subsystem recognizer.exe
+  // (PyInstaller console=True) doesn't pop a terminal window — the Windows
+  // analog of the macOS LSUIElement bundle trick above.
   recognizerProc = spawn(recognizerBin, [], {
     env: { ...process.env, RECOGNIZER_PORT: String(port), PATH: recPath },
     stdio: ['ignore', out, out],
+    windowsHide: true,
   });
   recognizerProc.on('spawn', () => log(`recognizer: spawned pid=${recognizerProc.pid}`));
   recognizerProc.on('error', (e) => log(`recognizer: failed to start: ${e}`));
