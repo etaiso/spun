@@ -101,10 +101,11 @@ The same app packages as a self-contained desktop app (macOS + Windows) via
 Electron — the Next server + recognizer are bundled and state lives in SQLite at
 the OS user-data dir. Run it in dev with `npm run electron:dev`.
 
-Prebuilt installers (macOS Apple Silicon / Intel `.dmg`, Windows `.exe`) are
-published to [**Releases**](https://github.com/etaiso/shazam-radio/releases) by
-CI on every version tag, and the app auto-updates from there. Building,
-code-signing, and the full release flow are documented in
+Prebuilt installers (macOS Apple Silicon `.dmg`, Windows `.exe`) are
+published to [**Releases**](https://github.com/etaiso/spun/releases) by
+CI on every version tag, and the app auto-updates from there. (Intel macOS is
+not built yet — GitHub's Intel runners are being retired; see the docs.)
+Building, code-signing, and the full release flow are documented in
 [`docs/DESKTOP.md`](docs/DESKTOP.md).
 
 ## How song detection works

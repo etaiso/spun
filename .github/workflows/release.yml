@@ -5,8 +5,8 @@
 # PyInstaller-frozen recognizer and an ffmpeg binary — and PyInstaller can't
 # cross-compile. So each artifact is built on a matching runner:
 #   • macos-14      → Apple Silicon (arm64)  — dmg + zip (auto-update)
-#   • macos-13      → Intel (x64)            — dmg only (manual download)
 #   • windows-latest→ Windows (x64)          — nsis (auto-update)
+# (macOS Intel is omitted for now — see the matrix note below.)
 #
 # electron-builder uploads each runner's installers — plus the auto-update
 # metadata electron-updater reads (latest-mac.yml / latest.yml) — to a single
@@ -37,10 +37,10 @@ jobs:
             label: macOS (Apple Silicon)
             platform: mac
             build_cmd: npx electron-builder --mac dmg zip --arm64 --publish always
-          - os: macos-13
-            label: macOS (Intel)
-            platform: mac
-            build_cmd: npx electron-builder --mac dmg --x64 --publish always
+          # macOS Intel (macos-13) is intentionally omitted: GitHub is retiring
+          # that image and its runners queue indefinitely. Apple-Silicon + Windows
+          # cover the target users; add Intel back via a macos-13 or Rosetta job
+          # when capacity allows. See docs/DESKTOP.md.
           - os: windows-latest
             label: Windows
             platform: win

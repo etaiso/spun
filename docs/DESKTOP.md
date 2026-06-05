@@ -100,7 +100,6 @@ tag:
 | Runner | Artifact | Auto-update |
 | --- | --- | --- |
 | `macos-14` (Apple Silicon) | `…-arm64.dmg` + `…-arm64-mac.zip` | ✅ via `latest-mac.yml` |
-| `macos-13` (Intel) | `…-x64.dmg` | ❌ manual download (see below) |
 | `windows-latest` | `…Setup….exe` (NSIS) | ✅ via `latest.yml` |
 
 Each runner freezes its **own** recognizer (PyInstaller can't cross-compile) and
@@ -126,14 +125,18 @@ the section above as GitHub **repository secrets** (`CSC_LINK`,
 and expose them as `env:` on the *Package + publish* step — no code changes
 needed; `electron/notarize.js` activates once `APPLE_ID` is present.
 
-### Intel Mac auto-update (deferred)
+### Intel Mac (not built)
 
-The Intel (`x64`) job builds a `.dmg` only. A `.zip` would generate its own
-`latest-mac.yml` and **clobber** the arm64 one on the shared Release (a single
-file name per Release), breaking arm64 auto-update. So Intel users download each
-new `.dmg` manually for now. Full dual-arch auto-update needs a follow-up step
-that uploads each arch's `latest-mac.yml` under a unique name and merges them
-into one canonical file — left for a later phase.
+There's no Intel (`x64`) macOS build: GitHub is retiring the `macos-13` image
+and its runners queue indefinitely, so an Intel job stalls without ever starting.
+Apple-Silicon + Windows cover the target users. To add Intel back later, either:
+
+- re-add a `macos-13` matrix entry (`--mac dmg --x64`) once capacity is reliable, or
+- build it on the `macos-14` runner under Rosetta (an `arch -x86_64` Python/Node
+  toolchain to freeze an x64 recognizer + `electron-builder --x64`).
+
+Either way, a second arch needs its `latest-mac.yml` merged with arm64's (one
+file name per Release) for dual-arch auto-update, or it ships as a manual `.dmg`.
 
 ### Local one-off build (no CI)
 
