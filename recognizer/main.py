@@ -19,20 +19,57 @@ API:  POST /recognize  { "url": "<stream url>", "seconds": 6 }
       -> 503 { "error": "..." }            (capture/recognition failed)
 """
 
-import contextlib
-import json
 import os
-import re
+import sys
+
+
+def _suppress_macos_dock_icon() -> None:
+    """Keep the bundled sidecar out of the macOS Dock.
+
+    The frozen .app process is GUI-eligible, so when the Electron app spawns it
+    (in the Aqua session) it gets a Dock tile — and LSUIElement in the bundle
+    Info.plist isn't honored because we exec the inner binary directly rather
+    than via LaunchServices. So set the activation policy to "prohibited"
+    ourselves. This MUST run before anything connects to the window server,
+    hence it's the very first thing in the process. Best-effort; no-op off macOS.
+    """
+    if sys.platform != "darwin":
+        return
+    try:
+        import ctypes
+
+        ctypes.cdll.LoadLibrary("/System/Library/Frameworks/AppKit.framework/AppKit")
+        objc = ctypes.cdll.LoadLibrary("/usr/lib/libobjc.dylib")
+        objc.objc_getClass.restype = ctypes.c_void_p
+        objc.sel_registerName.restype = ctypes.c_void_p
+        objc.objc_msgSend.restype = ctypes.c_void_p
+        objc.objc_msgSend.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+        ns_app = objc.objc_msgSend(
+            objc.objc_getClass(b"NSApplication"),
+            objc.sel_registerName(b"sharedApplication"),
+        )
+        # setActivationPolicy: NSApplicationActivationPolicyProhibited (2)
+        objc.objc_msgSend.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_long]
+        objc.objc_msgSend(ns_app, objc.sel_registerName(b"setActivationPolicy:"), 2)
+    except Exception:  # noqa: BLE001 — cosmetic; never block startup
+        pass
+
+
+# Run before any heavy import connects to the window server.
+_suppress_macos_dock_icon()
+
+import contextlib  # noqa: E402
+import json  # noqa: E402
+import re  # noqa: E402
 
 # Point OpenSSL at certifi's CA bundle BEFORE `import ssl` (and aiohttp /
 # ShazamIO) initialise — their default SSL contexts verify against it, and a
 # PyInstaller-frozen binary has no system cert path otherwise. Setting this
 # after ssl is imported is too late. run.sh sets it in dev; setdefault keeps it.
-import certifi
+import certifi  # noqa: E402
 os.environ.setdefault("SSL_CERT_FILE", certifi.where())
 
 import ssl  # noqa: E402
-import sys  # noqa: E402
 
 import aiohttp  # noqa: E402
 from fastapi import FastAPI  # noqa: E402
@@ -150,44 +187,13 @@ def _error(message: str):
     return JSONResponse(status_code=503, content={"error": message})
 
 
-def _suppress_macos_dock_icon() -> None:
-    """Keep the bundled sidecar out of the macOS Dock.
-
-    When the Electron app spawns this frozen binary, it inherits the GUI (Aqua)
-    session and — being a plain executable with no Info.plist — gets its own
-    generic Dock tile. Set the app's activation policy to "prohibited" (a
-    background/agent app) so no tile appears. Best-effort; no-op off macOS or if
-    the ObjC runtime calls fail.
-    """
-    if sys.platform != "darwin":
-        return
-    try:
-        import ctypes
-
-        ctypes.cdll.LoadLibrary("/System/Library/Frameworks/AppKit.framework/AppKit")
-        objc = ctypes.cdll.LoadLibrary("/usr/lib/libobjc.dylib")
-        objc.objc_getClass.restype = ctypes.c_void_p
-        objc.sel_registerName.restype = ctypes.c_void_p
-        objc.objc_msgSend.restype = ctypes.c_void_p
-        objc.objc_msgSend.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
-        ns_app = objc.objc_msgSend(
-            objc.objc_getClass(b"NSApplication"),
-            objc.sel_registerName(b"sharedApplication"),
-        )
-        # setActivationPolicy: NSApplicationActivationPolicyProhibited (2)
-        objc.objc_msgSend.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_long]
-        objc.objc_msgSend(ns_app, objc.sel_registerName(b"setActivationPolicy:"), 2)
-    except Exception:  # noqa: BLE001 — purely cosmetic; never block startup
-        pass
-
-
 # Allow `python main.py` (and the PyInstaller-frozen binary) to run directly.
 # run.sh uses the uvicorn CLI with its own --port; here we honour RECOGNIZER_PORT
-# so the Electron shell can place the sidecar on a free port.
+# so the Electron shell can place the sidecar on a free port. (Dock-icon
+# suppression already ran at the top of the module, before any GUI connection.)
 if __name__ == "__main__":
     import uvicorn
 
-    _suppress_macos_dock_icon()
     port = int(os.environ.get("RECOGNIZER_PORT", "8755"))
     with contextlib.suppress(KeyboardInterrupt):
         uvicorn.run(app, host="127.0.0.1", port=port)
