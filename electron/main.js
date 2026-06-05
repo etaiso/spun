@@ -1,14 +1,17 @@
 // Electron main process.
 //
 // Production: spawn the Next.js standalone server (.next/standalone/server.js)
-// on a free port using Electron's own Node (ELECTRON_RUN_AS_NODE, so the native
-// better-sqlite3 ABI matches), spawn the bundled recognizer sidecar on another
-// free port, then load a BrowserWindow at the app URL. The SQLite DB lives in
-// the OS user-data dir, so it survives uninstall-less browser-style clears.
+// on a free port as an Electron utilityProcess — it runs under Electron's own
+// Node ABI (so native better-sqlite3 matches) but headless, with NO Dock tile.
+// (Re-launching process.execPath with ELECTRON_RUN_AS_NODE also matched the ABI
+// but the relaunched binary got its own generic "exec" Dock tile.) Spawn the
+// bundled recognizer sidecar on another free port, then load a BrowserWindow at
+// the app URL. The SQLite DB lives in the OS user-data dir, so it survives
+// uninstall-less browser-style clears.
 //
 // Dev: skip spawning; load the separately-running `next dev` at localhost:3000.
 
-const { app, BrowserWindow, shell } = require('electron');
+const { app, BrowserWindow, shell, utilityProcess } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const http = require('node:http');
@@ -122,21 +125,25 @@ async function startNextServer(recognizerPort) {
   const port = await getFreePort();
   const serverJs = path.join(process.resourcesPath, 'app', 'server.js');
   log(`server: ${serverJs} port=${port} recognizer=http://127.0.0.1:${recognizerPort}`);
-  const out = logFd !== null ? logFd : 'ignore';
-  serverProc = spawn(process.execPath, [serverJs], {
+  // utilityProcess: headless Node child on Electron's ABI — no Dock tile.
+  // stdio:'pipe' surfaces the child's output as streams we forward to the log
+  // file (a Finder-launched app has no terminal to 'inherit').
+  serverProc = utilityProcess.fork(serverJs, [], {
+    stdio: 'pipe',
     env: {
       ...process.env,
-      ELECTRON_RUN_AS_NODE: '1',
       NODE_ENV: 'production',
       PORT: String(port),
       HOSTNAME: '127.0.0.1',
       APP_DB_PATH: path.join(app.getPath('userData'), 'app_state.db'),
       RECOGNIZER_URL: `http://127.0.0.1:${recognizerPort}`,
     },
-    stdio: ['ignore', out, out],
   });
-  serverProc.on('error', (e) => log(`server: failed to start: ${e}`));
-  serverProc.on('exit', (code, signal) => log(`server: exited code=${code} signal=${signal}`));
+  const pipe = (chunk) => { try { if (logFd !== null) fs.writeSync(logFd, chunk); } catch { /* ignore */ } };
+  serverProc.stdout?.on('data', pipe);
+  serverProc.stderr?.on('data', pipe);
+  serverProc.on('spawn', () => log(`server: spawned pid=${serverProc.pid}`));
+  serverProc.on('exit', (code) => log(`server: exited code=${code}`));
   await waitForHttp(port);
   log(`server: ready on :${port}`);
   return port;
