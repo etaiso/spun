@@ -11,7 +11,7 @@
 //
 // Dev: skip spawning; load the separately-running `next dev` at localhost:3000.
 
-const { app, BrowserWindow, shell, utilityProcess } = require('electron');
+const { app, BrowserWindow, Menu, shell, utilityProcess } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const http = require('node:http');
@@ -186,6 +186,10 @@ app.whenReady().then(async () => {
     logFd = fs.openSync(path.join(app.getPath('userData'), 'desktop.log'), 'a');
   } catch { /* logging is best-effort */ }
   log(`--- launch (packaged=${app.isPackaged}, platform=${process.platform}) ---`);
+  // On Windows/Linux the default menu bar (File, Edit, View, …) is attached to
+  // each window — drop it. macOS keeps its system menu bar so the standard
+  // ⌘C/⌘V/⌘Q shortcuts and app menu survive.
+  if (process.platform !== 'darwin') Menu.setApplicationMenu(null);
   await createWindow();
   if (!isDev) {
     try {
