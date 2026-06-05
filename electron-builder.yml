@@ -44,6 +44,6 @@ win:
 publish:
   provider: github
   owner: etaiso
-  repo: shazam-radio
+  repo: spun
 afterPack: electron/afterPack.js
 afterSign: electron/notarize.js
