@@ -61,6 +61,11 @@ jobs:
         with:
           python-version: '3.12'
 
+      # The npm bundled with Node 22 hits a fatal "Exit handler never called!"
+      # bug on `npm ci` here; upgrading to a current npm resolves it.
+      - name: Update npm
+        run: npm install -g npm@latest
+
       - name: Install npm dependencies
         run: npm ci
 
