@@ -13,9 +13,21 @@
   --color-warm: #d2691e;
 }
 
+/* Country-flag fallback. Windows' system emoji font has no flag glyphs, so
+   regional-indicator pairs (e.g. 🇮🇱) render as bare letters ("IL"). This is a
+   flag-only color font (Twemoji) scoped to the regional-indicator block, so it
+   only ever supplies flags — every other character falls through to the stack
+   below. Prepended to the body font-family so it wins for those code points. */
+@font-face {
+  font-family: "Twemoji Country Flags";
+  src: url("/fonts/TwemojiCountryFlags.woff2") format("woff2");
+  font-display: swap;
+  unicode-range: U+1F1E6-1F1FF;
+}
+
 html, body { background: var(--color-bg); color: var(--color-ink); }
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: "Twemoji Country Flags", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
