@@ -1,0 +1,50 @@
+# Continuous integration — lint + unit tests on every PR and push to main.
+#
+# This is the gate that branch protection requires before a PR can merge
+# (see docs/DESKTOP.md / repo settings → Branches). Keep it fast: it runs the
+# pure-Node vitest suite, NOT the Electron/PyInstaller packaging done in
+# release.yml. better-sqlite3 is exercised here via its Node-ABI prebuild, so
+# no electron-rebuild is needed.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Cancel superseded runs on the same ref (e.g. rapid pushes to a PR).
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Lint & test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Match release.yml: 22, not 20 — keeps native-module ABI and npm
+          # lifecycle behavior consistent across CI workflows.
+          node-version: 22
+          cache: npm
+
+      # The npm bundled with Node 22 can hit a fatal "Exit handler never
+      # called!" bug on `npm ci`; upgrading to a current npm resolves it.
+      - name: Update npm
+        run: npm install -g npm@latest
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
