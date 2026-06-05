@@ -69,20 +69,9 @@ function recognizerBinPath() {
   return path.join(base, 'recognizer', 'recognizer');
 }
 
-// ShazamIO's HTTPS calls need a CA bundle. Set SSL_CERT_FILE from process start
-// (most reliable — before the frozen Python's OpenSSL initialises) by pointing
-// at certifi's bundled cacert.pem. The recognizer also sets this itself, but
-// belt-and-suspenders.
-function recognizerCaBundle() {
-  const base = path.join(process.resourcesPath, 'recognizer');
-  const candidates = process.platform === 'darwin'
-    ? [path.join(base, 'recognizer.app', 'Contents', 'Resources', 'certifi', 'cacert.pem')]
-    : [
-        path.join(base, 'recognizer', '_internal', 'certifi', 'cacert.pem'),
-        path.join(base, 'recognizer', 'certifi', 'cacert.pem'),
-      ];
-  return candidates.find((p) => fs.existsSync(p)) ?? null;
-}
+// Unique substring of the recognizer's command line, used to kill it on quit
+// when it's launched detached via `open` on macOS.
+const RECOGNIZER_PROC_MATCH = 'recognizer.app/Contents/MacOS/recognizer';
 
 async function startRecognizer() {
   const port = await getFreePort();
@@ -93,16 +82,34 @@ async function startRecognizer() {
     return port;
   }
   const ffmpegDir = path.join(process.resourcesPath, 'ffmpeg');
-  const caBundle = recognizerCaBundle();
-  log(`recognizer: caBundle=${caBundle ?? '(none found)'}`);
+  const recPath = `${ffmpegDir}${path.delimiter}${process.env.PATH ?? '/usr/bin:/bin'}`;
   const out = logFd !== null ? logFd : 'ignore';
+  // SSL: the recognizer points OpenSSL at its bundled certifi itself.
+
+  if (process.platform === 'darwin') {
+    // Launch the .app via LaunchServices (`open`) so its Info.plist LSUIElement
+    // is honored → no Dock tile. (Exec'ing the binary directly bypasses
+    // LaunchServices, and an in-process activation-policy change doesn't update
+    // the Dock without a Cocoa run loop.) `open` returns immediately and the
+    // recognizer runs detached, so it's killed by command-line match on quit.
+    const appPath = path.join(process.resourcesPath, 'recognizer', 'recognizer.app');
+    const recLog = path.join(app.getPath('userData'), 'recognizer.log');
+    const args = [
+      '-n', '-g', '-j',
+      '--stdout', recLog, '--stderr', recLog,
+      '--env', `RECOGNIZER_PORT=${port}`,
+      '--env', `PATH=${recPath}`,
+      appPath,
+    ];
+    recognizerProc = spawn('open', args, { stdio: ['ignore', out, out] });
+    recognizerProc.on('error', (e) => log(`recognizer(open): launch failed: ${e}`));
+    recognizerProc.on('exit', (code) => log(`recognizer(open): launcher exited code=${code} (recognizer runs detached → ${recLog})`));
+    return port;
+  }
+
+  // Windows / Linux: spawn the onedir binary directly (no Dock concern).
   recognizerProc = spawn(recognizerBin, [], {
-    env: {
-      ...process.env,
-      RECOGNIZER_PORT: String(port),
-      PATH: `${ffmpegDir}${path.delimiter}${process.env.PATH ?? ''}`,
-      ...(caBundle ? { SSL_CERT_FILE: caBundle } : {}),
-    },
+    env: { ...process.env, RECOGNIZER_PORT: String(port), PATH: recPath },
     stdio: ['ignore', out, out],
   });
   recognizerProc.on('spawn', () => log(`recognizer: spawned pid=${recognizerProc.pid}`));
@@ -189,4 +196,11 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   try { serverProc?.kill(); } catch { /* already gone */ }
   try { recognizerProc?.kill(); } catch { /* already gone */ }
+  // On macOS the recognizer is launched detached via `open`, so recognizerProc
+  // is just the (exited) launcher — kill the real process by command-line match.
+  if (process.platform === 'darwin') {
+    try {
+      require('node:child_process').execFileSync('/usr/bin/pkill', ['-f', RECOGNIZER_PROC_MATCH]);
+    } catch { /* nothing to kill */ }
+  }
 });
