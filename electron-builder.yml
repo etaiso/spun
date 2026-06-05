@@ -30,7 +30,11 @@ extraResources:
     filter: ["**/*"]
 mac:
   category: public.app-category.music
-  target: [dmg]
+  icon: build/icon.icns
+  # dmg = manual download; zip = what electron-updater downloads for auto-update.
+  # The release workflow narrows this per arch (arm64 → dmg+zip, x64 → dmg only),
+  # so the arm64 latest-mac.yml isn't clobbered by the x64 job.
+  target: [dmg, zip]
   hardenedRuntime: true
   gatekeeperAssess: false
   entitlements: electron/entitlements.mac.plist

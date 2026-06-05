@@ -80,11 +80,68 @@ spctl -a -vv "/Applications/Shazam Radio.app"   # → accepted, source=Notarized
 
 ## Release / auto-update
 
-`electron-updater` checks **GitHub Releases** on launch (production only).
+Releases are built in CI and published to **GitHub Releases**, one Release per
+version tag. `electron-updater` checks that Release feed on launch (production
+only) and updates installed apps in the background.
 
-1. Bump `version` in `package.json`.
-2. `GH_TOKEN=<token> npm run electron:build` — electron-builder publishes the
-   installers + `latest-mac.yml` / `latest.yml` to GitHub Releases.
-3. Installed apps download the update in the background and apply it on restart.
-   The DB **migration runner** runs on first launch of the new version, so user
-   data is preserved across updates.
+### Cutting a release (the normal path)
+
+```bash
+# 1) Bump the version, commit it
+npm version patch        # or minor / major — edits package.json + makes a commit
+# 2) Push the commit and the tag it created (e.g. v0.2.0)
+git push && git push --tags
+```
+
+Pushing the `v*` tag triggers `.github/workflows/release.yml`, a build matrix
+that runs once per target and publishes to a **draft** Release named after the
+tag:
+
+| Runner | Artifact | Auto-update |
+| --- | --- | --- |
+| `macos-14` (Apple Silicon) | `…-arm64.dmg` + `…-arm64-mac.zip` | ✅ via `latest-mac.yml` |
+| `macos-13` (Intel) | `…-x64.dmg` | ❌ manual download (see below) |
+| `windows-latest` | `…Setup….exe` (NSIS) | ✅ via `latest.yml` |
+
+Each runner freezes its **own** recognizer (PyInstaller can't cross-compile) and
+stages its own ffmpeg (via the `ffmpeg-static` npm package), then runs
+`electron-builder --publish always`. The job uses the built-in `GITHUB_TOKEN`
+(the workflow grants it `contents: write`) — no PAT needed.
+
+**After the matrix finishes:** open the draft Release on GitHub, sanity-check the
+attached files, and click **Publish**. Installed apps then download the update on
+next launch and apply it on restart. The DB **migration runner** runs on first
+launch of the new version, so user data is preserved across updates.
+
+`workflow_dispatch` is also enabled, so you can trigger a build manually from the
+Actions tab (it publishes to the `v<version>` draft) without pushing a tag.
+
+### Builds are unsigned (Phase 1)
+
+The pipeline produces **unsigned** installers, so on first open users must
+click through Gatekeeper (macOS: right-click → Open) / SmartScreen (Windows:
+More info → Run anyway). To remove those prompts, add the signing secrets from
+the section above as GitHub **repository secrets** (`CSC_LINK`,
+`CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`)
+and expose them as `env:` on the *Package + publish* step — no code changes
+needed; `electron/notarize.js` activates once `APPLE_ID` is present.
+
+### Intel Mac auto-update (deferred)
+
+The Intel (`x64`) job builds a `.dmg` only. A `.zip` would generate its own
+`latest-mac.yml` and **clobber** the arm64 one on the shared Release (a single
+file name per Release), breaking arm64 auto-update. So Intel users download each
+new `.dmg` manually for now. Full dual-arch auto-update needs a follow-up step
+that uploads each arch's `latest-mac.yml` under a unique name and merges them
+into one canonical file — left for a later phase.
+
+### Local one-off build (no CI)
+
+To build + publish from your own machine instead of CI:
+
+```bash
+./scripts/build-recognizer.sh
+mkdir -p dist-ffmpeg && cp "$(which ffmpeg)" dist-ffmpeg/
+GH_TOKEN=<token> npm run electron:build -- --publish always
+```
+This only produces artifacts for *your* OS/arch — CI is how you get all three.

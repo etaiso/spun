@@ -1,0 +1,97 @@
+# Release pipeline — builds per-OS/arch installers and publishes them to a
+# GitHub Release. Triggered by pushing a version tag (e.g. `v0.2.0`).
+#
+# Why a build matrix: the app bundles two NATIVE, per-platform pieces — the
+# PyInstaller-frozen recognizer and an ffmpeg binary — and PyInstaller can't
+# cross-compile. So each artifact is built on a matching runner:
+#   • macos-14      → Apple Silicon (arm64)  — dmg + zip (auto-update)
+#   • macos-13      → Intel (x64)            — dmg only (manual download)
+#   • windows-latest→ Windows (x64)          — nsis (auto-update)
+#
+# electron-builder uploads each runner's installers — plus the auto-update
+# metadata electron-updater reads (latest-mac.yml / latest.yml) — to a single
+# DRAFT GitHub Release named after the tag. Review it on GitHub, then Publish.
+#
+# Builds are UNSIGNED (Phase 1): macOS Gatekeeper / Windows SmartScreen will warn
+# on first open. Add signing later by setting the secrets in docs/DESKTOP.md.
+
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch: {}   # allow manual runs (publishes to the v<version> draft)
+
+permissions:
+  contents: write          # electron-builder needs this to create/upload releases
+
+jobs:
+  build:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            label: macOS (Apple Silicon)
+            platform: mac
+            build_cmd: npx electron-builder --mac dmg zip --arm64 --publish always
+          - os: macos-13
+            label: macOS (Intel)
+            platform: mac
+            build_cmd: npx electron-builder --mac dmg --x64 --publish always
+          - os: windows-latest
+            label: Windows
+            platform: win
+            build_cmd: npx electron-builder --win nsis --x64 --publish always
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Freeze recognizer (PyInstaller)
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip pyinstaller
+          pip install -r recognizer/requirements.txt
+          ( cd recognizer && pyinstaller recognizer.spec --distpath ../dist-recognizer --workpath "${RUNNER_TEMP}/pyi" -y )
+          # macOS emits BOTH a COLLECT folder and the dock-less .app — keep the .app.
+          if [ "${{ matrix.platform }}" = "mac" ] && [ -d dist-recognizer/recognizer.app ]; then
+            rm -rf dist-recognizer/recognizer
+          fi
+
+      - name: Bundle ffmpeg
+        shell: bash
+        run: |
+          npm install --no-save ffmpeg-static
+          mkdir -p dist-ffmpeg
+          FF="$(node -p "require('ffmpeg-static')")"
+          if [ "${{ matrix.platform }}" = "win" ]; then
+            cp "$FF" dist-ffmpeg/ffmpeg.exe
+          else
+            cp "$FF" dist-ffmpeg/ffmpeg && chmod +x dist-ffmpeg/ffmpeg
+          fi
+
+      - name: Rebuild native modules for Electron
+        run: npm run electron:rebuild
+
+      - name: Build Next.js standalone server
+        run: npm run build
+
+      - name: Package + publish
+        shell: bash
+        run: ${{ matrix.build_cmd }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
