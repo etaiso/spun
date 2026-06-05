@@ -16,7 +16,11 @@ python3 -m venv .build-venv
   --distpath ../dist-recognizer --workpath /tmp/pyi-recognizer -y
 cd ..
 
-echo "==> Frozen binary: dist-recognizer/recognizer"
+# On macOS PyInstaller emits BOTH the onedir COLLECT folder and the .app BUNDLE;
+# ship only the dock-less .app (drop the redundant folder).
+if [ -d dist-recognizer/recognizer.app ]; then rm -rf dist-recognizer/recognizer; fi
+
+echo "==> Frozen recognizer in dist-recognizer/ (.app on macOS, onedir folder elsewhere)"
 echo "==> Reminder: place an ffmpeg binary at dist-ffmpeg/ffmpeg"
 echo "    e.g. (macOS):  mkdir -p dist-ffmpeg && cp \"\$(which ffmpeg)\" dist-ffmpeg/"
 echo "    Use a static LGPL/GPL-clean build for redistribution."

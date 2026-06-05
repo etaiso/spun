@@ -57,10 +57,21 @@ function waitForHttp(port, timeoutMs = 30000) {
 
 // Spawn the frozen recognizer sidecar. Non-fatal if it's not bundled — the app
 // just loses the Shazam fallback (calls to RECOGNIZER_URL fail gracefully).
+function recognizerBinPath() {
+  const base = path.join(process.resourcesPath, 'recognizer');
+  // macOS: a .app BUNDLE (dock-less); elsewhere: a onedir COLLECT folder.
+  if (process.platform === 'darwin') {
+    return path.join(base, 'recognizer.app', 'Contents', 'MacOS', 'recognizer');
+  }
+  if (process.platform === 'win32') {
+    return path.join(base, 'recognizer', 'recognizer.exe');
+  }
+  return path.join(base, 'recognizer', 'recognizer');
+}
+
 async function startRecognizer() {
   const port = await getFreePort();
-  const bin = process.platform === 'win32' ? 'recognizer.exe' : 'recognizer';
-  const recognizerBin = path.join(process.resourcesPath, 'recognizer', bin);
+  const recognizerBin = recognizerBinPath();
   log(`recognizer: path=${recognizerBin} exists=${fs.existsSync(recognizerBin)} port=${port}`);
   if (!fs.existsSync(recognizerBin)) {
     log('recognizer: binary not bundled; Shazam fallback disabled');
