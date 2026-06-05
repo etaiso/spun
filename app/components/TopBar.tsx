@@ -44,8 +44,24 @@ export function TopBar({ onOpenSearch, onOpenSettings, onOpenSaved, settingsActi
 
   return (
     <header className="flex items-center gap-4 px-6 h-16 border-b border-[var(--color-line)] bg-[var(--color-bg-2)] shrink-0">
-      <div className="text-[15px] font-extrabold tracking-tight text-[var(--color-ink)]">
-        <span className="text-[var(--color-warm)]">◈</span> Radio
+      <div className="flex items-center gap-1.5 text-[15px] font-extrabold tracking-tight text-[var(--color-ink)]">
+        {/* App logo: concentric pulse rings, matching the desktop app icon. */}
+        <svg viewBox="0 0 24 24" aria-hidden="true" className="w-[18px] h-[18px]">
+          <defs>
+            <linearGradient id="logoGradient" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
+              <stop offset="0" stopColor="#6366F1" />
+              <stop offset="0.55" stopColor="#A855F7" />
+              <stop offset="1" stopColor="#EC4899" />
+            </linearGradient>
+          </defs>
+          <rect x="0.5" y="0.5" width="23" height="23" rx="6" fill="url(#logoGradient)" />
+          <g fill="none" stroke="#ffffff" strokeLinecap="round">
+            <circle cx="12" cy="12" r="8" strokeWidth="1" strokeOpacity="0.4" />
+            <circle cx="12" cy="12" r="5" strokeWidth="1.3" strokeOpacity="0.8" />
+          </g>
+          <circle cx="12" cy="12" r="2.2" fill="#ffffff" />
+        </svg>
+        Radio
       </div>
       <button
         onClick={onOpenSearch}
