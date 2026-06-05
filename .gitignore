@@ -17,9 +17,6 @@
 /.next/
 /out/
 
-# production
-/build
-
 # misc
 .DS_Store
 *.pem
@@ -50,3 +47,9 @@ __pycache__/
 
 # Local SQLite DB (dev)
 /data/
+
+# Electron / desktop build outputs
+/dist/
+/dist-recognizer/
+/dist-ffmpeg/
+recognizer/.build-venv/

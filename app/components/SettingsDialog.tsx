@@ -4,9 +4,10 @@ import { useEffect, useState } from 'react';
 import type { Station } from '@/app/lib/stations';
 import type { PlayState } from './Player';
 import { RegionPicker } from './RegionPicker';
-import { HiddenStationsSettings } from './HiddenStationsSettings';
+import { HiddenStationsDialog } from './HiddenStationsDialog';
 import { DebugPanel } from './DebugPanel';
 import { useRingsEnabled } from '@/app/lib/visualizer';
+import { useHidden } from '@/app/lib/hidden';
 import { persistSet } from '@/app/lib/persist';
 
 type Props = {
@@ -23,6 +24,11 @@ export function SettingsDialog({ open, onOpenChange, station, playState, current
   // Audio-reactive rings toggle (persisted, on by default).
   const { enabled: ringsOn, toggle: toggleRings } = useRingsEnabled();
 
+  // Hidden stations live in their own modal (opened below) so a long list
+  // doesn't bloat Settings; here we only show the count + a way in.
+  const { hidden } = useHidden();
+  const [hiddenOpen, setHiddenOpen] = useState(false);
+
   // Whether to show the debug readout (dev only). Persisted, default off.
   const [showDebug, setShowDebug] = useState(() => {
     if (typeof window === 'undefined') return false;
@@ -33,15 +39,20 @@ export function SettingsDialog({ open, onOpenChange, station, playState, current
   useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onOpenChange(false);
+      // When the Hidden-stations modal is layered on top, let it own Escape.
+      if (e.key === 'Escape' && !hiddenOpen) onOpenChange(false);
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, onOpenChange]);
+  }, [open, onOpenChange, hiddenOpen]);
 
   if (!open) return null;
 
-  const isDev = process.env.NODE_ENV === 'development';
+  // Show the diagnostics panel in dev AND in the desktop (Electron) build —
+  // both are "power" contexts. It stays hidden in the plain production web build.
+  const isDev =
+    process.env.NODE_ENV === 'development' ||
+    (typeof navigator !== 'undefined' && /electron/i.test(navigator.userAgent));
 
   const toggleDebug = () => {
     setShowDebug(v => {
@@ -52,6 +63,7 @@ export function SettingsDialog({ open, onOpenChange, station, playState, current
   };
 
   return (
+    <>
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-6"
       onClick={() => onOpenChange(false)}
@@ -111,16 +123,32 @@ export function SettingsDialog({ open, onOpenChange, station, playState, current
             </div>
           </section>
 
-          <section className="mt-7 flex flex-col gap-3">
-            <h3 className="text-sm font-bold text-[var(--color-ink)]">Hidden stations</h3>
-            <HiddenStationsSettings />
+          <section className="mt-7">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-[var(--color-ink)]">Hidden stations</h3>
+                <p className="text-xs text-[var(--color-ink-3)] mt-0.5">
+                  {hidden.length > 0
+                    ? `${hidden.length} hidden · manage to unhide`
+                    : 'Nothing hidden. Right-click a station to hide it.'}
+                </p>
+              </div>
+              {hidden.length > 0 && (
+                <button
+                  onClick={() => setHiddenOpen(true)}
+                  className="shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold text-[var(--color-warm)] border border-[var(--color-line)] hover:border-[var(--color-warm)] hover:bg-[var(--color-bg)] cursor-pointer transition-colors"
+                >
+                  Manage
+                </button>
+              )}
+            </div>
           </section>
 
           {isDev && (
             <section className="mt-7 flex flex-col gap-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-bold text-[var(--color-ink)]">
-                  Debug <span className="text-[var(--color-ink-4)] font-normal">· dev only</span>
+                  Debug <span className="text-[var(--color-ink-4)] font-normal">· diagnostics</span>
                 </h3>
                 <button
                   type="button"
@@ -154,5 +182,7 @@ export function SettingsDialog({ open, onOpenChange, station, playState, current
         </div>
       </div>
     </div>
+    <HiddenStationsDialog open={hiddenOpen} onOpenChange={setHiddenOpen} />
+    </>
   );
 }

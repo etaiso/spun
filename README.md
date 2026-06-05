@@ -38,12 +38,15 @@ falls back to **fingerprinting the live audio with Shazam** to identify it.
   (filter every list to a single country), a **pulse-rings** toggle, and
   **hidden stations**.
 - 🙈 **Hide stations** — right-click any station in the sidebar to banish it
-  from search, favorites, popular and recent; restore it from Settings.
+  from search, favorites, popular and recent; unhide from a dedicated modal
+  opened via Settings → Hidden stations.
 - 🌍 **Region detection** from your IP (with a browser-locale fallback), shown
   in the top bar and overridable in Settings — drives search/Popular ranking.
 - 🔁 Reopens your **last played station** on reload.
 - ⌨️ Keyboard shortcuts (play/pause, mute, volume, prev/next favorite, search,
-  saved songs, help), scroll-to-change-volume over the slider, an auto-play
+  saved songs, help) plus **hardware media keys** — the ⏯/⏮/⏭ buttons on media
+  keyboards play/pause and switch favorites (and the OS "Now Playing" panel shows
+  the current track). Also scroll-to-change-volume over the slider, an auto-play
   toggle (off by default), and persisted volume.
 
 ## Requirements
@@ -89,6 +92,18 @@ for details.
 > Next.js (Node) runtime, so it runs as a small local HTTP service the app
 > calls.
 
+### 3. Desktop app (optional)
+
+The same app packages as a self-contained desktop app (macOS + Windows) via
+Electron — the Next server + recognizer are bundled and state lives in SQLite at
+the OS user-data dir. Run it in dev with `npm run electron:dev`.
+
+Prebuilt installers (macOS Apple Silicon / Intel `.dmg`, Windows `.exe`) are
+published to [**Releases**](https://github.com/etaiso/shazam-radio/releases) by
+CI on every version tag, and the app auto-updates from there. Building,
+code-signing, and the full release flow are documented in
+[`docs/DESKTOP.md`](docs/DESKTOP.md).
+
 ## How song detection works
 
 ```
@@ -121,6 +136,7 @@ Browser ── plays audio ─────────────────�
 | `GET /api/popular?region=` | Top stations (region-first), 5-min cache |
 | `GET /api/now-playing?url=` | SSE stream of track changes (ICY metadata + Shazam fallback) |
 | `GET /api/stream?url=` | Same-origin audio proxy (enables Web Audio analysis) |
+| `GET /api/state` · `PUT /api/state` | Read all / upsert persisted app state (SQLite) |
 
 ## Scripts
 
@@ -136,6 +152,9 @@ npm run lint     # ESLint
 
 - **Next.js 16** (App Router, Turbopack) · **React 19** · **TypeScript** (strict)
 - **Tailwind CSS v4**
+- **SQLite** (`better-sqlite3`) — durable local persistence behind `/api/state`
+- **Electron** (electron-builder + electron-updater) — desktop packaging &
+  auto-update; see [`docs/DESKTOP.md`](docs/DESKTOP.md)
 - **Web Audio API** — `AnalyserNode` for the audio-reactive visualiser
 - **Server-Sent Events** — live now-playing updates
 - **Vitest** — unit tests (ICY parser, ranking, station normalizer, …)
@@ -144,18 +163,26 @@ npm run lint     # ESLint
   [Uvicorn](https://www.uvicorn.org/) · [ShazamIO](https://github.com/shazamio/ShazamIO) ·
   `ffmpeg`
 
-State (favorites, recently played, volume, auto-play, region + region-only
-mode, hidden stations, and a short-lived per-station now-playing cache) is
-persisted in `localStorage`; there's no database or accounts.
+State (favorites, saved songs, recently played, tracked stations, volume,
+auto-play, region + region-only mode, hidden stations) is persisted in a local
+**SQLite** database (`better-sqlite3`) via the `/api/state` route, with
+`localStorage` kept as a synchronous cache and a one-time import of any
+pre-existing `localStorage` data on first load. So it survives clearing browser
+data. The dev DB lives at `data/app_state.db`; the desktop app stores it in the
+OS user-data dir. The short-lived per-station now-playing cache stays in
+`localStorage` only. No accounts.
 
 ## Project layout
 
 ```
 app/
-  api/{search,popular,now-playing,stream}/  route handlers
+  api/{search,popular,now-playing,stream,state}/  route handlers
   components/                               UI (player, sidebar, palette, …)
   lib/                                      icy parser, ranking, stores, audio bus
-recognizer/                                 Python ShazamIO sidecar
+  lib/db/                                   SQLite connection + migrations + queries
+electron/                                   desktop shell (main, preload, notarize)
+recognizer/                                 Python ShazamIO sidecar (+ PyInstaller spec)
+scripts/                                    build-recognizer.sh
 tests/                                      Vitest unit tests
-docs/superpowers/                           design spec + implementation plan
+docs/                                       DESKTOP.md + superpowers specs/plans
 ```

@@ -127,6 +127,51 @@ export default function Home() {
     return () => window.removeEventListener('keydown', onKey);
   }, [favorites, handleSelect, currentStation, paletteOpen]);
 
+  // Hardware media keys (the ⏮/⏭ buttons on media keyboards) and OS media
+  // controls. next/prev cycle favorites — mirroring the in-app ←/→ behavior —
+  // via the Media Session API (works in browsers and the Electron desktop app).
+  // Only wired while there are favorites, so the OS hides the buttons otherwise.
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
+    const ms = navigator.mediaSession;
+    const cycle = (dir: 1 | -1) => {
+      if (favorites.length === 0) return;
+      const i = favorites.findIndex(f => f.id === currentStation?.id);
+      const len = favorites.length;
+      const next =
+        dir === 1
+          ? favorites[i < 0 ? 0 : (i + 1) % len]
+          : favorites[i < 0 ? len - 1 : (i - 1 + len) % len];
+      handleSelect(next);
+    };
+    try {
+      const has = favorites.length > 0;
+      ms.setActionHandler('previoustrack', has ? () => cycle(-1) : null);
+      ms.setActionHandler('nexttrack', has ? () => cycle(1) : null);
+    } catch { /* some actions aren't supported everywhere */ }
+    return () => {
+      try {
+        ms.setActionHandler('previoustrack', null);
+        ms.setActionHandler('nexttrack', null);
+      } catch { /* ignore */ }
+    };
+  }, [favorites, currentStation, handleSelect]);
+
+  // Populate the OS "Now Playing" panel (and lock screen) with the current
+  // station/track, which also keeps the media-key session reliably active.
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
+    if (typeof MediaMetadata === 'undefined') return;
+    if (!currentStation) { navigator.mediaSession.metadata = null; return; }
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: currentTrack ?? currentStation.name,
+      artist: currentTrack ? currentStation.name : 'Radio',
+      artwork: currentStation.favicon
+        ? [{ src: currentStation.favicon, sizes: '512x512' }]
+        : [],
+    });
+  }, [currentStation, currentTrack]);
+
   return (
     <div className="flex flex-col h-screen">
       <TopBar

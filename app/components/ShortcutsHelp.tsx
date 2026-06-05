@@ -71,7 +71,9 @@ export function ShortcutsHelp({ open, onOpenChange }: Props) {
               ))}
             </div>
             <p className="text-xs text-[var(--color-ink-4)] mt-5">
-              Shortcuts pause while you&apos;re typing in the search box. Press{' '}
+              Media keyboard buttons work too: <span className="font-semibold">⏯</span> plays/pauses
+              and <span className="font-semibold">⏮ ⏭</span> switch favorites. Shortcuts pause while
+              you&apos;re typing in the search box. Press{' '}
               <kbd className="px-1.5 py-0.5 rounded border border-[var(--color-line)] bg-[var(--color-bg)] text-[11px] font-semibold">Esc</kbd>{' '}
               to close.
             </p>

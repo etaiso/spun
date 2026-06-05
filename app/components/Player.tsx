@@ -206,6 +206,44 @@ export function Player({ station, onPlayStateChange }: Props) {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  // Hardware media keys (play/pause button on media keyboards) and OS media
+  // controls, for the live stream this Player owns. Prev/next are handled at
+  // the page level (they cycle favorites). Mirrors the Space/K keydown logic.
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
+    const ms = navigator.mediaSession;
+    const play = () => {
+      const a = audioRef.current;
+      if (!a) return;
+      setPaused(false);
+      cbRef.current('connecting');
+      setupAnalysis();
+      a.play().catch(() => cbRef.current('error'));
+    };
+    const pause = () => {
+      const a = audioRef.current;
+      if (!a || a.paused) return;
+      a.pause();
+      setPaused(true);
+    };
+    try {
+      ms.setActionHandler('play', play);
+      ms.setActionHandler('pause', pause);
+    } catch { /* unsupported — ignore */ }
+    return () => {
+      try {
+        ms.setActionHandler('play', null);
+        ms.setActionHandler('pause', null);
+      } catch { /* ignore */ }
+    };
+  }, []);
+
+  // Keep the OS media UI's play/pause icon in sync with reality.
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
+    navigator.mediaSession.playbackState = paused ? 'paused' : 'playing';
+  }, [paused]);
+
   // Wire the element into the Web Audio analyser once the context is running
   // (after a gesture) so the canvas visualiser can react to the live audio.
   function setupAnalysis() {
