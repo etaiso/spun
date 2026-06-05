@@ -22,6 +22,6 @@ coll = COLLECT(exe, a.binaries, a.datas, name='recognizer')
 app = BUNDLE(
     coll,
     name='recognizer.app',
-    bundle_identifier='com.shazamradio.recognizer',
+    bundle_identifier='com.spun.recognizer',
     info_plist={'LSUIElement': True},
 )
