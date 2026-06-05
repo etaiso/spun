@@ -13,44 +13,22 @@ falls back to **fingerprinting the live audio with Shazam** to identify it.
 
 ## Features
 
-- 🔎 **Command palette search** (`⌘K` / `Ctrl K`), Raycast-style with a glass
-  overlay, fuzzy matching, and results ranked by your region, recently played,
-  and favorites. Empty query shows your recently played stations.
-- ⭐ **Favorites** and a region-aware **Popular** list, persisted in the
-  browser. Duplicate entries (the same station submitted to radio-browser more
-  than once) are collapsed, while staying searchable by any of their names.
-- 🎙️ **Now playing** with the current song and **album cover art** — from
-  Shazam, with an iTunes Search fallback for broadcast-metadata tracks — plus a
-  **playlist history** that's restored when you reload or switch back to a
-  station (within 5 minutes). The active station + song also appear in the
-  browser tab title.
-- 〰️ **Audio-reactive canvas** — concentric "radio wave" rings behind the
-  player that pulse to the live audio (Web Audio analyser), with a gentle
-  timed fallback when a stream can't be analysed (toggle off in Settings).
-- ✦ **Shazam fallback** for stations that broadcast no song title.
+- 🔎 **Command palette search** (`⌘K` / `Ctrl K`) with fuzzy matching and
+  results ranked by your region, recently played, and favorites.
+- 🎙️ **Now playing** with the current song and **album cover art**, plus a
+  **playlist history** restored when you reload or switch back to a station.
+- 〰️ **Audio-reactive visualiser** — "radio wave" rings behind the player that
+  pulse to the live audio (Web Audio analyser).
 - 📡 **Background tracking** — track multiple stations at once and watch what's
-  playing on each in a live monitor panel beside the player (recognised in the
-  background, no audio). The station you're listening to stays in the list,
-  highlighted as "Playing". Add/remove from a station's right-click menu.
-- 💾 **Saved songs** — save any recognized track to a personal, persisted
-  playlist (top-bar button, or the `S` shortcut). Each entry links to **Apple
-  Music**, plays a ~30s preview (at the player's volume, pausing the radio), and
-  is fuzzy-searchable. Previews come from Shazam or an iTunes lookup, backfilled
-  for older entries when the list is opened.
-- ⚙️ **Settings** (gear in the top bar): **localization**, **region-only mode**
-  (filter every list to a single country), a **pulse-rings** toggle, and
-  **hidden stations**.
-- 🙈 **Hide stations** — right-click any station in the sidebar to banish it
-  from search, favorites, popular and recent; unhide from a dedicated modal
-  opened via Settings → Hidden stations.
-- 🌍 **Region detection** from your IP (with a browser-locale fallback), shown
-  in the top bar and overridable in Settings — drives search/Popular ranking.
-- 🔁 Reopens your **last played station** on reload.
-- ⌨️ Keyboard shortcuts (play/pause, mute, volume, prev/next favorite, search,
-  saved songs, help) plus **hardware media keys** — the ⏯/⏮/⏭ buttons on media
-  keyboards play/pause and switch favorites (and the OS "Now Playing" panel shows
-  the current track). Also scroll-to-change-volume over the slider, an auto-play
-  toggle (off by default), and persisted volume.
+  playing on each in a live monitor panel, no audio needed.
+- 💾 **Saved songs** — save any recognized track to a persisted playlist with a
+  ~30s preview and an **Apple Music** link.
+- ⭐ **Favorites** and a region-aware **Popular** list, with duplicate stations
+  collapsed but still searchable by any of their names.
+- 🙈 **Hide stations** to banish them from every list, **region-only mode** to
+  filter to a single country, and other knobs in **Settings**.
+- ⌨️ **Keyboard & media-key shortcuts** — play/pause, mute, volume, switch
+  favorites, search, saved songs; the OS "Now Playing" panel reflects the track.
 
 ## Requirements
 
@@ -82,18 +60,10 @@ sidecar in a second terminal:
 ```
 
 First run creates a Python virtualenv and installs dependencies; later runs are
-instant. It listens on `http://127.0.0.1:8755`.
-
-The app discovers it via the `RECOGNIZER_URL` env var (default
-`http://127.0.0.1:8755`). **It's entirely optional** — if the recognizer isn't
-running, the app still works; you just won't get Shazam results on stations
-that lack broadcast metadata. See [`recognizer/README.md`](recognizer/README.md)
-for details.
-
-> Why a separate process? Shazam recognition uses [ShazamIO](https://github.com/shazamio/ShazamIO),
-> an async Python library that depends on `ffmpeg` — neither fits inside the
-> Next.js (Node) runtime, so it runs as a small local HTTP service the app
-> calls.
+instant. It listens on `http://127.0.0.1:8755`. **It's entirely optional** — if
+it isn't running, the app still works; you just won't get Shazam results on
+stations that lack broadcast metadata. See
+[`recognizer/README.md`](recognizer/README.md) for details.
 
 ### 3. Desktop app (optional)
 
@@ -108,40 +78,6 @@ not built yet — GitHub's Intel runners are being retired; see the docs.)
 Building, code-signing, and the full release flow are documented in
 [`docs/DESKTOP.md`](docs/DESKTOP.md).
 
-## How song detection works
-
-```
-Browser ── plays audio ─────────────────────────► Radio station
-   │
-   └── EventSource(/api/now-playing) ─► Next.js route ─► Radio station (ICY metadata)
-                                              │
-                                  empty / no metadata?
-                                              │
-                                              └─► POST /recognize ─► Shazam recognizer (Python)
-```
-
-- The browser plays the stream through `/api/stream`, a same-origin proxy.
-  This serves two purposes: it sidesteps mixed-content / playlist quirks, and
-  it lets the Web Audio API analyse the waveform to drive the reactive rings
-  (cross-origin streams can't be analysed).
-- A Next.js route (`/api/now-playing`) opens its own connection with
-  `Icy-MetaData: 1`, parses the interleaved `StreamTitle`, and pushes track
-  changes to the browser over Server-Sent Events.
-- When the metadata is empty or absent, the route asks the recognizer to
-  fingerprint ~6 seconds of the live audio and returns the match (tagged
-  "Identified by Shazam") along with its cover art. Broadcast-metadata tracks
-  that carry no art get a cover from the iTunes Search API.
-
-### API routes
-
-| Route | Purpose |
-|-------|---------|
-| `GET /api/search?q=&region=` | radio-browser search proxy; region + global candidate pool, 60s cache |
-| `GET /api/popular?region=` | Top stations (region-first), 5-min cache |
-| `GET /api/now-playing?url=` | SSE stream of track changes (ICY metadata + Shazam fallback) |
-| `GET /api/stream?url=` | Same-origin audio proxy (enables Web Audio analysis) |
-| `GET /api/state` · `PUT /api/state` | Read all / upsert persisted app state (SQLite) |
-
 ## Scripts
 
 ```bash
@@ -154,39 +90,9 @@ npm run lint     # ESLint
 
 ## Tech stack
 
-- **Next.js 16** (App Router, Turbopack) · **React 19** · **TypeScript** (strict)
-- **Tailwind CSS v4**
-- **SQLite** (`better-sqlite3`) — durable local persistence behind `/api/state`
-- **Electron** (electron-builder + electron-updater) — desktop packaging &
-  auto-update; see [`docs/DESKTOP.md`](docs/DESKTOP.md)
-- **Web Audio API** — `AnalyserNode` for the audio-reactive visualiser
-- **Server-Sent Events** — live now-playing updates
-- **Vitest** — unit tests (ICY parser, ranking, station normalizer, …)
-- **[radio-browser.info](https://www.radio-browser.info/)** — station directory
-- **Recognizer sidecar:** Python · [FastAPI](https://fastapi.tiangolo.com/) ·
-  [Uvicorn](https://www.uvicorn.org/) · [ShazamIO](https://github.com/shazamio/ShazamIO) ·
-  `ffmpeg`
+**Next.js 16** · **React 19** · **TypeScript** · **Tailwind CSS v4** ·
+**SQLite** · **Electron** · **Web Audio API** · **Server-Sent Events** ·
+a **Python/ShazamIO** recognizer sidecar.
 
-State (favorites, saved songs, recently played, tracked stations, volume,
-auto-play, region + region-only mode, hidden stations) is persisted in a local
-**SQLite** database (`better-sqlite3`) via the `/api/state` route, with
-`localStorage` kept as a synchronous cache and a one-time import of any
-pre-existing `localStorage` data on first load. So it survives clearing browser
-data. The dev DB lives at `data/app_state.db`; the desktop app stores it in the
-OS user-data dir. The short-lived per-station now-playing cache stays in
-`localStorage` only. No accounts.
-
-## Project layout
-
-```
-app/
-  api/{search,popular,now-playing,stream,state}/  route handlers
-  components/                               UI (player, sidebar, palette, …)
-  lib/                                      icy parser, ranking, stores, audio bus
-  lib/db/                                   SQLite connection + migrations + queries
-electron/                                   desktop shell (main, preload, notarize)
-recognizer/                                 Python ShazamIO sidecar (+ PyInstaller spec)
-scripts/                                    build-recognizer.sh
-tests/                                      Vitest unit tests
-docs/                                       DESKTOP.md + superpowers specs/plans
-```
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for how song detection works,
+the API routes, persistence, and the project layout.
