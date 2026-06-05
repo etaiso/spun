@@ -6,8 +6,11 @@ In production, the Electron main process spawns the Next.js **standalone server*
 a window. State is stored in **SQLite** at the OS user-data dir, so it survives
 clearing browser data.
 
-- macOS: `~/Library/Application Support/Shazam Radio/app_state.db`
-- Windows: `%APPDATA%/Shazam Radio/app_state.db`
+The user-data dir is named from the package.json `name` (`shazam-radio`), not
+the display name:
+- macOS: `~/Library/Application Support/shazam-radio/` (holds `app_state.db` and,
+  in builds with logging, `desktop.log`)
+- Windows: `%APPDATA%/shazam-radio/`
 
 ## Develop
 
