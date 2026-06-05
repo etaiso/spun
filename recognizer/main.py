@@ -21,15 +21,23 @@ API:  POST /recognize  { "url": "<stream url>", "seconds": 6 }
 
 import contextlib
 import json
+import os
 import re
-import ssl
-import sys
 
-import aiohttp
+# Point OpenSSL at certifi's CA bundle BEFORE `import ssl` (and aiohttp /
+# ShazamIO) initialise — their default SSL contexts verify against it, and a
+# PyInstaller-frozen binary has no system cert path otherwise. Setting this
+# after ssl is imported is too late. run.sh sets it in dev; setdefault keeps it.
 import certifi
-from fastapi import FastAPI
-from pydantic import BaseModel
-from shazamio import Shazam
+os.environ.setdefault("SSL_CERT_FILE", certifi.where())
+
+import ssl  # noqa: E402
+import sys  # noqa: E402
+
+import aiohttp  # noqa: E402
+from fastapi import FastAPI  # noqa: E402
+from pydantic import BaseModel  # noqa: E402
+from shazamio import Shazam  # noqa: E402
 
 def extract_apple_music_url(hub: dict | None) -> str:
     """First https://music.apple.com/... link found in the hub deep links, or ''."""
@@ -177,7 +185,6 @@ def _suppress_macos_dock_icon() -> None:
 # run.sh uses the uvicorn CLI with its own --port; here we honour RECOGNIZER_PORT
 # so the Electron shell can place the sidecar on a free port.
 if __name__ == "__main__":
-    import os
     import uvicorn
 
     _suppress_macos_dock_icon()

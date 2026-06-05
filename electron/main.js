@@ -69,6 +69,21 @@ function recognizerBinPath() {
   return path.join(base, 'recognizer', 'recognizer');
 }
 
+// ShazamIO's HTTPS calls need a CA bundle. Set SSL_CERT_FILE from process start
+// (most reliable — before the frozen Python's OpenSSL initialises) by pointing
+// at certifi's bundled cacert.pem. The recognizer also sets this itself, but
+// belt-and-suspenders.
+function recognizerCaBundle() {
+  const base = path.join(process.resourcesPath, 'recognizer');
+  const candidates = process.platform === 'darwin'
+    ? [path.join(base, 'recognizer.app', 'Contents', 'Resources', 'certifi', 'cacert.pem')]
+    : [
+        path.join(base, 'recognizer', '_internal', 'certifi', 'cacert.pem'),
+        path.join(base, 'recognizer', 'certifi', 'cacert.pem'),
+      ];
+  return candidates.find((p) => fs.existsSync(p)) ?? null;
+}
+
 async function startRecognizer() {
   const port = await getFreePort();
   const recognizerBin = recognizerBinPath();
@@ -78,12 +93,15 @@ async function startRecognizer() {
     return port;
   }
   const ffmpegDir = path.join(process.resourcesPath, 'ffmpeg');
+  const caBundle = recognizerCaBundle();
+  log(`recognizer: caBundle=${caBundle ?? '(none found)'}`);
   const out = logFd !== null ? logFd : 'ignore';
   recognizerProc = spawn(recognizerBin, [], {
     env: {
       ...process.env,
       RECOGNIZER_PORT: String(port),
       PATH: `${ffmpegDir}${path.delimiter}${process.env.PATH ?? ''}`,
+      ...(caBundle ? { SSL_CERT_FILE: caBundle } : {}),
     },
     stdio: ['ignore', out, out],
   });
