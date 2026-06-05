@@ -96,7 +96,7 @@ def extract_preview_url(hub: dict | None) -> str:
 # stream CDNs (and Shazam) fails cert verification. Pin certifi's CA bundle.
 _SSL_CTX = ssl.create_default_context(cafile=certifi.where())
 
-app = FastAPI(title="shazam-radio recognizer")
+app = FastAPI(title="Spun recognizer")
 
 # Cap the captured clip so a request can't run away. ~6s is plenty for Shazam.
 MAX_SECONDS = 12
@@ -120,7 +120,7 @@ async def capture(url: str, seconds: int) -> bytes:
     timeout = aiohttp.ClientTimeout(total=CAPTURE_TIMEOUT)
     connector = aiohttp.TCPConnector(ssl=_SSL_CTX)
     async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
-        async with session.get(url, headers={"User-Agent": "shazam-radio/0.1"}) as resp:
+        async with session.get(url, headers={"User-Agent": "Spun/0.1"}) as resp:
             resp.raise_for_status()
             async for chunk in resp.content.iter_chunked(16_384):
                 chunks.extend(chunk)
