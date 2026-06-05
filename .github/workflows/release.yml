@@ -51,7 +51,10 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # 22, not 20: @electron/notarize, @electron/rebuild and node-abi all
+          # require Node >=22.12, and the mismatch destabilizes npm's lifecycle
+          # scripts (ffmpeg-static's postinstall download got silently skipped).
+          node-version: 22
           cache: npm
 
       - uses: actions/setup-python@v5
@@ -76,8 +79,16 @@ jobs:
         shell: bash
         run: |
           npm install --no-save ffmpeg-static
-          mkdir -p dist-ffmpeg
           FF="$(node -p "require('ffmpeg-static')")"
+          # ffmpeg-static fetches its binary in a postinstall; if that didn't
+          # run (CI npm-lifecycle quirks), trigger the download explicitly and
+          # then verify, so we never silently package a missing binary.
+          if [ ! -s "$FF" ]; then
+            echo "ffmpeg not present at $FF — running ffmpeg-static installer"
+            node node_modules/ffmpeg-static/install.js
+          fi
+          test -s "$FF" || { echo "::error::ffmpeg-static binary still missing at $FF"; exit 1; }
+          mkdir -p dist-ffmpeg
           if [ "${{ matrix.platform }}" = "win" ]; then
             cp "$FF" dist-ffmpeg/ffmpeg.exe
           else
