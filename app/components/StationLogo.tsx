@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { gradientForName } from '@/app/lib/colors';
+import { gradientForName, initialLetter } from '@/app/lib/colors';
 
 type Props = { name: string; favicon: string; size?: number };
 
@@ -10,7 +10,7 @@ export function StationLogo({ name, favicon, size = 40 }: Props) {
   // automatically un-fails without needing useEffect to reset.
   const [failedFor, setFailedFor] = useState<string | null>(null);
   const failed = failedFor === favicon;
-  const letter = (name.trim()[0] ?? '?').toUpperCase();
+  const letter = initialLetter(name);
 
   if (!favicon || failed) {
     return (

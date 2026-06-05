@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeStation } from '../app/lib/stations';
+import { normalizeStation, parseStoredStations } from '../app/lib/stations';
 
 describe('normalizeStation', () => {
   it('maps radio-browser fields to our Station shape', () => {
@@ -62,5 +62,38 @@ describe('normalizeStation', () => {
       codec: '',
     };
     expect(normalizeStation(raw).streamUrl).toBe('http://fallback/stream');
+  });
+});
+
+describe('parseStoredStations', () => {
+  const valid = {
+    id: 'a', name: 'KEXP', streamUrl: 'http://x/s', favicon: '',
+    country: 'US', countrycode: 'US', bitrate: 128, codec: 'MP3',
+  };
+
+  it('keeps well-formed stations', () => {
+    expect(parseStoredStations(JSON.stringify([valid]))).toEqual([valid]);
+  });
+
+  it('drops entries missing a name or stream url (legacy/partial data)', () => {
+    const raw = JSON.stringify([
+      valid,
+      { id: 'durable-test' },                          // stray test junk
+      { ...valid, id: 'b', name: null },               // null name
+      { ...valid, id: 'c', name: '   ' },              // blank name
+      { ...valid, id: 'd', streamUrl: '' },            // unplayable
+    ]);
+    expect(parseStoredStations(raw).map(s => s.id)).toEqual(['a']);
+  });
+
+  it('drops null and non-object array members', () => {
+    const raw = JSON.stringify([valid, null, 42, 'nope']);
+    expect(parseStoredStations(raw).map(s => s.id)).toEqual(['a']);
+  });
+
+  it('returns [] for null, non-arrays, and invalid JSON', () => {
+    expect(parseStoredStations(null)).toEqual([]);
+    expect(parseStoredStations('{}')).toEqual([]);
+    expect(parseStoredStations('not json')).toEqual([]);
   });
 });

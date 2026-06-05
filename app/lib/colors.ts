@@ -16,6 +16,14 @@ function hash(s: string): number {
 }
 
 export function gradientForName(name: string): string {
-  const [a, b] = PALETTE[hash(name) % PALETTE.length];
+  const [a, b] = PALETTE[hash(name ?? '') % PALETTE.length];
   return `linear-gradient(135deg, ${a}, ${b})`;
+}
+
+// First letter of a station name for the logo fallback chip, uppercased.
+// Coerces a missing/empty name to '?' — persisted favorites are JSON.parsed
+// from localStorage without normalization, so a legacy/partial entry can
+// reach the UI with no name, and the chip must render rather than throw.
+export function initialLetter(name: string): string {
+  return ((name ?? '').trim()[0] ?? '?').toUpperCase();
 }

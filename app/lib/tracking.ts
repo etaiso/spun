@@ -2,6 +2,7 @@
 
 import { useCallback, useSyncExternalStore } from 'react';
 import type { Station } from './stations';
+import { parseStoredStations } from './stations';
 import { persistSet } from './persist';
 
 // Stations the user is "tracking" — the app watches what each is playing in the
@@ -13,12 +14,7 @@ const EMPTY: Station[] = [];
 
 function loadFromStorage(): Station[] {
   if (typeof window === 'undefined') return EMPTY;
-  try {
-    const raw = window.localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as Station[]) : EMPTY;
-  } catch {
-    return EMPTY;
-  }
+  return parseStoredStations(window.localStorage.getItem(KEY));
 }
 
 let snapshot: Station[] | null = null;
