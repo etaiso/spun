@@ -46,7 +46,7 @@ export function TopBar({ onOpenSearch, onOpenSettings, onOpenSaved, settingsActi
     <header className="flex items-center gap-4 px-6 h-16 border-b border-[var(--color-line)] bg-[var(--color-bg-2)] shrink-0">
       <div className="flex items-center gap-1.5 text-[15px] font-extrabold tracking-tight text-[var(--color-ink)]">
         {/* App logo: concentric pulse rings, matching the desktop app icon. */}
-        <svg viewBox="0 0 24 24" aria-hidden="true" className="w-[18px] h-[18px]">
+        <svg viewBox="0 0 24 24" aria-hidden="true" className="w-10 h-10">
           <defs>
             <linearGradient id="logoGradient" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
               <stop offset="0" stopColor="#6366F1" />
@@ -61,7 +61,17 @@ export function TopBar({ onOpenSearch, onOpenSettings, onOpenSaved, settingsActi
           </g>
           <circle cx="12" cy="12" r="2.2" fill="#ffffff" />
         </svg>
-        Radio
+        {/* "spun" wordmark — lowercase, filled with the logo's gradient. */}
+        <svg viewBox="0 0 57 31" className="h-[28px] w-auto" role="img" aria-label="Spun">
+          <defs>
+            <linearGradient id="wordmarkGradient" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stopColor="#6366F1" />
+              <stop offset="0.55" stopColor="#A855F7" />
+              <stop offset="1" stopColor="#EC4899" />
+            </linearGradient>
+          </defs>
+          <text x="0" y="25" fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" fontSize="26" fontWeight="800" letterSpacing="-1.4" fill="url(#wordmarkGradient)">spun</text>
+        </svg>
       </div>
       <button
         onClick={onOpenSearch}

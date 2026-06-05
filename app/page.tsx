@@ -50,13 +50,13 @@ export default function Home() {
   const currentStation = selected ?? recent.find(s => !isHidden(s.id)) ?? null;
 
   // Reflect what's playing in the browser tab: "Song — Station", or just the
-  // station name, falling back to "Radio" when nothing's selected.
+  // station name, falling back to "Spun" when nothing's selected.
   useEffect(() => {
     document.title = currentStation
       ? currentTrack
         ? `♫ ${currentTrack} — ${currentStation.name}`
         : currentStation.name
-      : 'Radio';
+      : 'Spun';
   }, [currentStation, currentTrack]);
 
   // Track play-state from Player. Also remember whether audio has ever played
@@ -165,7 +165,7 @@ export default function Home() {
     if (!currentStation) { navigator.mediaSession.metadata = null; return; }
     navigator.mediaSession.metadata = new MediaMetadata({
       title: currentTrack ?? currentStation.name,
-      artist: currentTrack ? currentStation.name : 'Radio',
+      artist: currentTrack ? currentStation.name : 'Spun',
       artwork: currentStation.favicon
         ? [{ src: currentStation.favicon, sizes: '512x512' }]
         : [],
@@ -203,7 +203,7 @@ export default function Home() {
                   <div className="flex items-center justify-center text-center">
                     <div>
                       <div className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-warm)] mb-3">
-                        Radio
+                        Spun
                       </div>
                       <div className="text-[32px] font-bold tracking-tight">Pick a station to begin</div>
                       <div className="text-base text-[var(--color-ink-3)] mt-3 max-w-md mx-auto">

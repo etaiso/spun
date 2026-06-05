@@ -1,7 +1,10 @@
-# shazam-radio
+<p align="center">
+  <img src="docs/spun-logo.svg" alt="Spun" width="180" />
+</p>
 
-Listen to live internet radio and see what's playing — even when the station
-doesn't tell you.
+<p align="center">
+  Listen to live internet radio and see what's playing — even when the station doesn't tell you.
+</p>
 
 Stations are discovered through [radio-browser.info](https://www.radio-browser.info/).
 The current song comes from the station's broadcast metadata when available

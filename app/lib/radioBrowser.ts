@@ -2,7 +2,7 @@
 // Both /api/search and /api/popular use this so the mirror is resolved
 // once per server process and the UA + timeout policies stay consistent.
 
-const UA = 'ShazamRadioPOC/0.1';
+const UA = 'Spun/0.1';
 const UPSTREAM_TIMEOUT_MS = 5_000;
 
 let mirrorPromise: Promise<string> | null = null;

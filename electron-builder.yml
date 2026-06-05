@@ -1,5 +1,5 @@
-appId: com.shazamradio.app
-productName: Shazam Radio
+appId: com.spun.app
+productName: Spun
 # We rebuild better-sqlite3 for Electron (electron:rebuild) and let `next build`
 # trace it into .next/standalone before packaging, so electron-builder must NOT
 # run its own native rebuild — doing so creates a dangling hashed symlink under

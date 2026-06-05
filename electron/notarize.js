@@ -14,7 +14,7 @@ exports.default = async function notarizing(context) {
   }
   const appName = context.packager.appInfo.productFilename;
   await notarize({
-    appBundleId: 'com.shazamradio.app',
+    appBundleId: 'com.spun.app',
     appPath: `${appOutDir}/${appName}.app`,
     appleId: process.env.APPLE_ID,
     appleIdPassword: process.env.APPLE_APP_SPECIFIC_PASSWORD,

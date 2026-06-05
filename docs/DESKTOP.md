@@ -6,11 +6,11 @@ In production, the Electron main process spawns the Next.js **standalone server*
 a window. State is stored in **SQLite** at the OS user-data dir, so it survives
 clearing browser data.
 
-The user-data dir is named from the package.json `name` (`shazam-radio`), not
+The user-data dir is named from the package.json `name` (`spun`), not
 the display name:
-- macOS: `~/Library/Application Support/shazam-radio/` (holds `app_state.db` and,
+- macOS: `~/Library/Application Support/spun/` (holds `app_state.db` and,
   in builds with logging, `desktop.log`)
-- Windows: `%APPDATA%/shazam-radio/`
+- Windows: `%APPDATA%/spun/`
 
 ## Develop
 
@@ -75,7 +75,7 @@ removes the SmartScreen prompt).
 
 Verify a notarized macOS build:
 ```bash
-spctl -a -vv "/Applications/Shazam Radio.app"   # → accepted, source=Notarized Developer ID
+spctl -a -vv "/Applications/Spun.app"   # → accepted, source=Notarized Developer ID
 ```
 
 ## Release / auto-update

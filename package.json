@@ -1,5 +1,5 @@
 {
-  "name": "shazam-radio",
+  "name": "spun",
   "version": "0.1.2",
   "private": true,
   "main": "electron/main.js",

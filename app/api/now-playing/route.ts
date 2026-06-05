@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { parseIcy } from '@/app/lib/icy';
 import { isJunkMetadata } from '@/app/lib/nonTrack';
 
-const UA = 'ShazamRadioPOC/0.1';
+const UA = 'Spun/0.1';
 
 // Python ShazamIO sidecar (recognizer/). When a station's broadcast metadata
 // doesn't name the current song, we ask it to fingerprint a few seconds of
