@@ -38,12 +38,15 @@ falls back to **fingerprinting the live audio with Shazam** to identify it.
   (filter every list to a single country), a **pulse-rings** toggle, and
   **hidden stations**.
 - 🙈 **Hide stations** — right-click any station in the sidebar to banish it
-  from search, favorites, popular and recent; restore it from Settings.
+  from search, favorites, popular and recent; unhide from a dedicated modal
+  opened via Settings → Hidden stations.
 - 🌍 **Region detection** from your IP (with a browser-locale fallback), shown
   in the top bar and overridable in Settings — drives search/Popular ranking.
 - 🔁 Reopens your **last played station** on reload.
 - ⌨️ Keyboard shortcuts (play/pause, mute, volume, prev/next favorite, search,
-  saved songs, help), scroll-to-change-volume over the slider, an auto-play
+  saved songs, help) plus **hardware media keys** — the ⏯/⏮/⏭ buttons on media
+  keyboards play/pause and switch favorites (and the OS "Now Playing" panel shows
+  the current track). Also scroll-to-change-volume over the slider, an auto-play
   toggle (off by default), and persisted volume.
 
 ## Requirements
