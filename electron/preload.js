@@ -24,4 +24,19 @@ contextBridge.exposeInMainWorld('spun', {
     ipcRenderer.on('spun:update-status', handler);
     return () => ipcRenderer.removeListener('spun:update-status', handler);
   },
+
+  // Spotify playlist export — exposed only when SPOTIFY_CLIENT_ID is configured,
+  // so the renderer's isAvailable() guard hides the feature otherwise. All calls
+  // are handled in the main process (see electron/spotify.js).
+  ...(process.env.SPOTIFY_CLIENT_ID ? {
+    spotify: {
+      getStatus: () => ipcRenderer.invoke('spun:spotify:get-status'),
+      connect: () => ipcRenderer.invoke('spun:spotify:connect'),
+      disconnect: () => ipcRenderer.invoke('spun:spotify:disconnect'),
+      search: (query) => ipcRenderer.invoke('spun:spotify:search', query),
+      ensurePlaylist: () => ipcRenderer.invoke('spun:spotify:ensure-playlist'),
+      playlistTrackIds: () => ipcRenderer.invoke('spun:spotify:playlist-track-ids'),
+      addTracks: (uris) => ipcRenderer.invoke('spun:spotify:add-tracks', uris),
+    },
+  } : {}),
 });

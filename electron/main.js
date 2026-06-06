@@ -17,6 +17,7 @@ const fs = require('node:fs');
 const http = require('node:http');
 const net = require('node:net');
 const { spawn } = require('node:child_process');
+const spotify = require('./spotify');
 
 const isDev = !app.isPackaged;
 let win = null;
@@ -291,6 +292,9 @@ app.whenReady().then(async () => {
   // User agreed to the update in the dialog → download it, then (optionally) install.
   ipcMain.handle('spun:download-update', () => { downloadUpdate(); return true; });
   ipcMain.handle('spun:quit-and-install', () => { quitAndInstall(); return true; });
+  // Spotify playlist export — registers spun:spotify:* only when SPOTIFY_CLIENT_ID
+  // is set (else the renderer's isAvailable() guard hides the feature).
+  try { spotify.register(ipcMain, { log }); } catch (e) { log(`spotify: register failed: ${e}`); }
   await createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
