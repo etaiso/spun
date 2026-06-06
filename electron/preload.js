@@ -11,6 +11,13 @@ contextBridge.exposeInMainWorld('spun', {
   // Renderer reports the user's auto-update preference; main gates the updater.
   setAutoUpdate: (enabled) => ipcRenderer.invoke('spun:set-auto-update', !!enabled),
 
+  // Renderer asks the shell to check for an update now (manual "Check now").
+  checkForUpdate: () => ipcRenderer.invoke('spun:check-for-update'),
+
+  // After the user agrees in the update dialog: download, then restart to apply.
+  downloadUpdate: () => ipcRenderer.invoke('spun:download-update'),
+  quitAndInstall: () => ipcRenderer.invoke('spun:quit-and-install'),
+
   // Subscribe to updater lifecycle events. Returns an unsubscribe fn.
   onUpdateStatus: (cb) => {
     const handler = (_event, status) => cb(status);
