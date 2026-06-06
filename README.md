@@ -96,3 +96,38 @@ a **Python/ShazamIO** recognizer sidecar.
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for how song detection works,
 the API routes, persistence, and the project layout.
+
+## Disclaimer
+
+Spun is an independent, hobby project. It is **not affiliated with, endorsed
+by, or sponsored by** Apple Inc., Shazam, or radio-browser.info.
+
+The optional song-recognition fallback uses [ShazamIO](https://github.com/shazamio/ShazamIO),
+an **unofficial, third-party** library that talks to Shazam's service.
+"Shazam" is a trademark of its respective owner and is used here only to
+describe what that optional component does. The recognizer is disabled unless
+you choose to run it, and the app is fully functional without it. Use of any
+third-party service is subject to that service's own terms.
+
+## Acknowledgements
+
+- **[radio-browser.info](https://www.radio-browser.info/)** — the community
+  station directory that powers search and the Popular list.
+- **[iTunes Search API](https://performance-partners.apple.com/search-api)** —
+  cover art, ~30s previews, and Apple Music links.
+- **[ShazamIO](https://github.com/shazamio/ShazamIO)** and **[FFmpeg](https://ffmpeg.org/)**
+  — the optional audio-fingerprinting recognizer.
+
+A fuller list of bundled components and their licenses is in
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+
+## Contributing
+
+Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) and our
+[Code of Conduct](CODE_OF_CONDUCT.md). To report a security issue, see
+[SECURITY.md](SECURITY.md).
+
+## License
+
+[MIT](LICENSE) © 2026 Etai Solomon. Bundled and third-party components retain
+their own licenses; see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
