@@ -61,20 +61,12 @@ jobs:
         with:
           python-version: '3.12'
 
-      # The committed package-lock.json resolves every package from the private registry's
-      # internal registry (registry.npmjs.org, baked in from the author's
-      # machine) — unreachable from public runners. Rewrite those URLs to the
-      # public npm registry, which the private registry mirrors, so the integrity hashes still
-      # match. CI-only: the committed lockfile is left untouched for local dev.
+      # Pin the public npm registry for CI installs.
       - name: Use the public npm registry
-        shell: bash
-        run: |
-          npm config set registry https://registry.npmjs.org/
-          node -e "const f='package-lock.json',fs=require('fs');fs.writeFileSync(f,fs.readFileSync(f,'utf8').replace(/https:\/\/npm\.dev\.npmjs\.com\/api\/npm\/npm-repos\//g,'https://registry.npmjs.org/'))"
-          echo "rewrote $(grep -c registry.npmjs.org package-lock.json) lockfile URLs to the public registry"
+        run: npm config set registry https://registry.npmjs.org/
 
-      # Node 22's bundled npm threw "Exit handler never called!" when the (the private registry)
-      # registry was unreachable; a current npm is more robust. Cheap insurance.
+      # A current npm is more robust than Node 22's bundled version against
+      # transient registry/lifecycle hiccups. Cheap insurance.
       - name: Update npm
         run: npm install -g npm@latest
 
