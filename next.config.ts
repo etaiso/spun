@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import path from "node:path";
+import { version } from "./package.json";
 
 const nextConfig: NextConfig = {
   // Emit a self-contained server (.next/standalone/server.js) so the Electron
@@ -8,6 +9,10 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: path.join(__dirname),
   turbopack: {
     root: path.join(__dirname),
+  },
+  // Inlined at build time so the debug panel can show the running version.
+  env: {
+    appVersion: version,
   },
 };
 
