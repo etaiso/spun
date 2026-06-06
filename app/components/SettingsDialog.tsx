@@ -9,6 +9,7 @@ import { DebugPanel } from './DebugPanel';
 import { useRingsEnabled } from '@/app/lib/visualizer';
 import { useHidden } from '@/app/lib/hidden';
 import { persistSet } from '@/app/lib/persist';
+import { useAutoUpdate, type UpdateStatus } from '@/app/lib/autoUpdate';
 
 type Props = {
   open: boolean;
@@ -19,6 +20,20 @@ type Props = {
 };
 
 const DEBUG_KEY = 'radio:showDebug';
+
+// One-line summary of the updater's current state, or null when there's nothing
+// worth showing. Driven by events the Electron main process forwards over IPC.
+function updateStatusLine(s: UpdateStatus): string | null {
+  switch (s.state) {
+    case 'checking': return 'Checking for updates…';
+    case 'available': return s.version ? `Found ${s.version} — downloading…` : 'Downloading update…';
+    case 'downloading': return `Downloading update… ${s.percent ?? 0}%`;
+    case 'downloaded': return s.version ? `Update ${s.version} ready — restart to apply.` : 'Update ready — restart to apply.';
+    case 'none': return 'You’re on the latest version.';
+    case 'error': return 'Update check failed — will retry next launch.';
+    default: return null;
+  }
+}
 
 export function SettingsDialog({ open, onOpenChange, station, playState, currentTrack }: Props) {
   // Audio-reactive rings toggle (persisted, on by default).
@@ -34,6 +49,16 @@ export function SettingsDialog({ open, onOpenChange, station, playState, current
     if (typeof window === 'undefined') return false;
     try { return window.localStorage.getItem(DEBUG_KEY) === '1'; } catch { return false; }
   });
+
+  // Auto-update preference (persisted, on by default) + live status forwarded
+  // from the Electron updater. The toggle/status only mean anything in the
+  // desktop build; on web `window.spun` is absent and onUpdateStatus is a no-op.
+  const { enabled: autoUpdateOn, toggle: toggleAutoUpdate } = useAutoUpdate();
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>({ state: 'idle' });
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.spun?.onUpdateStatus) return;
+    return window.spun.onUpdateStatus(setUpdateStatus);
+  }, []);
 
   // Esc to close.
   useEffect(() => {
@@ -122,6 +147,42 @@ export function SettingsDialog({ open, onOpenChange, station, playState, current
               </button>
             </div>
           </section>
+
+          {isDev && (
+            <section className="mt-7 flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-[var(--color-ink)]">Software update</h3>
+                  <p className="text-xs text-[var(--color-ink-3)] mt-0.5">
+                    {autoUpdateOn
+                      ? 'Install new versions automatically and apply them on restart.'
+                      : 'Off — you won’t receive new versions until you turn this back on.'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={autoUpdateOn}
+                  aria-label="Automatic updates"
+                  onClick={toggleAutoUpdate}
+                  className={[
+                    'relative h-5 w-9 rounded-full transition-colors cursor-pointer shrink-0',
+                    autoUpdateOn ? 'bg-[var(--color-warm)]' : 'bg-[var(--color-line)]',
+                  ].join(' ')}
+                >
+                  <span
+                    className={[
+                      'absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all',
+                      autoUpdateOn ? 'left-[18px]' : 'left-0.5',
+                    ].join(' ')}
+                  />
+                </button>
+              </div>
+              {autoUpdateOn && updateStatusLine(updateStatus) && (
+                <p className="text-xs text-[var(--color-ink-4)]">{updateStatusLine(updateStatus)}</p>
+              )}
+            </section>
+          )}
 
           <section className="mt-7">
             <div className="flex items-center justify-between">

@@ -2,11 +2,16 @@
 
 import { useEffect } from 'react';
 import { hydrateFromServer } from '@/app/lib/persist';
+import { syncToShell as syncAutoUpdateToShell } from '@/app/lib/autoUpdate';
 
 // Pulls persisted state from the SQLite-backed /api/state into localStorage on
 // load (server is the source of truth), then imports any local-only keys.
 // Renders nothing.
 export function PersistenceBootstrap() {
-  useEffect(() => { void hydrateFromServer(); }, []);
+  useEffect(() => {
+    // Hydrate first so the desktop shell hears the *persisted* auto-update
+    // preference (server wins), not the pre-hydration default. No-op on web.
+    void hydrateFromServer().then(syncAutoUpdateToShell);
+  }, []);
   return null;
 }
