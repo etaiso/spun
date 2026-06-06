@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { Station } from '@/app/lib/stations';
+import { useTracking } from '@/app/lib/tracking';
 import { StationLogo } from './StationLogo';
 import { StationContextMenu } from './StationContextMenu';
 
@@ -16,6 +17,8 @@ type Props = {
 export function StationRow({ station, isActive, isFavorite, onSelect, onToggleFavorite }: Props) {
   // Right-click menu anchor (viewport coords), or null when closed.
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  const { isTracked, track, untrack } = useTracking();
+  const tracked = isTracked(station.id);
 
   return (
     <>
@@ -49,6 +52,22 @@ export function StationRow({ station, isActive, isFavorite, onSelect, onToggleFa
             {[station.country, station.bitrate > 0 ? `${station.bitrate} kbps` : null].filter(Boolean).join(' · ')}
           </div>
         </div>
+        <button
+          onClick={(e) => { e.stopPropagation(); if (tracked) untrack(station.id); else track(station); }}
+          aria-label={tracked ? 'Stop tracking' : 'Track station'}
+          title={tracked ? 'Stop tracking' : 'Track station'}
+          className={[
+            'shrink-0 w-8 h-8 flex items-center justify-center',
+            'cursor-pointer transition-transform hover:scale-125',
+            tracked ? 'text-[var(--color-warm)]' : 'text-[var(--color-ink-4)] hover:text-[var(--color-warm)]',
+          ].join(' ')}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-[18px] h-[18px]">
+            <path d="M4 11a9 9 0 0 1 9 9" />
+            <path d="M4 4a16 16 0 0 1 16 16" />
+            <circle cx="5" cy="19" r="1" fill="currentColor" stroke="none" />
+          </svg>
+        </button>
         <button
           onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }}
           aria-label={isFavorite ? 'Unfavorite' : 'Favorite'}
