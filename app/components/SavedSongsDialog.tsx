@@ -5,6 +5,7 @@ import { useSavedSongs, searchSavedSongs } from '@/app/lib/savedSongs';
 import { pauseRadio } from '@/app/lib/playbackBus';
 import { readStoredVolume } from '@/app/lib/volume';
 import { lookupITunesSong } from '@/app/lib/itunes';
+import { buildExport, type ExportFormat } from '@/app/lib/integrations/export';
 import { StationLogo } from './StationLogo';
 
 type Props = { open: boolean; onOpenChange: (open: boolean) => void };
@@ -14,10 +15,24 @@ function hhmm(ts: number): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+/** Trigger a client-side file download (works in the browser and the Electron renderer). */
+function downloadText(filename: string, mime: string, text: string): void {
+  const url = URL.createObjectURL(new Blob([text], { type: mime }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 export function SavedSongsDialog({ open, onOpenChange }: Props) {
   const { saved, remove, update } = useSavedSongs();
   const [query, setQuery] = useState('');
   const [previewId, setPreviewId] = useState<string | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
+  const exportRef = useRef<HTMLDivElement | null>(null);
   // The preview <audio> stays mounted regardless of `open` so this ref is always
   // valid — letting us explicitly stop the preview when the dialog closes
   // (rather than relying on the element being unmounted).
@@ -58,11 +73,29 @@ export function SavedSongsDialog({ open, onOpenChange }: Props) {
   useEffect(() => {
     if (open) return;
     audioRef.current?.pause();
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    /* eslint-disable react-hooks/set-state-in-effect */
     setPreviewId(null);
+    setExportOpen(false);
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [open]);
 
+  // Dismiss the export menu on an outside click (without closing the dialog).
+  useEffect(() => {
+    if (!exportOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (exportRef.current && !exportRef.current.contains(e.target as Node)) setExportOpen(false);
+    };
+    window.addEventListener('mousedown', onDown);
+    return () => window.removeEventListener('mousedown', onDown);
+  }, [exportOpen]);
+
   const shown = useMemo(() => searchSavedSongs(saved, query), [saved, query]);
+
+  // Export *all* saved songs (not just the current filter) — "everything by default".
+  const exportSaved = (format: ExportFormat) => {
+    const { filename, mime, content } = buildExport(saved, format);
+    downloadText(filename, mime, content);
+  };
 
   const togglePreview = (id: string, url: string) => {
     const a = audioRef.current;
@@ -92,7 +125,34 @@ export function SavedSongsDialog({ open, onOpenChange }: Props) {
             <div className="overflow-y-auto p-7">
               <div className="flex items-center justify-between mb-5">
                 <h2 className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-warm)]">★ Saved songs</h2>
-                <button onClick={() => onOpenChange(false)} aria-label="Close" className="text-lg leading-none text-[var(--color-ink-3)] hover:text-[var(--color-ink)] cursor-pointer">✕</button>
+                <div className="flex items-center gap-2">
+                  {saved.length > 0 && (
+                    <div className="relative" ref={exportRef}>
+                      <button
+                        onClick={() => setExportOpen(o => !o)}
+                        aria-haspopup="menu"
+                        aria-expanded={exportOpen}
+                        title="Export your saved songs to import into Apple Music, Spotify, or YouTube Music"
+                        className="flex items-center gap-1.5 text-[11px] font-semibold rounded-full px-3 py-1 border border-[var(--color-line)] text-[var(--color-ink-2)] hover:border-[var(--color-warm)] cursor-pointer"
+                      >
+                        Export <span aria-hidden="true" className="text-[7px] translate-y-px">▼</span>
+                      </button>
+                      {exportOpen && (
+                        <div role="menu" className="absolute right-0 mt-1.5 z-10 min-w-[12rem] bg-white rounded-xl border border-[var(--color-line)] shadow-[0_12px_32px_rgba(0,0,0,0.16)] py-1.5">
+                          <button role="menuitem" onClick={() => { exportSaved('csv'); setExportOpen(false); }} className="w-full text-left px-3.5 py-2 hover:bg-[var(--color-bg)] cursor-pointer">
+                            <div className="text-sm font-semibold text-[var(--color-ink)]">CSV</div>
+                            <div className="text-[11px] text-[var(--color-ink-4)]">For transfer tools (Soundiiz, TuneMyMusic)</div>
+                          </button>
+                          <button role="menuitem" onClick={() => { exportSaved('m3u8'); setExportOpen(false); }} className="w-full text-left px-3.5 py-2 hover:bg-[var(--color-bg)] cursor-pointer">
+                            <div className="text-sm font-semibold text-[var(--color-ink)]">M3U8</div>
+                            <div className="text-[11px] text-[var(--color-ink-4)]">Playlist file (Apple Music, media players)</div>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <button onClick={() => onOpenChange(false)} aria-label="Close" className="text-lg leading-none text-[var(--color-ink-3)] hover:text-[var(--color-ink)] cursor-pointer">✕</button>
+                </div>
               </div>
 
               {saved.length === 0 ? (
