@@ -17,6 +17,7 @@ import { useTracking } from './lib/tracking';
 import { ShortcutsHelp } from './components/ShortcutsHelp';
 import { SettingsDialog } from './components/SettingsDialog';
 import { SavedSongsDialog } from './components/SavedSongsDialog';
+import { SpotifyAutoSync } from './components/SpotifyAutoSync';
 import type { PlayState } from './components/Player';
 import type { HistoryEntry } from './lib/nowPlayingTypes';
 
@@ -238,6 +239,7 @@ export default function Home() {
         currentTrack={currentTrack}
       />
       <SavedSongsDialog open={savedOpen} onOpenChange={setSavedOpen} />
+      <SpotifyAutoSync />
     </div>
   );
 }

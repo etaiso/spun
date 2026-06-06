@@ -6,6 +6,7 @@ import { pauseRadio } from '@/app/lib/playbackBus';
 import { readStoredVolume } from '@/app/lib/volume';
 import { lookupITunesSong } from '@/app/lib/itunes';
 import { buildExport, type ExportFormat } from '@/app/lib/integrations/export';
+import { spotify, isAvailable as spotifyAvailable } from '@/app/lib/integrations/spotifyBridge';
 import { StationLogo } from './StationLogo';
 
 type Props = { open: boolean; onOpenChange: (open: boolean) => void };
@@ -33,6 +34,8 @@ export function SavedSongsDialog({ open, onOpenChange }: Props) {
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const exportRef = useRef<HTMLDivElement | null>(null);
+  const spotifyOn = spotifyAvailable();
+  const [spotifyConnected, setSpotifyConnected] = useState(false);
   // The preview <audio> stays mounted regardless of `open` so this ref is always
   // valid — letting us explicitly stop the preview when the dialog closes
   // (rather than relying on the element being unmounted).
@@ -89,7 +92,15 @@ export function SavedSongsDialog({ open, onOpenChange }: Props) {
     return () => window.removeEventListener('mousedown', onDown);
   }, [exportOpen]);
 
+  // Reflect Spotify connection state for the per-row badges + footer.
+  useEffect(() => {
+    if (!open || !spotifyOn) return;
+    spotify.getStatus().then(s => setSpotifyConnected(s.connected)).catch(() => { /* shell gone */ });
+  }, [open, spotifyOn]);
+
   const shown = useMemo(() => searchSavedSongs(saved, query), [saved, query]);
+  const syncedCount = saved.filter(s => s.syncState === 'synced').length;
+  const notFoundCount = saved.filter(s => s.syncState === 'not_found').length;
 
   // Export *all* saved songs (not just the current filter) — "everything by default".
   const exportSaved = (format: ExportFormat) => {
@@ -197,6 +208,20 @@ export function SavedSongsDialog({ open, onOpenChange }: Props) {
                             {s.appleMusicUrl && (
                               <a href={s.appleMusicUrl} target="_blank" rel="noreferrer" className="text-[11px] font-bold rounded-full px-2.5 py-1 bg-[var(--color-ink)] text-white">Apple Music</a>
                             )}
+                            {s.syncState === 'synced' && s.spotifyUrl && (
+                              <a href={s.spotifyUrl} target="_blank" rel="noreferrer" title="Open in Spotify" className="text-[11px] font-bold rounded-full px-2.5 py-1 bg-[#1DB954] text-white">Spotify</a>
+                            )}
+                            {spotifyOn && s.syncState === 'not_found' && (
+                              <a
+                                href={`https://open.spotify.com/search/${encodeURIComponent(`${s.artist} ${s.title}`.trim())}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                title="Not matched automatically — search on Spotify"
+                                className="text-[11px] font-semibold rounded-full px-2.5 py-1 border border-[var(--color-line)] text-[var(--color-ink-3)] hover:border-[#1DB954] hover:text-[#1DB954] transition-colors"
+                              >
+                                Find ↗
+                              </a>
+                            )}
                             <button onClick={() => remove(s.id)} aria-label={`Remove ${s.title}`} title="Remove from saved" className="w-7 h-7 flex items-center justify-center rounded-full text-[var(--color-ink-4)] hover:text-[var(--color-accent)] hover:bg-[rgba(192,57,43,0.08)] cursor-pointer transition-colors">
                               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4" aria-hidden="true">
                                 <path d="M3 6h18" />
@@ -210,6 +235,14 @@ export function SavedSongsDialog({ open, onOpenChange }: Props) {
                         </li>
                       ))}
                     </ul>
+                  )}
+
+                  {spotifyOn && (
+                    <p className="text-xs text-[var(--color-ink-4)] mt-4">
+                      {spotifyConnected
+                        ? `Spotify: ${syncedCount} synced${notFoundCount ? ` · ${notFoundCount} not found` : ''}`
+                        : 'Connect Spotify in Settings to sync these to a playlist.'}
+                    </p>
                   )}
                 </>
               )}

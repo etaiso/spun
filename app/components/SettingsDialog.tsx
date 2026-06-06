@@ -10,6 +10,10 @@ import { UpdateModal } from './UpdateModal';
 import { useRingsEnabled } from '@/app/lib/visualizer';
 import { useHidden } from '@/app/lib/hidden';
 import { persistSet } from '@/app/lib/persist';
+import { useSavedSongs } from '@/app/lib/savedSongs';
+import { spotify, isAvailable as spotifyAvailable, type SpotifyStatus } from '@/app/lib/integrations/spotifyBridge';
+import { pendingSongs, syncSongs } from '@/app/lib/integrations/spotifySync';
+import { useSpotifyAutoSync } from '@/app/lib/spotifyPrefs';
 import {
   useAutoUpdate,
   canCheckForUpdate,
@@ -97,6 +101,18 @@ export function SettingsDialog({ open, onOpenChange, station, playState, current
     manualRef.current = false;
   };
 
+  // --- Spotify playlist export (desktop only, when SPOTIFY_CLIENT_ID set) -----
+  const { saved, update } = useSavedSongs();
+  const { enabled: autoSyncOn, toggle: toggleAutoSync } = useSpotifyAutoSync();
+  const spotifyOn = spotifyAvailable();
+  const [spotifyStatus, setSpotifyStatus] = useState<SpotifyStatus>({ connected: false });
+  const [spotifyBusy, setSpotifyBusy] = useState<null | 'connecting' | 'syncing'>(null);
+  const [spotifyMsg, setSpotifyMsg] = useState('');
+  useEffect(() => {
+    if (!open || !spotifyOn) return;
+    spotify.getStatus().then(setSpotifyStatus).catch(() => { /* shell gone */ });
+  }, [open, spotifyOn]);
+
   // Esc to close.
   useEffect(() => {
     if (!open) return;
@@ -127,6 +143,46 @@ export function SettingsDialog({ open, onOpenChange, station, playState, current
       persistSet(DEBUG_KEY, next ? '1' : '0');
       return next;
     });
+  };
+
+  const syncedCount = saved.filter(s => s.syncState === 'synced').length;
+  const notFoundCount = saved.filter(s => s.syncState === 'not_found').length;
+  const pendingCount = pendingSongs(saved).length;
+
+  // Resolve + append pending songs. includeNotFound is true for a manual "Sync now"
+  // so previously-unmatched songs get re-attempted; the connect-time backfill omits it.
+  const runSpotifySync = async (includeNotFound: boolean) => {
+    setSpotifyBusy('syncing');
+    setSpotifyMsg('Syncing…');
+    try {
+      const r = await syncSongs(pendingSongs(saved, includeNotFound), spotify, update);
+      setSpotifyMsg(`${r.synced} synced${r.notFound ? ` · ${r.notFound} not found` : ''}`);
+    } catch {
+      setSpotifyMsg('Sync failed — check your connection.');
+    } finally {
+      setSpotifyBusy(null);
+    }
+  };
+
+  const onConnectSpotify = async () => {
+    setSpotifyBusy('connecting');
+    setSpotifyMsg('Waiting for Spotify authorization…');
+    try {
+      const r = await spotify.connect();
+      if (!r.ok) { setSpotifyMsg('Connection cancelled.'); setSpotifyBusy(null); return; }
+      setSpotifyStatus(await spotify.getStatus());
+      setSpotifyBusy(null);
+      await runSpotifySync(false); // backfill all existing saved songs
+    } catch {
+      setSpotifyMsg('Could not connect to Spotify.');
+      setSpotifyBusy(null);
+    }
+  };
+
+  const onDisconnectSpotify = async () => {
+    await spotify.disconnect();
+    setSpotifyStatus({ connected: false });
+    setSpotifyMsg('');
   };
 
   return (
@@ -236,6 +292,92 @@ export function SettingsDialog({ open, onOpenChange, station, playState, current
                   ) : 'Check now'}
                 </button>
               </div>
+            </section>
+          )}
+
+          {spotifyOn && (
+            <section className="mt-7 flex flex-col gap-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-bold text-[var(--color-ink)]">Spotify</h3>
+                  <p className="text-xs text-[var(--color-ink-3)] mt-0.5">
+                    {spotifyStatus.connected
+                      ? <>Saved songs sync to your private <b>Spun</b> playlist{spotifyStatus.displayName ? ` · ${spotifyStatus.displayName}` : ''}.</>
+                      : 'Export saved songs to a private “Spun” playlist. Requires Spotify Premium.'}
+                  </p>
+                </div>
+                {spotifyStatus.connected ? (
+                  <button
+                    onClick={onDisconnectSpotify}
+                    className="shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold text-[var(--color-ink-3)] border border-[var(--color-line)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] cursor-pointer transition-colors"
+                  >
+                    Disconnect
+                  </button>
+                ) : (
+                  <button
+                    onClick={onConnectSpotify}
+                    disabled={spotifyBusy === 'connecting'}
+                    className="shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold text-white bg-[#1DB954] hover:bg-[#1aa84a] cursor-pointer transition-colors disabled:opacity-60 disabled:cursor-default"
+                  >
+                    {spotifyBusy === 'connecting' ? 'Connecting…' : 'Connect Spotify'}
+                  </button>
+                )}
+              </div>
+
+              {spotifyStatus.connected && (
+                <>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-[13px] font-semibold text-[var(--color-ink)]">Auto-sync</h4>
+                      <p className="text-xs text-[var(--color-ink-3)] mt-0.5">Add new saves to the playlist automatically.</p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={autoSyncOn}
+                      aria-label="Auto-sync to Spotify"
+                      onClick={toggleAutoSync}
+                      className={[
+                        'relative h-5 w-9 rounded-full transition-colors cursor-pointer shrink-0',
+                        autoSyncOn ? 'bg-[var(--color-warm)]' : 'bg-[var(--color-line)]',
+                      ].join(' ')}
+                    >
+                      <span className={['absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all', autoSyncOn ? 'left-[18px]' : 'left-0.5'].join(' ')} />
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs text-[var(--color-ink-4)]">
+                      {spotifyBusy === 'syncing'
+                        ? (spotifyMsg || 'Syncing…')
+                        : `${syncedCount} synced${notFoundCount ? ` · ${notFoundCount} not found` : ''}${pendingCount ? ` · ${pendingCount} pending` : ''}`}
+                    </p>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {spotifyStatus.playlistUrl && (
+                        <a
+                          href={spotifyStatus.playlistUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-3 py-1.5 rounded-full text-xs font-semibold text-[var(--color-warm)] border border-[var(--color-line)] hover:border-[var(--color-warm)] cursor-pointer transition-colors"
+                        >
+                          Open playlist ↗
+                        </a>
+                      )}
+                      <button
+                        onClick={() => runSpotifySync(true)}
+                        disabled={spotifyBusy === 'syncing'}
+                        className="px-3 py-1.5 rounded-full text-xs font-semibold text-[var(--color-warm)] border border-[var(--color-line)] hover:border-[var(--color-warm)] hover:bg-[var(--color-bg)] cursor-pointer transition-colors disabled:opacity-60 disabled:cursor-default"
+                      >
+                        {spotifyBusy === 'syncing' ? 'Syncing…' : 'Sync now'}
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {!spotifyStatus.connected && spotifyMsg && (
+                <p className="text-xs text-[var(--color-ink-4)]">{spotifyMsg}</p>
+              )}
             </section>
           )}
 
