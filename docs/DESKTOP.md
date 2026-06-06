@@ -84,6 +84,27 @@ Releases are built in CI and published to **GitHub Releases**, one Release per
 version tag. `electron-updater` checks that Release feed on launch (production
 only) and updates installed apps in the background.
 
+### User control + delta downloads
+
+Auto-update is **user-configurable**: **Settings → Software update** (on by
+default). The renderer owns the toggle and persists it like any other setting;
+after it hydrates it reports the preference to the main process over the
+`window.spun` IPC bridge ([electron/preload.js](../electron/preload.js)), and
+`setAutoUpdate()` in [electron/main.js](../electron/main.js) gates the updater —
+so a user who turns it **off** gets no background check or download. The Settings
+panel also shows live status (checking / downloading % / "restart to apply").
+
+Updates do **not** re-download the whole installer. electron-builder publishes a
+`.blockmap` beside each NSIS installer and mac `.zip`, so electron-updater does a
+**differential download** — comparing the installed version's blocks to the new
+one and fetching only the changed blocks (usually a few MB; Spun's big pieces —
+the recognizer, ffmpeg, Electron itself — rarely change between releases). This
+is automatic; there's nothing to enable.
+
+> **macOS caveat:** `electron-updater` only *applies* an update if the app is
+> validly signed. While builds are unsigned (below), auto-update works on Windows
+> but is a no-op on macOS until a Developer ID cert is added.
+
 ### Cutting a release (the normal path)
 
 ```bash

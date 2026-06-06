@@ -11,7 +11,7 @@
 //
 // Dev: skip spawning; load the separately-running `next dev` at localhost:3000.
 
-const { app, BrowserWindow, Menu, shell, utilityProcess } = require('electron');
+const { app, BrowserWindow, Menu, shell, utilityProcess, ipcMain } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const http = require('node:http');
@@ -30,6 +30,43 @@ function log(msg) {
   const line = `[${new Date().toISOString()}] ${msg}\n`;
   try { if (logFd !== null) fs.writeSync(logFd, line); } catch { /* ignore */ }
   console.log(msg);
+}
+
+// --- Auto-update (electron-updater) -----------------------------------------
+// The renderer owns the on/off setting (Settings → Software update) and reports
+// it over IPC; the main process owns the updater. We only check once per launch,
+// and only after the renderer confirms the preference is ON — so a user who
+// turned it OFF is never surprised by a background download. Delta downloads are
+// automatic: electron-builder publishes a .blockmap beside each installer/zip, so
+// electron-updater fetches only the changed blocks instead of the full installer.
+let updaterStarted = false;
+
+function sendUpdateStatus(status) {
+  log(`auto-update: ${JSON.stringify(status)}`);
+  try { win?.webContents.send('spun:update-status', status); } catch { /* window gone */ }
+}
+
+function setAutoUpdate(enabled) {
+  if (isDev) return;                 // dev runs the live server — nothing to update
+  if (!enabled) { log('auto-update: disabled by preference'); return; }
+  if (updaterStarted) return;        // one check per launch
+  updaterStarted = true;
+  try {
+    const { autoUpdater } = require('electron-updater');
+    autoUpdater.logger = { info: log, warn: log, error: log, debug: () => {} };
+    autoUpdater.autoDownload = true; // download (delta) as soon as one is found
+    autoUpdater.on('checking-for-update', () => sendUpdateStatus({ state: 'checking' }));
+    autoUpdater.on('update-available', (i) => sendUpdateStatus({ state: 'available', version: i?.version }));
+    autoUpdater.on('update-not-available', () => sendUpdateStatus({ state: 'none' }));
+    autoUpdater.on('download-progress', (p) => sendUpdateStatus({ state: 'downloading', percent: Math.round(p?.percent ?? 0) }));
+    autoUpdater.on('update-downloaded', (i) => sendUpdateStatus({ state: 'downloaded', version: i?.version }));
+    autoUpdater.on('error', (e) => sendUpdateStatus({ state: 'error', message: String(e?.message ?? e) }));
+    // checkForUpdatesAndNotify downloads in the background and fires a native OS
+    // notification when the update is staged; it applies on next quit/restart.
+    autoUpdater.checkForUpdatesAndNotify();
+  } catch (e) {
+    log(`updater init failed: ${e}`);
+  }
 }
 
 function getFreePort() {
@@ -190,15 +227,10 @@ app.whenReady().then(async () => {
   // each window — drop it. macOS keeps its system menu bar so the standard
   // ⌘C/⌘V/⌘Q shortcuts and app menu survive.
   if (process.platform !== 'darwin') Menu.setApplicationMenu(null);
+  // The renderer pushes the persisted auto-update preference after it hydrates
+  // (see app/components/PersistenceBootstrap.tsx); setAutoUpdate gates the check.
+  ipcMain.handle('spun:set-auto-update', (_event, enabled) => { setAutoUpdate(enabled); return true; });
   await createWindow();
-  if (!isDev) {
-    try {
-      const { autoUpdater } = require('electron-updater');
-      autoUpdater.checkForUpdatesAndNotify();
-    } catch (e) {
-      log(`updater init failed: ${e}`);
-    }
-  }
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
