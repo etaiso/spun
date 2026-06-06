@@ -22,7 +22,9 @@ falls back to **fingerprinting the live audio with Shazam** to identify it.
 - 📡 **Background tracking** — track multiple stations at once and watch what's
   playing on each in a live monitor panel, no audio needed.
 - 💾 **Saved songs** — save any recognized track to a persisted playlist with a
-  ~30s preview and an **Apple Music** link.
+  ~30s preview and an **Apple Music** link. **Export** the list as **CSV / M3U8**
+  (import anywhere), or connect **Spotify** to auto-sync saves into a private
+  "Spun" playlist.
 - ⭐ **Favorites** and a region-aware **Popular** list, with duplicate stations
   collapsed but still searchable by any of their names.
 - 🙈 **Hide stations** to banish them from every list, **region-only mode** to
@@ -77,6 +79,24 @@ CI on every version tag, and the app auto-updates from there. (Intel macOS is
 not built yet — GitHub's Intel runners are being retired; see the docs.)
 Building, code-signing, and the full release flow are documented in
 [`docs/DESKTOP.md`](docs/DESKTOP.md).
+
+### 4. Spotify playlist export (optional, desktop only)
+
+Saved songs always export to **CSV / M3U8** (no setup). To additionally **auto-sync**
+them into a private **"Spun"** Spotify playlist, set a Spotify app client id:
+
+1. Create an app at the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard),
+   choose the **Web API**, and add the redirect URI **`http://127.0.0.1:8888/callback`**.
+   Copy the **Client ID** (PKCE — no client secret needed).
+2. Set it before launching the desktop app: `SPOTIFY_CLIENT_ID=xxx npm run electron:dev`
+   (or via `.env` — see [`.env.example`](.env.example)).
+3. In the app: **Settings → Spotify → Connect**.
+
+> **Caveats (Spotify, since Feb 2026):** the Web API requires the **app owner to
+> have Spotify Premium**, and a Development-Mode app is limited to **5 authorized
+> users**. This is therefore a personal / small-group feature, not something the
+> bundled app ships enabled. The integration stays hidden unless `SPOTIFY_CLIENT_ID`
+> is set.
 
 ## Scripts
 
