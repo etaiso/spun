@@ -34,38 +34,94 @@ function log(msg) {
 
 // --- Auto-update (electron-updater) -----------------------------------------
 // The renderer owns the on/off setting (Settings → Software update) and reports
-// it over IPC; the main process owns the updater. We only check once per launch,
-// and only after the renderer confirms the preference is ON — so a user who
-// turned it OFF is never surprised by a background download. Delta downloads are
-// automatic: electron-builder publishes a .blockmap beside each installer/zip, so
-// electron-updater fetches only the changed blocks instead of the full installer.
-let updaterStarted = false;
+// it over IPC; the main process owns the updater. The automatic check runs once
+// per launch, and only after the renderer confirms the preference is ON — so a
+// user who turned it OFF is never surprised by a background download. A manual
+// "Check now" (also in Settings) can be triggered at any time regardless of the
+// preference. Delta downloads are automatic either way: electron-builder
+// publishes a .blockmap beside each installer/zip, so electron-updater fetches
+// only the changed blocks instead of the full installer.
+let updaterInited = false;
+let autoChecked = false;
 
 function sendUpdateStatus(status) {
   log(`auto-update: ${JSON.stringify(status)}`);
   try { win?.webContents.send('spun:update-status', status); } catch { /* window gone */ }
 }
 
+// Lazily require electron-updater and wire its lifecycle events to the renderer.
+// Idempotent: the handlers are attached once, then shared by both the automatic
+// check and any manual "Check now". Returns the autoUpdater, or null in dev.
+function initUpdater() {
+  if (isDev) return null;            // dev runs the live server — nothing to update
+  const { autoUpdater } = require('electron-updater');
+  if (updaterInited) return autoUpdater;
+  updaterInited = true;
+  autoUpdater.logger = { info: log, warn: log, error: log, debug: () => {} };
+  autoUpdater.autoDownload = true;   // download (delta) as soon as one is found
+  autoUpdater.on('checking-for-update', () => sendUpdateStatus({ state: 'checking' }));
+  autoUpdater.on('update-available', (i) => sendUpdateStatus({ state: 'available', version: i?.version }));
+  autoUpdater.on('update-not-available', () => sendUpdateStatus({ state: 'none' }));
+  autoUpdater.on('download-progress', (p) => sendUpdateStatus({ state: 'downloading', percent: Math.round(p?.percent ?? 0) }));
+  autoUpdater.on('update-downloaded', (i) => sendUpdateStatus({ state: 'downloaded', version: i?.version }));
+  autoUpdater.on('error', (e) => sendUpdateStatus({ state: 'error', message: String(e?.message ?? e) }));
+  return autoUpdater;
+}
+
+// Automatic check: runs once per launch, only when the preference is ON. It
+// downloads in the background (autoDownload) and applies on the next quit.
 function setAutoUpdate(enabled) {
-  if (isDev) return;                 // dev runs the live server — nothing to update
+  if (isDev) return;
   if (!enabled) { log('auto-update: disabled by preference'); return; }
-  if (updaterStarted) return;        // one check per launch
-  updaterStarted = true;
+  if (autoChecked) return;           // one automatic check per launch
+  autoChecked = true;
   try {
-    const { autoUpdater } = require('electron-updater');
-    autoUpdater.logger = { info: log, warn: log, error: log, debug: () => {} };
-    autoUpdater.autoDownload = true; // download (delta) as soon as one is found
-    autoUpdater.on('checking-for-update', () => sendUpdateStatus({ state: 'checking' }));
-    autoUpdater.on('update-available', (i) => sendUpdateStatus({ state: 'available', version: i?.version }));
-    autoUpdater.on('update-not-available', () => sendUpdateStatus({ state: 'none' }));
-    autoUpdater.on('download-progress', (p) => sendUpdateStatus({ state: 'downloading', percent: Math.round(p?.percent ?? 0) }));
-    autoUpdater.on('update-downloaded', (i) => sendUpdateStatus({ state: 'downloaded', version: i?.version }));
-    autoUpdater.on('error', (e) => sendUpdateStatus({ state: 'error', message: String(e?.message ?? e) }));
+    const u = initUpdater();
+    if (!u) return;
+    u.autoDownload = true;
     // checkForUpdatesAndNotify downloads in the background and fires a native OS
     // notification when the update is staged; it applies on next quit/restart.
-    autoUpdater.checkForUpdatesAndNotify();
+    u.checkForUpdatesAndNotify();
   } catch (e) {
     log(`updater init failed: ${e}`);
+  }
+}
+
+// Manual check: triggered by the user clicking "Check now" in Settings, and
+// works regardless of the auto-update preference. Unlike the automatic path it
+// does NOT auto-download — the renderer shows the user a dialog and only calls
+// downloadUpdate() if they agree, so a manual check never downloads behind their
+// back. The update-(not-)available events drive that dialog.
+function checkForUpdate() {
+  if (isDev) { sendUpdateStatus({ state: 'none' }); return; }
+  try {
+    const u = initUpdater();
+    if (!u) { sendUpdateStatus({ state: 'none' }); return; }
+    u.autoDownload = false;
+    u.checkForUpdates();
+  } catch (e) {
+    sendUpdateStatus({ state: 'error', message: String(e?.message ?? e) });
+  }
+}
+
+// Download an update the user agreed to from the manual "Update now" dialog.
+// Progress and completion arrive via download-progress / update-downloaded.
+function downloadUpdate() {
+  if (isDev) return;
+  try {
+    initUpdater()?.downloadUpdate();
+  } catch (e) {
+    sendUpdateStatus({ state: 'error', message: String(e?.message ?? e) });
+  }
+}
+
+// Quit and install a downloaded update now (user clicked "Restart now").
+function quitAndInstall() {
+  if (isDev) return;
+  try {
+    initUpdater()?.quitAndInstall();
+  } catch (e) {
+    log(`quitAndInstall failed: ${e}`);
   }
 }
 
@@ -230,6 +286,11 @@ app.whenReady().then(async () => {
   // The renderer pushes the persisted auto-update preference after it hydrates
   // (see app/components/PersistenceBootstrap.tsx); setAutoUpdate gates the check.
   ipcMain.handle('spun:set-auto-update', (_event, enabled) => { setAutoUpdate(enabled); return true; });
+  // Manual "Check now" from Settings — works regardless of the auto preference.
+  ipcMain.handle('spun:check-for-update', () => { checkForUpdate(); return true; });
+  // User agreed to the update in the dialog → download it, then (optionally) install.
+  ipcMain.handle('spun:download-update', () => { downloadUpdate(); return true; });
+  ipcMain.handle('spun:quit-and-install', () => { quitAndInstall(); return true; });
   await createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

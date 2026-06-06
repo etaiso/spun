@@ -28,6 +28,9 @@ export type UpdateStatus =
 // it only exists in the desktop shell.
 type SpunShell = {
   setAutoUpdate: (enabled: boolean) => void;
+  checkForUpdate: () => void;
+  downloadUpdate: () => void;
+  quitAndInstall: () => void;
   onUpdateStatus: (cb: (status: UpdateStatus) => void) => () => void;
 };
 
@@ -69,6 +72,29 @@ function subscribe(cb: () => void): () => void {
 export function syncToShell(): void {
   if (typeof window === 'undefined') return;
   try { window.spun?.setAutoUpdate(read()); } catch { /* shell gone / web build */ }
+}
+
+/** True when running inside the desktop shell (manual checks are possible). */
+export function canCheckForUpdate(): boolean {
+  return typeof window !== 'undefined' && typeof window.spun?.checkForUpdate === 'function';
+}
+
+/** Ask the shell to check for an update now (no-op on web). */
+export function requestUpdateCheck(): void {
+  if (typeof window === 'undefined') return;
+  try { window.spun?.checkForUpdate(); } catch { /* shell gone / web build */ }
+}
+
+/** Download the update found by a manual check, after the user agrees. */
+export function downloadUpdate(): void {
+  if (typeof window === 'undefined') return;
+  try { window.spun?.downloadUpdate(); } catch { /* shell gone / web build */ }
+}
+
+/** Quit and install a downloaded update now ("Restart now"). */
+export function quitAndInstall(): void {
+  if (typeof window === 'undefined') return;
+  try { window.spun?.quitAndInstall(); } catch { /* shell gone / web build */ }
 }
 
 function write(next: boolean) {

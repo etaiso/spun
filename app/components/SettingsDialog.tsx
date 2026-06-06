@@ -1,15 +1,23 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Station } from '@/app/lib/stations';
 import type { PlayState } from './Player';
 import { RegionPicker } from './RegionPicker';
 import { HiddenStationsDialog } from './HiddenStationsDialog';
 import { DebugPanel } from './DebugPanel';
+import { UpdateModal } from './UpdateModal';
 import { useRingsEnabled } from '@/app/lib/visualizer';
 import { useHidden } from '@/app/lib/hidden';
 import { persistSet } from '@/app/lib/persist';
-import { useAutoUpdate, type UpdateStatus } from '@/app/lib/autoUpdate';
+import {
+  useAutoUpdate,
+  canCheckForUpdate,
+  requestUpdateCheck,
+  downloadUpdate,
+  quitAndInstall,
+  type UpdateStatus,
+} from '@/app/lib/autoUpdate';
 
 type Props = {
   open: boolean;
@@ -30,7 +38,7 @@ function updateStatusLine(s: UpdateStatus): string | null {
     case 'downloading': return `Downloading update… ${s.percent ?? 0}%`;
     case 'downloaded': return s.version ? `Update ${s.version} ready — restart to apply.` : 'Update ready — restart to apply.';
     case 'none': return 'You’re on the latest version.';
-    case 'error': return 'Update check failed — will retry next launch.';
+    case 'error': return 'Update check failed — try again later.';
     default: return null;
   }
 }
@@ -55,21 +63,50 @@ export function SettingsDialog({ open, onOpenChange, station, playState, current
   // desktop build; on web `window.spun` is absent and onUpdateStatus is a no-op.
   const { enabled: autoUpdateOn, toggle: toggleAutoUpdate } = useAutoUpdate();
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>({ state: 'idle' });
+  // "Check now" UX: a spinner while the check is in flight, then a modal with the
+  // result. `manualRef` distinguishes a user-initiated check (which gets the
+  // spinner + modal) from background auto-update events (which only update the
+  // ambient status line), since both arrive on the same onUpdateStatus stream.
+  const [checking, setChecking] = useState(false);
+  const [updateModalOpen, setUpdateModalOpen] = useState(false);
+  const manualRef = useRef(false);
   useEffect(() => {
     if (typeof window === 'undefined' || !window.spun?.onUpdateStatus) return;
-    return window.spun.onUpdateStatus(setUpdateStatus);
+    return window.spun.onUpdateStatus((s) => {
+      setUpdateStatus(s);
+      if (!manualRef.current) return;     // background auto-update — no spinner/modal
+      if (s.state === 'checking') return; // still spinning; nothing resolved yet
+      setChecking(false);                 // resolved → stop the spinner, show the modal
+      setUpdateModalOpen(true);
+    });
   }, []);
+
+  const onCheckNow = () => {
+    if (!canCheckForUpdate()) return;     // web build / no shell — nothing to do
+    manualRef.current = true;
+    setChecking(true);
+    setUpdateStatus({ state: 'checking' });
+    requestUpdateCheck();
+  };
+  const onUpdateNow = () => {
+    setUpdateStatus({ state: 'downloading', percent: 0 }); // immediate feedback
+    downloadUpdate();
+  };
+  const closeUpdateModal = () => {
+    setUpdateModalOpen(false);
+    manualRef.current = false;
+  };
 
   // Esc to close.
   useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) {
-      // When the Hidden-stations modal is layered on top, let it own Escape.
-      if (e.key === 'Escape' && !hiddenOpen) onOpenChange(false);
+      // When the Hidden-stations or Update modal is layered on top, let it own Escape.
+      if (e.key === 'Escape' && !hiddenOpen && !updateModalOpen) onOpenChange(false);
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, onOpenChange, hiddenOpen]);
+  }, [open, onOpenChange, hiddenOpen, updateModalOpen]);
 
   if (!open) return null;
 
@@ -78,6 +115,11 @@ export function SettingsDialog({ open, onOpenChange, station, playState, current
   const isDev =
     process.env.NODE_ENV === 'development' ||
     (typeof navigator !== 'undefined' && /electron/i.test(navigator.userAgent));
+
+  // The update UI (auto-update toggle + "Check now") only does anything in the
+  // desktop shell, where Electron exposes the updater on window.spun. Hide it
+  // entirely on the web build — there's nothing to update there.
+  const isDesktop = canCheckForUpdate();
 
   const toggleDebug = () => {
     setShowDebug(v => {
@@ -90,7 +132,7 @@ export function SettingsDialog({ open, onOpenChange, station, playState, current
   return (
     <>
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-6"
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/30 px-6 pt-[12vh] pb-6"
       onClick={() => onOpenChange(false)}
     >
       <div
@@ -148,7 +190,7 @@ export function SettingsDialog({ open, onOpenChange, station, playState, current
             </div>
           </section>
 
-          {isDev && (
+          {isDesktop && (
             <section className="mt-7 flex flex-col gap-3">
               <div className="flex items-center justify-between">
                 <div>
@@ -178,9 +220,22 @@ export function SettingsDialog({ open, onOpenChange, station, playState, current
                   />
                 </button>
               </div>
-              {autoUpdateOn && updateStatusLine(updateStatus) && (
-                <p className="text-xs text-[var(--color-ink-4)]">{updateStatusLine(updateStatus)}</p>
-              )}
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs text-[var(--color-ink-4)]">{autoUpdateOn ? (updateStatusLine(updateStatus) ?? '') : ''}</p>
+                <button
+                  type="button"
+                  onClick={onCheckNow}
+                  disabled={checking}
+                  className="shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold text-[var(--color-warm)] border border-[var(--color-line)] hover:border-[var(--color-warm)] hover:bg-[var(--color-bg)] cursor-pointer transition-colors disabled:opacity-60 disabled:cursor-default disabled:hover:border-[var(--color-line)] disabled:hover:bg-transparent"
+                >
+                  {checking ? (
+                    <span className="flex items-center gap-1.5">
+                      <span className="inline-block h-3 w-3 rounded-full border-2 border-current border-r-transparent animate-spin" />
+                      Checking…
+                    </span>
+                  ) : 'Check now'}
+                </button>
+              </div>
             </section>
           )}
 
@@ -244,6 +299,14 @@ export function SettingsDialog({ open, onOpenChange, station, playState, current
       </div>
     </div>
     <HiddenStationsDialog open={hiddenOpen} onOpenChange={setHiddenOpen} />
+    <UpdateModal
+      open={updateModalOpen}
+      status={updateStatus}
+      currentVersion={process.env.appVersion ?? ''}
+      onClose={closeUpdateModal}
+      onUpdate={onUpdateNow}
+      onRestart={quitAndInstall}
+    />
     </>
   );
 }
