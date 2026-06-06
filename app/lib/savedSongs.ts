@@ -4,6 +4,13 @@ import { useCallback, useSyncExternalStore } from 'react';
 import { fuzzyScore } from './rank';
 import { persistSet } from './persist';
 
+/**
+ * Per-song state of the playlist-export integration (Spotify first).
+ * Absent means "not yet processed" — treated as pending once a provider is
+ * connected. `not_found` = no confident match; `skipped` = user excluded it.
+ */
+export type SyncState = 'pending' | 'synced' | 'not_found' | 'skipped';
+
 export type SavedSong = {
   id: string;            // Shazam key, else normalized `${artist}|${title}`
   title: string;
@@ -15,6 +22,11 @@ export type SavedSong = {
   previewUrl: string;
   stationName: string;
   savedAt: number;
+  // --- Playlist-export integration (additive; iTunes fields above untouched) ---
+  isrc?: string;         // exact cross-provider match key, when the recognizer supplies it
+  spotifyTrackId?: string;
+  spotifyUrl?: string;   // "Open in Spotify" link, resolved at save time when connected
+  syncState?: SyncState;
 };
 
 export type BuildInput = {
@@ -26,6 +38,7 @@ export type BuildInput = {
   appleMusicUrl?: string;
   previewUrl?: string;
   key?: string;
+  isrc?: string;
   stationName: string;
   savedAt: number;
 };
@@ -48,6 +61,7 @@ export function buildSavedSong(input: BuildInput): SavedSong {
     previewUrl: input.previewUrl || '',
     stationName: input.stationName,
     savedAt: input.savedAt,
+    ...(input.isrc && input.isrc.trim() ? { isrc: input.isrc.trim() } : {}),
   };
 }
 

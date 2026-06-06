@@ -27,6 +27,11 @@ describe('buildSavedSong', () => {
     expect(s.appleMusicUrl).toBe('https://music.apple.com/search?term=' + encodeURIComponent('Tracy Chapman Fast Car'));
     expect(s.previewUrl).toBe('');
   });
+
+  it('passes a trimmed isrc through when supplied, and omits the field otherwise', () => {
+    expect(buildSavedSong({ ...base, isrc: '  USCM51900012 ' }).isrc).toBe('USCM51900012');
+    expect('isrc' in buildSavedSong(base)).toBe(false);
+  });
 });
 
 describe('addSong / removeSong', () => {
