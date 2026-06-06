@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Station } from '@/app/lib/stations';
 import { useFavorites } from '@/app/lib/favorites';
 import { useRecent } from '@/app/lib/recent';
+import { useTracking } from '@/app/lib/tracking';
 import { useRegion, useRegionFilter } from '@/app/lib/region';
 import { useHiddenFilter } from '@/app/lib/hidden';
 import { rankStations } from '@/app/lib/rank';
@@ -28,6 +29,7 @@ export function CommandPalette({ onClose, onSelect }: Props) {
   const listRef = useRef<HTMLDivElement | null>(null);
   const { favorites, isFavorite, toggle } = useFavorites();
   const { recent } = useRecent();
+  const { isTracked, track, untrack } = useTracking();
   const { region } = useRegion();
   const filterByRegion = useRegionFilter();
   const filterHidden = useHiddenFilter();
@@ -173,6 +175,22 @@ export function CommandPalette({ onClose, onSelect }: Props) {
                   {[s.country, s.bitrate > 0 ? `${s.bitrate} kbps` : null].filter(Boolean).join(' · ')}
                 </div>
               </div>
+              <button
+                onClick={(e) => { e.stopPropagation(); if (isTracked(s.id)) untrack(s.id); else track(s); }}
+                aria-label={isTracked(s.id) ? 'Stop tracking' : 'Track station'}
+                title={isTracked(s.id) ? 'Stop tracking' : 'Track station'}
+                className={[
+                  'shrink-0 w-8 h-8 flex items-center justify-center',
+                  'cursor-pointer transition-transform hover:scale-125',
+                  isTracked(s.id) ? 'text-[var(--color-warm)]' : 'text-[var(--color-ink-4)] hover:text-[var(--color-warm)]',
+                ].join(' ')}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-[18px] h-[18px]">
+                  <path d="M4 11a9 9 0 0 1 9 9" />
+                  <path d="M4 4a16 16 0 0 1 16 16" />
+                  <circle cx="5" cy="19" r="1" fill="currentColor" stroke="none" />
+                </svg>
+              </button>
               <button
                 onClick={(e) => { e.stopPropagation(); toggle(s); }}
                 aria-label={isFavorite(s.id) ? 'Unfavorite' : 'Favorite'}

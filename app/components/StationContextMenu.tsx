@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Station } from '@/app/lib/stations';
 import { useHidden } from '@/app/lib/hidden';
 import { useTracking } from '@/app/lib/tracking';
@@ -20,8 +20,16 @@ export function StationContextMenu({ station, position, onClose }: Props) {
   const { hide } = useHidden();
   const { isTracked, track, untrack } = useTracking();
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
 
-  // Dismiss on Escape / scroll / resize.
+  // Dismiss on Escape / scroll / resize / click outside. Clicks that land on the
+  // full-screen overlay are handled by its own onClick (which also blocks
+  // click-through). The document-level pointerdown below is a fallback that
+  // catches clicks on anything that escapes the overlay's stacking context
+  // (e.g. when this menu is reused inside the command palette's own fixed
+  // backdrop), so dismissal stays reliable. Skipped while the confirm dialog is
+  // up — that step has its own backdrop.
   useEffect(() => {
     const close = () => onClose();
     window.addEventListener('scroll', close, true);
@@ -30,10 +38,20 @@ export function StationContextMenu({ station, position, onClose }: Props) {
       if (e.key === 'Escape') { if (confirmOpen) setConfirmOpen(false); else onClose(); }
     };
     window.addEventListener('keydown', onKey);
+    const onPointerDown = (e: PointerEvent) => {
+      if (confirmOpen) return;
+      const target = e.target as Node;
+      // Overlay clicks and in-menu clicks are handled elsewhere; only act on
+      // targets that slipped above the overlay.
+      if (target === overlayRef.current) return;
+      if (menuRef.current && !menuRef.current.contains(target)) onClose();
+    };
+    window.addEventListener('pointerdown', onPointerDown, true);
     return () => {
       window.removeEventListener('scroll', close, true);
       window.removeEventListener('resize', close);
       window.removeEventListener('keydown', onKey);
+      window.removeEventListener('pointerdown', onPointerDown, true);
     };
   }, [onClose, confirmOpen]);
 
@@ -76,8 +94,18 @@ export function StationContextMenu({ station, position, onClose }: Props) {
 
   return (
     <>
-      <div className="fixed inset-0 z-[60]" onClick={onClose} onContextMenu={(e) => { e.preventDefault(); onClose(); }} />
+      {/* Transparent layer to block click-through to the app behind the menu.
+          stopPropagation keeps an outside click from also closing a surrounding
+          surface (e.g. the command palette). Actual dismissal is handled by the
+          document pointerdown listener above. */}
       <div
+        ref={overlayRef}
+        className="fixed inset-0 z-[60]"
+        onClick={(e) => { e.stopPropagation(); onClose(); }}
+        onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onClose(); }}
+      />
+      <div
+        ref={menuRef}
         role="menu"
         className="fixed z-[60] min-w-[190px] rounded-xl border border-[var(--color-line)] bg-white shadow-[0_12px_40px_rgba(0,0,0,0.22)] py-1.5"
         style={{ top: position.y, left: position.x }}
