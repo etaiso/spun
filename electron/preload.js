@@ -18,6 +18,14 @@ contextBridge.exposeInMainWorld('spun', {
   downloadUpdate: () => ipcRenderer.invoke('spun:download-update'),
   quitAndInstall: () => ipcRenderer.invoke('spun:quit-and-install'),
 
+  // Whether the shell can download & install updates itself. False on unsigned
+  // macOS builds (Squirrel.Mac can't validate the signature) — there the
+  // renderer offers a manual download via openReleasePage instead.
+  canSelfUpdate: process.platform !== 'darwin',
+
+  // Open the GitHub releases page in the system browser for a manual download.
+  openReleasePage: () => ipcRenderer.invoke('spun:open-release-page'),
+
   // Subscribe to updater lifecycle events. Returns an unsubscribe fn.
   onUpdateStatus: (cb) => {
     const handler = (_event, status) => cb(status);

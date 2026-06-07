@@ -44,6 +44,20 @@ function log(msg) {
 let updaterInited = false;
 let autoChecked = false;
 
+// macOS auto-INSTALL needs Developer ID signing: Squirrel.Mac validates the
+// downloaded app against the running app's code requirement before swapping it
+// in, and our Phase 1 mac builds are unsigned — so a self-install always fails
+// ("code signature … did not pass validation"). Until the mac build is signed
+// we still CHECK on macOS, but an available update is handed off to the browser
+// for a manual download. Windows (NSIS) has no such gate and keeps the full
+// background updater. Flip this to `true` for macOS once the build is signed.
+const canSelfUpdate = process.platform !== 'darwin';
+const RELEASES_URL = 'https://github.com/etaiso/spun/releases/latest';
+
+function openReleasePage() {
+  shell.openExternal(RELEASES_URL).catch((e) => log(`openReleasePage failed: ${e}`));
+}
+
 function sendUpdateStatus(status) {
   log(`auto-update: ${JSON.stringify(status)}`);
   try { win?.webContents.send('spun:update-status', status); } catch { /* window gone */ }
@@ -78,10 +92,18 @@ function setAutoUpdate(enabled) {
   try {
     const u = initUpdater();
     if (!u) return;
-    u.autoDownload = true;
-    // checkForUpdatesAndNotify downloads in the background and fires a native OS
-    // notification when the update is staged; it applies on next quit/restart.
-    u.checkForUpdatesAndNotify();
+    if (canSelfUpdate) {
+      u.autoDownload = true;
+      // checkForUpdatesAndNotify downloads in the background and fires a native
+      // OS notification when the update is staged; it applies on next restart.
+      u.checkForUpdatesAndNotify();
+    } else {
+      // macOS: detect only — never auto-download (the self-install would fail
+      // the signature check). The renderer surfaces the available update and
+      // opens the release page for a manual download.
+      u.autoDownload = false;
+      u.checkForUpdates();
+    }
   } catch (e) {
     log(`updater init failed: ${e}`);
   }
@@ -108,6 +130,7 @@ function checkForUpdate() {
 // Progress and completion arrive via download-progress / update-downloaded.
 function downloadUpdate() {
   if (isDev) return;
+  if (!canSelfUpdate) { openReleasePage(); return; }  // mac can't self-install — hand off to the browser
   try {
     initUpdater()?.downloadUpdate();
   } catch (e) {
@@ -291,6 +314,8 @@ app.whenReady().then(async () => {
   // User agreed to the update in the dialog → download it, then (optionally) install.
   ipcMain.handle('spun:download-update', () => { downloadUpdate(); return true; });
   ipcMain.handle('spun:quit-and-install', () => { quitAndInstall(); return true; });
+  // Open the GitHub releases page for a manual download (unsigned macOS path).
+  ipcMain.handle('spun:open-release-page', () => { openReleasePage(); return true; });
   await createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

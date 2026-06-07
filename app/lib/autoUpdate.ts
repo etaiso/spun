@@ -31,6 +31,8 @@ type SpunShell = {
   checkForUpdate: () => void;
   downloadUpdate: () => void;
   quitAndInstall: () => void;
+  canSelfUpdate?: boolean;
+  openReleasePage: () => void;
   onUpdateStatus: (cb: (status: UpdateStatus) => void) => () => void;
 };
 
@@ -83,6 +85,21 @@ export function canCheckForUpdate(): boolean {
 export function requestUpdateCheck(): void {
   if (typeof window === 'undefined') return;
   try { window.spun?.checkForUpdate(); } catch { /* shell gone / web build */ }
+}
+
+/**
+ * Whether the shell can download & install updates itself. False on unsigned
+ * macOS builds, where the install can't pass Squirrel.Mac's signature check —
+ * there the UI offers a manual download via openReleasePage() instead.
+ */
+export function canSelfInstallUpdate(): boolean {
+  return typeof window !== 'undefined' && window.spun?.canSelfUpdate === true;
+}
+
+/** Open the GitHub releases page for a manual download (no-op on web). */
+export function openReleasePage(): void {
+  if (typeof window === 'undefined') return;
+  try { window.spun?.openReleasePage(); } catch { /* shell gone / web build */ }
 }
 
 /** Download the update found by a manual check, after the user agrees. */

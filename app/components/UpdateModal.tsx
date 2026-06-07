@@ -7,15 +7,16 @@ type Props = {
   open: boolean;
   status: UpdateStatus;
   currentVersion: string;
+  canSelfInstall: boolean; // false on unsigned macOS — "update" opens the download page
   onClose: () => void;
-  onUpdate: () => void;   // download the available update
+  onUpdate: () => void;   // self-install: download the update; otherwise: open the release page
   onRestart: () => void;  // quit and install a downloaded update
 };
 
 // The outcome of a manual "Check now" — a small confirmation dialog layered over
 // Settings. It mirrors the updater's lifecycle: ask to update when one's found,
 // show download progress, then offer a restart; or simply confirm you're current.
-export function UpdateModal({ open, status, currentVersion, onClose, onUpdate, onRestart }: Props) {
+export function UpdateModal({ open, status, currentVersion, canSelfInstall, onClose, onUpdate, onRestart }: Props) {
   // Esc closes — except mid-download, where there's no clean cancel point.
   useEffect(() => {
     if (!open) return;
@@ -43,13 +44,18 @@ export function UpdateModal({ open, status, currentVersion, onClose, onUpdate, o
       body = (
         <>
           A new version{status.version ? <> <strong className="text-[var(--color-ink)]">{status.version}</strong></> : ''} is
-          available{currentVersion ? ` (you’re on ${currentVersion})` : ''}. Download and install it now?
+          available{currentVersion ? ` (you’re on ${currentVersion})` : ''}.{' '}
+          {canSelfInstall
+            ? 'Download and install it now?'
+            : 'Open the download page to install it?'}
         </>
       );
       actions = (
         <>
           <button onClick={onClose} className={secondaryBtn}>Later</button>
-          <button onClick={onUpdate} className={primaryBtn} autoFocus>Update now</button>
+          <button onClick={onUpdate} className={primaryBtn} autoFocus>
+            {canSelfInstall ? 'Update now' : 'Download'}
+          </button>
         </>
       );
       break;

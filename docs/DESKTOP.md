@@ -102,8 +102,15 @@ the recognizer, ffmpeg, Electron itself — rarely change between releases). Thi
 is automatic; there's nothing to enable.
 
 > **macOS caveat:** `electron-updater` only *applies* an update if the app is
-> validly signed. While builds are unsigned (below), auto-update works on Windows
-> but is a no-op on macOS until a Developer ID cert is added.
+> validly signed — Squirrel.Mac validates the downloaded app against the running
+> app's code requirement, so an unsigned self-install fails ("code signature …
+> did not pass validation"). While builds are unsigned (below), Windows
+> auto-updates normally; macOS instead **detects** the update and opens the
+> [releases page](https://github.com/etaiso/spun/releases/latest) for a manual
+> download. This split is driven by `canSelfUpdate` in
+> [electron/main.js](../electron/main.js) (`false` on darwin) and surfaced by the
+> renderer (the "Check now" dialog's button becomes **Download**). Turn it on for
+> macOS once builds are signed — see "Turning on macOS signing" below.
 
 ### Cutting a release (the normal path)
 
@@ -136,15 +143,31 @@ launch of the new version, so user data is preserved across updates.
 `workflow_dispatch` is also enabled, so you can trigger a build manually from the
 Actions tab (it publishes to the `v<version>` draft) without pushing a tag.
 
-### Builds are unsigned (Phase 1)
+### Builds are unsigned by default
 
 The pipeline produces **unsigned** installers, so on first open users must
 click through Gatekeeper (macOS: right-click → Open) / SmartScreen (Windows:
-More info → Run anyway). To remove those prompts, add the signing secrets from
-the section above as GitHub **repository secrets** (`CSC_LINK`,
-`CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`)
-and expose them as `env:` on the *Package + publish* step — no code changes
-needed; `electron/notarize.js` activates once `APPLE_ID` is present.
+More info → Run anyway). On macOS, auto-update can't self-apply while unsigned,
+so the app falls back to a manual download (see the macOS caveat above).
+
+### Turning on macOS signing
+
+The *Package + publish* step already passes the signing/notarization env
+(scoped to the mac job), so **no workflow edits are needed** — it's wired and
+empty. To activate:
+
+1. Add these as GitHub **repository secrets** (Settings → Secrets and variables
+   → Actions): `CSC_LINK` (base64 of the Developer ID `.p12`), `CSC_KEY_PASSWORD`,
+   `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`. The next release
+   then builds signed + notarized (`electron/notarize.js` activates once
+   `APPLE_ID` is present). Confirm with `spctl -a -vv` (above).
+2. **Only after** verifying a signed+notarized build actually auto-updates, flip
+   `canSelfUpdate` in [electron/main.js](../electron/main.js) to enable macOS too
+   (e.g. drop the `!== 'darwin'` guard). Until that flip, signed macOS builds
+   still use the manual-download fallback — which is intentional: it avoids
+   re-enabling self-install before notarization is proven end-to-end. Windows
+   signing remains optional (a cert just removes the SmartScreen prompt) and is
+   independent of this flag.
 
 ### Intel Mac (not built)
 

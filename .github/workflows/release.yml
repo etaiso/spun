@@ -12,8 +12,10 @@
 # metadata electron-updater reads (latest-mac.yml / latest.yml) — to a single
 # DRAFT GitHub Release named after the tag. Review it on GitHub, then Publish.
 #
-# Builds are UNSIGNED (Phase 1): macOS Gatekeeper / Windows SmartScreen will warn
-# on first open. Add signing later by setting the secrets in docs/DESKTOP.md.
+# Builds are UNSIGNED by default: macOS Gatekeeper / Windows SmartScreen warn on
+# first open. The Package step already passes the macOS signing/notarization env
+# (scoped to the mac job) — it's empty until the repo secrets are set, at which
+# point mac builds are signed + notarized automatically. See docs/DESKTOP.md.
 
 name: Release
 
@@ -115,3 +117,14 @@ jobs:
         run: ${{ matrix.build_cmd }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # macOS Developer ID signing + notarization. These are EMPTY — and thus
+          # no-ops (electron-builder ad-hoc-signs → "unsigned"; notarize.js skips
+          # when APPLE_ID is unset) — until the repo secrets are added, at which
+          # point the mac build is signed + notarized with no further changes.
+          # Scoped to the mac job so the Windows build never picks up the Apple
+          # cert via CSC_LINK. See docs/DESKTOP.md → "Turning on macOS signing".
+          CSC_LINK: ${{ matrix.platform == 'mac' && secrets.CSC_LINK || '' }}
+          CSC_KEY_PASSWORD: ${{ matrix.platform == 'mac' && secrets.CSC_KEY_PASSWORD || '' }}
+          APPLE_ID: ${{ matrix.platform == 'mac' && secrets.APPLE_ID || '' }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ matrix.platform == 'mac' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ matrix.platform == 'mac' && secrets.APPLE_TEAM_ID || '' }}
