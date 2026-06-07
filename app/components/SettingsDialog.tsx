@@ -13,8 +13,10 @@ import { persistSet } from '@/app/lib/persist';
 import {
   useAutoUpdate,
   canCheckForUpdate,
+  canSelfInstallUpdate,
   requestUpdateCheck,
   downloadUpdate,
+  openReleasePage,
   quitAndInstall,
   type UpdateStatus,
 } from '@/app/lib/autoUpdate';
@@ -31,10 +33,12 @@ const DEBUG_KEY = 'radio:showDebug';
 
 // One-line summary of the updater's current state, or null when there's nothing
 // worth showing. Driven by events the Electron main process forwards over IPC.
-function updateStatusLine(s: UpdateStatus): string | null {
+function updateStatusLine(s: UpdateStatus, selfInstall: boolean): string | null {
   switch (s.state) {
     case 'checking': return 'Checking for updates…';
-    case 'available': return s.version ? `Found ${s.version} — downloading…` : 'Downloading update…';
+    case 'available':
+      if (!selfInstall) return s.version ? `Version ${s.version} available — download it.` : 'A new version is available — download it.';
+      return s.version ? `Found ${s.version} — downloading…` : 'Downloading update…';
     case 'downloading': return `Downloading update… ${s.percent ?? 0}%`;
     case 'downloaded': return s.version ? `Update ${s.version} ready — restart to apply.` : 'Update ready — restart to apply.';
     case 'none': return 'You’re on the latest version.';
@@ -89,6 +93,11 @@ export function SettingsDialog({ open, onOpenChange, station, playState, current
     requestUpdateCheck();
   };
   const onUpdateNow = () => {
+    if (!canSelfInstallUpdate()) {          // unsigned macOS — the install can't self-apply
+      openReleasePage();                     // hand off to the browser for a manual download
+      closeUpdateModal();
+      return;
+    }
     setUpdateStatus({ state: 'downloading', percent: 0 }); // immediate feedback
     downloadUpdate();
   };
@@ -120,6 +129,9 @@ export function SettingsDialog({ open, onOpenChange, station, playState, current
   // desktop shell, where Electron exposes the updater on window.spun. Hide it
   // entirely on the web build — there's nothing to update there.
   const isDesktop = canCheckForUpdate();
+  // On unsigned macOS the shell can't self-install — it detects updates and the
+  // user downloads them manually. Drives the copy and the modal's primary action.
+  const selfInstall = canSelfInstallUpdate();
 
   const toggleDebug = () => {
     setShowDebug(v => {
@@ -197,7 +209,9 @@ export function SettingsDialog({ open, onOpenChange, station, playState, current
                   <h3 className="text-sm font-bold text-[var(--color-ink)]">Software update</h3>
                   <p className="text-xs text-[var(--color-ink-3)] mt-0.5">
                     {autoUpdateOn
-                      ? 'Install new versions automatically and apply them on restart.'
+                      ? (selfInstall
+                          ? 'Install new versions automatically and apply them on restart.'
+                          : 'Check for new versions automatically — you download and install them.')
                       : 'Off — you won’t receive new versions until you turn this back on.'}
                   </p>
                 </div>
@@ -221,7 +235,7 @@ export function SettingsDialog({ open, onOpenChange, station, playState, current
                 </button>
               </div>
               <div className="flex items-center justify-between gap-3">
-                <p className="text-xs text-[var(--color-ink-4)]">{autoUpdateOn ? (updateStatusLine(updateStatus) ?? '') : ''}</p>
+                <p className="text-xs text-[var(--color-ink-4)]">{autoUpdateOn ? (updateStatusLine(updateStatus, selfInstall) ?? '') : ''}</p>
                 <button
                   type="button"
                   onClick={onCheckNow}
@@ -303,6 +317,7 @@ export function SettingsDialog({ open, onOpenChange, station, playState, current
       open={updateModalOpen}
       status={updateStatus}
       currentVersion={process.env.appVersion ?? ''}
+      canSelfInstall={selfInstall}
       onClose={closeUpdateModal}
       onUpdate={onUpdateNow}
       onRestart={quitAndInstall}
