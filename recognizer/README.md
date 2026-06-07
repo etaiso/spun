@@ -33,10 +33,16 @@ don't simply show "No song info right now" instead of a Shazam result.
 ```
 GET  /health                      -> { "ok": true }
 POST /recognize  { "url", "seconds" }
-     -> { "match": true, "artist", "title", "raw" }   identified
+     -> { "match": true, "artist", "title", "raw",
+          "offset", "durationMs" }                    identified
      -> { "match": false }                            no match
      -> 503 { "error" }                               capture/recognition failed
 ```
+
+`offset` (seconds into the song the sample matched) and `durationMs` (full track
+length, resolved via a cached iTunes lookup) let the app predict when the song
+ends and time its next fingerprint instead of polling blindly — either may be
+null when unavailable. See [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md).
 
 ## Notes
 

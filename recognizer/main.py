@@ -14,9 +14,17 @@ API:  POST /recognize  { "url": "<stream url>", "seconds": 6 }
       -> 200 { "match": true, "artist": "...", "title": "...",
                "raw": "Artist - Title", "cover": "<art url|>",
                "shazamUrl": "<shazam track url|>", "appleMusicUrl": "<apple music url|>",
-               "previewUrl": "<~30s .m4a clip|>", "key": "<shazam track id|>" }
+               "previewUrl": "<~30s .m4a clip|>", "key": "<shazam track id|>",
+               "offset": <seconds into the song the sample matched|null>,
+               "durationMs": <full track length in ms|null> }
       -> 200 { "match": false }            (no song identified)
       -> 503 { "error": "..." }            (capture/recognition failed)
+
+The `offset` + `durationMs` pair lets the caller predict when the song ends
+(remaining ≈ durationMs - offset*1000) and time its next poll accordingly,
+instead of fingerprinting on a blind fixed interval. `offset` comes straight
+from the Shazam match; `durationMs` is resolved via a cached iTunes lookup
+(Shazam's recognize result carries no duration).
 """
 
 import os
@@ -92,6 +100,54 @@ def extract_preview_url(hub: dict | None) -> str:
     return ""
 
 
+def extract_adam_id(track: dict | None) -> str | None:
+    """The Apple Music song id (adam id), needed to look up the track length.
+
+    It rides along in the hub's Apple Music deep links as `?i=<id>`. Fall back
+    to a bare numeric id in a music.apple.com path if the query form is absent.
+    """
+    blob = json.dumps(track or {})
+    m = re.search(r"[?&]i=(\d+)", blob)
+    if m:
+        return m.group(1)
+    m = re.search(r"music\.apple\.com[^\"]*?/(\d{6,})", blob)
+    return m.group(1) if m else None
+
+
+# Track length isn't in the Shazam recognize result, so we resolve it once per
+# song from the public, keyless iTunes lookup API and cache it for the process
+# lifetime (the same songs recur across stations and re-fingerprints).
+_DURATION_CACHE: dict[str, int | None] = {}
+
+
+async def resolve_duration_ms(adam_id: str | None) -> int | None:
+    """Full track length in ms via iTunes lookup, or None. Best-effort."""
+    if not adam_id:
+        return None
+    if adam_id in _DURATION_CACHE:
+        return _DURATION_CACHE[adam_id]
+    ms: int | None = None
+    try:
+        timeout = aiohttp.ClientTimeout(total=8)
+        connector = aiohttp.TCPConnector(ssl=_SSL_CTX)
+        async with aiohttp.ClientSession(timeout=timeout, connector=connector) as s:
+            async with s.get(
+                f"https://itunes.apple.com/lookup?id={adam_id}",
+                headers={"User-Agent": "Spun/0.1"},
+            ) as r:
+                if r.ok:
+                    # iTunes serves JSON as text/javascript, so parse manually.
+                    data = json.loads(await r.text())
+                    for res in data.get("results", []):
+                        if res.get("trackTimeMillis"):
+                            ms = int(res["trackTimeMillis"])
+                            break
+    except Exception:  # noqa: BLE001 — duration is optional; never fail recognize
+        ms = None
+    _DURATION_CACHE[adam_id] = ms
+    return ms
+
+
 # macOS python.org builds don't use the system trust store, so HTTPS to the
 # stream CDNs (and Shazam) fails cert verification. Pin certifi's CA bundle.
 _SSL_CTX = ssl.create_default_context(cafile=certifi.where())
@@ -154,6 +210,11 @@ async def recognize(req: RecognizeRequest):
     if not track:
         return {"match": False}
 
+    # Where in the song this sample landed (seconds, sub-second precision). Lets
+    # the caller tell "just started" from "about to end".
+    matches = (result or {}).get("matches") or []
+    offset = matches[0].get("offset") if matches else None
+
     artist = track.get("subtitle") or ""
     title = track.get("title") or ""
     raw = f"{artist} - {title}".strip(" -") if artist else title
@@ -167,6 +228,7 @@ async def recognize(req: RecognizeRequest):
     )
     hub = track.get("hub") or {}
     shazam_url = (track.get("share") or {}).get("href") or track.get("url") or ""
+    duration_ms = await resolve_duration_ms(extract_adam_id(track))
 
     return {
         "match": True,
@@ -178,6 +240,8 @@ async def recognize(req: RecognizeRequest):
         "appleMusicUrl": extract_apple_music_url(hub),
         "previewUrl": extract_preview_url(hub),
         "key": str(track.get("key") or ""),
+        "offset": offset,
+        "durationMs": duration_ms,
     }
 
 
