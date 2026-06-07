@@ -27,6 +27,28 @@ Browser ── plays audio ─────────────────�
   "Identified by Shazam") along with its cover art. Broadcast-metadata tracks
   that carry no art get a cover from the iTunes Search API.
 
+### Timing the fingerprint loop
+
+Metadata stations push title changes live, so nothing here applies to them —
+this is only about stations the recognizer drives. Re-fingerprinting on a fixed
+interval is wasteful (most polls land mid-song, unchanged) and laggy (a switch
+isn't seen until the next tick). Instead the route **predicts when the song
+ends** and times the next attempt to it (`app/lib/recognitionSchedule.ts`):
+
+- Every Shazam match carries an **offset** — how far into the song the sample
+  landed — and the route resolves the track's **duration** via a cached iTunes
+  lookup (Shazam's result has none). Together: `remaining ≈ duration − offset`.
+- **Coast** until the song is nearly over (capped at 120s), then **bracket** the
+  boundary — probe every ~12s until the title actually changes — and re-sync.
+- This is mid-song-aware: catching a track 2:30 into a 3:00 song schedules the
+  next poll ~30s out, not a blind 60s. After the first match the loop locks onto
+  the song boundaries, so each subsequent prediction starts near a song's start.
+- Fallbacks keep it honest: no resolvable duration → a fixed 60s cadence; a
+  no-match (ad break / talk) → retry in 30s; a radio edit that overruns the
+  catalog length (offset past duration) is treated as "at the boundary" so
+  recognition never goes silent. Capture-then-recognize takes ~6s, so polls are
+  floored at 10s.
+
 ### Why the recognizer is a separate process
 
 Shazam recognition uses [ShazamIO](https://github.com/shazamio/ShazamIO), an

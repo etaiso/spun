@@ -1,6 +1,8 @@
 import { NextRequest } from 'next/server';
 import { parseIcy } from '@/app/lib/icy';
 import { isJunkMetadata } from '@/app/lib/nonTrack';
+import { computeNextDelayMs, FINGERPRINT_INTERVAL_MS } from '@/app/lib/recognitionSchedule';
+import type { FingerprintOutcome } from '@/app/lib/recognitionSchedule';
 
 const UA = 'Spun/0.1';
 
@@ -9,9 +11,6 @@ const UA = 'Spun/0.1';
 // the stream. If it's not running, fingerprinting silently no-ops and we fall
 // back to the no-song / no-metadata states.
 const RECOGNIZER_URL = process.env.RECOGNIZER_URL || 'http://127.0.0.1:8755';
-// How often to re-fingerprint while metadata still isn't naming a song
-// (catches song changes on metadata-less stations).
-const FINGERPRINT_INTERVAL_MS = 60_000;
 
 function sseLine(obj: unknown): string {
   return `data: ${JSON.stringify(obj)}\n\n`;
@@ -24,6 +23,11 @@ type Recognized = {
   appleMusicUrl: string;
   previewUrl: string;
   key: string;
+  // Position-in-song (seconds) and full track length (ms), used to predict when
+  // the song ends and time the next fingerprint. Null when the sidecar can't
+  // resolve them (older sidecar, or no Apple Music match for the duration).
+  offsetSec: number | null;
+  durationMs: number | null;
 };
 
 async function fingerprint(streamUrl: string, external?: AbortSignal): Promise<Recognized | null> {
@@ -48,6 +52,7 @@ async function fingerprint(streamUrl: string, external?: AbortSignal): Promise<R
     const data = (await res.json()) as {
       match?: boolean; raw?: string; cover?: string;
       shazamUrl?: string; appleMusicUrl?: string; previewUrl?: string; key?: string;
+      offset?: number | null; durationMs?: number | null;
     };
     return data?.match && data?.raw
       ? {
@@ -57,6 +62,8 @@ async function fingerprint(streamUrl: string, external?: AbortSignal): Promise<R
           appleMusicUrl: data.appleMusicUrl || '',
           previewUrl: data.previewUrl || '',
           key: data.key || '',
+          offsetSec: typeof data.offset === 'number' ? data.offset : null,
+          durationMs: typeof data.durationMs === 'number' ? data.durationMs : null,
         }
       : null;
   } catch {
@@ -128,8 +135,10 @@ export async function GET(req: NextRequest) {
       // another attempt is already running. `silent` skips the "recognizing"
       // status (used for the initial parallel attempt on metadata stations, so
       // a quick broadcast title doesn't get preceded by an Identifying… flash).
-      async function tryFingerprint(silent = false) {
-        if (closed || haveMetaTitle || fpInFlight) return;
+      // Returns the attempt's outcome (matched + offset/duration) so the poll
+      // loop can time the next attempt, or null when it was a no-op.
+      async function tryFingerprint(silent = false): Promise<FingerprintOutcome | null> {
+        if (closed || haveMetaTitle || fpInFlight) return null;
         fpInFlight = true;
         if (!silent) send({ type: 'recognizing' });
         fpAbort = new AbortController();
@@ -137,7 +146,7 @@ export async function GET(req: NextRequest) {
         fpAbort = null;
         fpInFlight = false;
         // Metadata may have arrived (and aborted us) while we were working.
-        if (closed || haveMetaTitle) return;
+        if (closed || haveMetaTitle) return null;
         if (match) {
           if (match.raw !== lastTitle) {
             lastTitle = match.raw;
@@ -150,20 +159,33 @@ export async function GET(req: NextRequest) {
               key: match.key || undefined,
             });
           }
-        } else {
-          // Couldn't identify — report the honest "no song" state. Distinguish
-          // a station with a metadata channel (no-song) from one without it
-          // (no-metadata).
-          send({ type: hasMeta ? 'no-song' : 'no-metadata' });
+          return { matched: true, durationMs: match.durationMs, offsetSec: match.offsetSec };
         }
+        // Couldn't identify — report the honest "no song" state. Distinguish
+        // a station with a metadata channel (no-song) from one without it
+        // (no-metadata).
+        send({ type: hasMeta ? 'no-song' : 'no-metadata' });
+        return { matched: false, durationMs: null, offsetSec: null };
       }
+
+      // Self-rescheduling fingerprint loop. After each attempt we time the next
+      // from what we learned: coast toward the predicted song end, probe tightly
+      // near the boundary, or fall back to the fixed cadence when there's no
+      // duration to predict against (see computeNextDelayMs). Once metadata
+      // names a song the loop stops — broadcast titles drive updates from there.
+      let fpTimer: ReturnType<typeof setTimeout> | null = null;
+      const runFingerprintLoop = async (silent = false) => {
+        const outcome = await tryFingerprint(silent);
+        if (closed || haveMetaTitle) return;
+        const delay = outcome ? computeNextDelayMs(outcome) : FINGERPRINT_INTERVAL_MS;
+        fpTimer = setTimeout(() => { void runFingerprintLoop(); }, delay);
+      };
 
       // Kick off recognition immediately on connect, in parallel with the
       // metadata wait — whichever resolves first wins, with metadata preferred
       // (it aborts the fingerprint if it arrives). On metadata stations the
       // first attempt is silent to avoid a recognizing flash before the title.
-      const fpInitial = setTimeout(() => tryFingerprint(hasMeta), 0);
-      const fpInterval = setInterval(() => tryFingerprint(), FINGERPRINT_INTERVAL_MS);
+      const fpInitial = setTimeout(() => { void runFingerprintLoop(hasMeta); }, 0);
 
       try {
         if (hasMeta) {
@@ -186,7 +208,7 @@ export async function GET(req: NextRequest) {
         } else {
           // No metadata channel at all. We don't need the audio body here —
           // the recognizer pulls its own copy. Keep the SSE open so the
-          // initial + periodic fingerprints can push results.
+          // fingerprint loop can push results.
           upstreamController.abort();
           await new Promise<void>((resolve) => {
             req.signal.addEventListener('abort', () => resolve(), { once: true });
@@ -197,7 +219,7 @@ export async function GET(req: NextRequest) {
       } finally {
         closed = true;
         clearInterval(keepalive);
-        clearInterval(fpInterval);
+        if (fpTimer) clearTimeout(fpTimer);
         clearTimeout(fpInitial);
         try { controller.close(); } catch {}
         upstreamController.abort();
