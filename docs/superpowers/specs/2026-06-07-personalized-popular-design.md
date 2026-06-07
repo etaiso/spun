@@ -51,15 +51,25 @@ app currently discards.
 
 ### 2. Play tally store (new — `app/lib/playCounts.ts`)
 
-A small localStorage store under key `radio:playCounts`, keyed by station id:
+A store under key `radio:playCounts`, keyed by station id:
 
 ```ts
 type PlayCount = { count: number; tags: string[]; lastAt: number };
 ```
 
+- **Persistence:** uses the existing write-through layer (`persistSet` /
+  `persistGet` in `app/lib/persist.ts`), exactly like `recent.ts` /
+  `favorites.ts`. That means localStorage is a synchronous cache **and** every
+  write is mirrored (debounced) to the SQLite-backed `/api/state`, and is
+  rehydrated from the server on boot. It is **persisted in the DB, not
+  localStorage-only.** No schema/migration work — `/api/state` is a generic
+  key/value store.
 - Incremented in `handleSelect` in `app/page.tsx` (the same spot recents are
   updated), capturing the station's `tags` at play time.
 - This is the signal that sharpens the taste profile over time.
+
+> The derived **taste profile** (§3) is computed at runtime from these signals
+> and is **not** persisted separately — nothing extra to store or migrate.
 
 ### 3. Taste profile — weighted blend (new — `app/lib/taste.ts`)
 
