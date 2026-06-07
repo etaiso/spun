@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useSyncExternalStore } from 'react';
-import { useRegion } from '@/app/lib/region';
+import { useRegion, useRegionLock } from '@/app/lib/region';
 
 type Props = {
   onOpenSearch: () => void;
@@ -33,10 +33,11 @@ export function TopBar({ onOpenSearch, onOpenSettings, onOpenSaved, settingsActi
   const isMac = useIsMac();
 
   // Surface the active region alongside the settings cog (one merged control —
-  // both open the same modal). Shown whenever a region is set; "Global" (empty)
-  // just shows the cog.
+  // both open the same modal). Shown only while Region-only mode is on — when
+  // it's off the region doesn't filter anything, so the cog stands alone.
   const { region } = useRegion();
-  const showRegion = !!region;
+  const { locked } = useRegionLock();
+  const showRegion = !!region && locked;
   const regionName = useMemo(() => {
     try { return new Intl.DisplayNames(['en'], { type: 'region' }).of(region) ?? region; }
     catch { return region; }
