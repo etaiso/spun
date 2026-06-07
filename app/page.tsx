@@ -3,6 +3,7 @@
 import { Fragment, useCallback, useEffect, useState } from 'react';
 import type { Station } from './lib/stations';
 import { useRecent } from './lib/recent';
+import { usePlayCounts } from './lib/playCounts';
 import { useFavorites } from './lib/favorites';
 import { useHidden } from './lib/hidden';
 import { useDetectRegionByIP } from './lib/region';
@@ -33,6 +34,7 @@ export default function Home() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [savedOpen, setSavedOpen] = useState(false);
   const { recent, add: addRecent } = useRecent();
+  const { bump: bumpPlay } = usePlayCounts();
   const { favorites } = useFavorites();
   const { isHidden } = useHidden();
   const { tracked } = useTracking();
@@ -84,7 +86,8 @@ export default function Home() {
     // history on mount (the restored list, or []), which keeps this in sync.
     // Clearing it here would desync when the same station is re-selected.
     addRecent(s);
-  }, [addRecent, currentStation]);
+    bumpPlay(s);
+  }, [addRecent, bumpPlay, currentStation]);
 
   // Page-level shortcuts. ⌘K / Ctrl+K opens the command palette (handled
   // before the modifier bail). ←/→ cycle favorites, ? toggles help, S toggles
