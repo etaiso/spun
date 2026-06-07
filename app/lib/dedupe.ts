@@ -46,7 +46,9 @@ export function dedupeStations(stations: Station[]): Station[] {
     if (!tags || tags.length === 0) return;
     const set = new Set(owner.tags ?? []);
     for (const t of tags) set.add(t);
-    owner.tags = [...set];
+    // Keep the same 8-tag cap parseTags applies, so a heavily-duplicated
+    // station can't accumulate an unbounded tag list via merges.
+    owner.tags = [...set].slice(0, 8);
   };
 
   for (const s of stations) {
