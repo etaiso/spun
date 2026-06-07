@@ -169,16 +169,14 @@ function TrackedStationRow({
           <span className="truncate">{subtitle}</span>
         </div>
       </div>
-      {!active && (
-        <button
-          onClick={(e) => { e.stopPropagation(); onUntrack(); }}
-          aria-label={`Stop tracking ${station.name}`}
-          title="Stop tracking"
-          className="shrink-0 w-7 h-7 flex items-center justify-center text-base leading-none rounded-full text-[var(--color-ink-4)] hover:text-[var(--color-accent)] hover:bg-[rgba(192,57,43,0.08)] cursor-pointer transition-colors"
-        >
-          ✕
-        </button>
-      )}
+      <button
+        onClick={(e) => { e.stopPropagation(); onUntrack(); }}
+        aria-label={`Stop tracking ${station.name}`}
+        title="Stop tracking"
+        className="shrink-0 w-7 h-7 flex items-center justify-center text-base leading-none rounded-full text-[var(--color-ink-4)] hover:text-[var(--color-accent)] hover:bg-[rgba(192,57,43,0.08)] cursor-pointer transition-colors"
+      >
+        ✕
+      </button>
     </div>
   );
 }
