@@ -47,12 +47,16 @@ export function NowPlayingCard({ station, nowPlaying }: Props) {
             aria-label={tracked ? 'Stop tracking' : 'Track in background'}
             title={tracked ? 'Stop tracking' : 'Track in background'}
             className={[
-              'w-8 h-8 flex items-center justify-center text-base leading-none',
+              'w-8 h-8 flex items-center justify-center',
               'cursor-pointer transition-transform hover:scale-125',
-              tracked ? 'opacity-100' : 'opacity-40 hover:opacity-100',
+              tracked ? 'text-[var(--color-warm)]' : 'text-[var(--color-ink-4)] hover:text-[var(--color-warm)]',
             ].join(' ')}
           >
-            📡
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-[18px] h-[18px]">
+              <path d="M4 11a9 9 0 0 1 9 9" />
+              <path d="M4 4a16 16 0 0 1 16 16" />
+              <circle cx="5" cy="19" r="1" fill="currentColor" stroke="none" />
+            </svg>
           </button>
           <button
             onClick={() => toggle(station)}
