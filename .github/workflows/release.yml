@@ -112,19 +112,40 @@ jobs:
       - name: Build Next.js standalone server
         run: npm run build
 
+      # macOS Developer ID signing + notarization. Export the secrets to the job
+      # env ONLY when they actually have values — an EMPTY CSC_LINK is NOT a
+      # no-op: electron-builder treats a defined-but-empty CSC_LINK as a cert
+      # FILE PATH, resolves "" to the workspace dir, and fails ("… not a file").
+      # Leaving them UNSET (the default, as on every pre-0.1.10 release) makes
+      # electron-builder ad-hoc-sign → unsigned. Once the repo secrets are set,
+      # this step exports them and the mac build is signed + notarized with no
+      # further changes. mac-only, so Windows never picks up the cert via
+      # CSC_LINK. See docs/DESKTOP.md → "Turning on macOS signing".
+      - name: Configure macOS signing
+        if: matrix.platform == 'mac'
+        shell: bash
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -z "$CSC_LINK" ]; then
+            echo "No signing cert configured — building unsigned (ad-hoc)."
+            exit 0
+          fi
+          echo "Signing cert present — enabling signing + notarization."
+          {
+            echo "CSC_LINK=$CSC_LINK"
+            echo "CSC_KEY_PASSWORD=$CSC_KEY_PASSWORD"
+            echo "APPLE_ID=$APPLE_ID"
+            echo "APPLE_APP_SPECIFIC_PASSWORD=$APPLE_APP_SPECIFIC_PASSWORD"
+            echo "APPLE_TEAM_ID=$APPLE_TEAM_ID"
+          } >> "$GITHUB_ENV"
+
       - name: Package + publish
         shell: bash
         run: ${{ matrix.build_cmd }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # macOS Developer ID signing + notarization. These are EMPTY — and thus
-          # no-ops (electron-builder ad-hoc-signs → "unsigned"; notarize.js skips
-          # when APPLE_ID is unset) — until the repo secrets are added, at which
-          # point the mac build is signed + notarized with no further changes.
-          # Scoped to the mac job so the Windows build never picks up the Apple
-          # cert via CSC_LINK. See docs/DESKTOP.md → "Turning on macOS signing".
-          CSC_LINK: ${{ matrix.platform == 'mac' && secrets.CSC_LINK || '' }}
-          CSC_KEY_PASSWORD: ${{ matrix.platform == 'mac' && secrets.CSC_KEY_PASSWORD || '' }}
-          APPLE_ID: ${{ matrix.platform == 'mac' && secrets.APPLE_ID || '' }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ matrix.platform == 'mac' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
-          APPLE_TEAM_ID: ${{ matrix.platform == 'mac' && secrets.APPLE_TEAM_ID || '' }}
