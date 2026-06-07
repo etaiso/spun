@@ -13,12 +13,17 @@ falls back to **fingerprinting the live audio with Shazam** to identify it.
 
 ## Features
 
+- 🪄 **Smart song recognition** — when a station doesn't broadcast titles, Spun
+  fingerprints the live audio with Shazam *and* **predicts when each song ends**
+  — from where the match lands in the track and the track's length — so it
+  catches the next song the moment it starts instead of polling on a dumb timer.
+  It's **mid-song-aware** (tuning in 2:30 into a 3:00 song schedules the next
+  check ~30s out, not a blind minute later) and re-syncs to each song boundary,
+  so it gets *more* accurate the longer you listen.
 - 🔎 **Command palette search** (`⌘K` / `Ctrl K`) with fuzzy matching and
   results ranked by your region, recently played, and favorites.
 - 🎙️ **Now playing** with the current song and **album cover art**, plus a
   **playlist history** restored when you reload or switch back to a station.
-- 〰️ **Audio-reactive visualiser** — "radio wave" rings behind the player that
-  pulse to the live audio (Web Audio analyser).
 - 📡 **Background tracking** — track multiple stations at once and watch what's
   playing on each in a live monitor panel, no audio needed.
 - 💾 **Saved songs** — save any recognized track to a persisted playlist with a
@@ -28,10 +33,6 @@ falls back to **fingerprinting the live audio with Shazam** to identify it.
   and play history) and your region, so it stays full and relevant even for
   smaller markets. Duplicate stations are collapsed but still searchable by any
   of their names.
-- 🙈 **Hide stations** to banish them from every list, **region-only mode** to
-  filter to a single country, and other knobs in **Settings**.
-- ⌨️ **Keyboard & media-key shortcuts** — play/pause, mute, volume, switch
-  favorites, search, saved songs; the OS "Now Playing" panel reflects the track.
 
 ## Requirements
 
