@@ -44,6 +44,7 @@ export function Recommended({ onSelect }: Props) {
     let cancelled = false;
     (async () => {
       try {
+        if (!cancelled) setErrored(false);
         const params = new URLSearchParams();
         if (region) params.set('region', region);
         if (genresKey) params.set('genres', genresKey);
