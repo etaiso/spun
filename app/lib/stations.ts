@@ -11,6 +11,11 @@ export type Station = {
   // (e.g. a Hebrew "גלגלצ - Glglz" folded into "Glglz"). Kept so the station
   // stays searchable by any of its submitted names. See lib/dedupe.ts.
   aliases?: string[];
+  // Genre/format tags from radio-browser (e.g. ["pop","rock","news"]),
+  // lowercased + deduped. Used to personalize the Popular section. Optional —
+  // absent on legacy stored stations and on records radio-browser tagged with
+  // nothing. See lib/taste.ts.
+  tags?: string[];
 };
 
 type RawStation = {
@@ -23,6 +28,7 @@ type RawStation = {
   countrycode: string;
   bitrate: number;
   codec: string;
+  tags?: string; // comma-separated from radio-browser, e.g. "pop,rock,news"
 };
 
 // A persisted station is only usable if it has the fields the UI and player
@@ -54,7 +60,21 @@ export function parseStoredStations(raw: string | null): Station[] {
   }
 }
 
+// radio-browser returns tags as a single comma-separated string. Normalize to a
+// clean, lowercased, deduped array, capped so a station spamming 30 tags can't
+// dominate the genre profile.
+export function parseTags(raw: string | undefined): string[] {
+  if (!raw) return [];
+  const seen = new Set<string>();
+  for (const part of raw.split(',')) {
+    const t = part.trim().toLowerCase();
+    if (t) seen.add(t);
+  }
+  return [...seen].slice(0, 8);
+}
+
 export function normalizeStation(raw: RawStation): Station {
+  const tags = parseTags(raw.tags);
   return {
     id: raw.stationuuid,
     name: (raw.name ?? '').trim(),
@@ -64,5 +84,6 @@ export function normalizeStation(raw: RawStation): Station {
     countrycode: (raw.countrycode ?? '').toUpperCase(),
     bitrate: raw.bitrate,
     codec: raw.codec,
+    ...(tags.length ? { tags } : {}),
   };
 }
