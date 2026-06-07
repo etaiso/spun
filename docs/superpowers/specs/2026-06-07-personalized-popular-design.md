@@ -147,6 +147,27 @@ score = W_GENRE · affinity(station.tags)
 - After the first play, the play tally + recents update live and personalization
   shapes the order on the very next render.
 
+### 6. Debug / observability (dev-only)
+
+Surface the otherwise-invisible taste signals for debugging, reusing the
+**existing** double-gated debug surface — no new flag, no user-facing UI, no
+`console.*` logging (the app deliberately avoids console logging and routes
+diagnostics through `DebugPanel`).
+
+- Gating is already in place in `app/components/SettingsDialog.tsx`: the panel
+  renders only when `isDev` (`NODE_ENV === 'development'` **or** Electron) **and**
+  the `radio:showDebug` toggle is on. Invisible in production web builds.
+- Add a **"Taste" block** to `app/components/DebugPanel.tsx` showing:
+  - **Top genres** — affinity map sorted desc with normalized scores
+    (e.g. `pop 0.82 · rock 0.61 · news 0.34`).
+  - **`genres` param** currently sent to `/api/popular` (top 3).
+  - **Play tally** — total tracked stations + top few by count with their tags.
+  - **Per-source breakdown** — favorites / tracked / play-count / recents
+    contribution, so it's visible *why* a genre ranks high.
+- The panel reads `useGenreAffinity()` and the play-count store directly; it does
+  **not** need the candidate pool or the re-rank output (the visible Popular list
+  order is that output). No coupling into `StationRow` / the user-facing list.
+
 ## Data Flow
 
 ```
@@ -177,6 +198,7 @@ play/favorite/track  ──►  localStorage (playCounts, favorites, tracking, r
 | `app/api/popular/route.ts`        | `genres` param, per-genre + trending fetch, pool  |
 | `app/components/Recommended.tsx`  | send `genres`, client re-rank by combined score   |
 | `app/page.tsx`                    | increment play tally in `handleSelect`            |
+| `app/components/DebugPanel.tsx`   | dev-only "Taste" block (profile, genres, tally)   |
 
 ## Testing Strategy
 
