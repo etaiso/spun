@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo } from 'react';
-import type { Station } from './stations';
 import { useFavorites } from './favorites';
 import { useTracking } from './tracking';
 import { useRecent } from './recent';
@@ -86,7 +85,7 @@ export function useGenreAffinity(topN = 3): Affinity {
   const { counts } = usePlayCounts();
   return useMemo(
     () => computeAffinity(
-      { favorites: favorites as Station[], tracked, recent, playCounts: counts },
+      { favorites, tracked, recent, playCounts: counts },
       topN,
     ),
     [favorites, tracked, recent, counts, topN],

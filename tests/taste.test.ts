@@ -55,4 +55,18 @@ describe('computeAffinity', () => {
     }, 2);
     expect(a.top).toEqual(['a', 'b']);
   });
+
+  it('blends the same genre across sources (favorites + play count both count)', () => {
+    const a = computeAffinity({
+      ...empty,
+      favorites: [{ tags: ['pop'] }],                          // +4
+      playCounts: { s1: { count: 3, tags: ['pop'], lastAt: 0 } }, // +3
+      recent: [{ tags: ['rock'] }],                            // +1 (competing)
+    });
+    // pop raw = 4 + 3 = 7 (top → 1), rock raw = 1 → 1/7
+    expect(a.scores.pop).toBe(1);
+    expect(a.scores.rock).toBeCloseTo(1 / 7, 5);
+    expect(a.bySource.favorites.pop).toBe(4);
+    expect(a.bySource.play.pop).toBe(3);
+  });
 });
