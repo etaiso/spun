@@ -7,6 +7,22 @@ import { buildPopularPaths } from '@/app/lib/popularPaths';
 type CacheEntry = { at: number; data: unknown };
 const cache = new Map<string, CacheEntry>();
 const TTL_MS = 5 * 60_000; // 5 minutes — popularity rankings don't change fast
+const MAX_ENTRIES = 50;
+
+function getCached(key: string): unknown | null {
+  const e = cache.get(key);
+  if (!e) return null;
+  if (Date.now() - e.at > TTL_MS) { cache.delete(key); return null; }
+  return e.data;
+}
+
+function setCached(key: string, data: unknown) {
+  if (cache.size >= MAX_ENTRIES) {
+    const oldest = cache.keys().next().value;
+    if (oldest) cache.delete(oldest);
+  }
+  cache.set(key, { at: Date.now(), data });
+}
 
 type RawStation = Parameters<typeof normalizeStation>[0] & {
   stationuuid: string;
@@ -39,13 +55,13 @@ export async function GET(req: NextRequest) {
   const genres = parseGenres(req.nextUrl.searchParams.get('genres'));
 
   const cacheKey = `${region}::${genres.join(',')}`;
-  const cached = cache.get(cacheKey);
-  if (cached && Date.now() - cached.at < TTL_MS) {
-    return NextResponse.json(cached.data);
-  }
+  const cached = getCached(cacheKey);
+  if (cached) return NextResponse.json(cached);
 
   const paths = buildPopularPaths(region, genres);
   const batches = await Promise.all(paths.map(fetchBatch));
+  // All upstream batches empty → treat as upstream failure (there are always
+  // popular stations), unlike /api/search which returns [] for "no matches".
   if (batches.every(b => b.length === 0)) {
     return NextResponse.json([], { status: 502 });
   }
@@ -70,6 +86,6 @@ export async function GET(req: NextRequest) {
     merged.map(normalizeStation).filter(s => s.streamUrl && s.name),
   ).slice(0, 40);
 
-  cache.set(cacheKey, { at: Date.now(), data: stations });
+  setCached(cacheKey, stations);
   return NextResponse.json(stations);
 }
