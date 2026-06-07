@@ -6,6 +6,8 @@ import type { PlayState } from './Player';
 import { useRegion, userRegion } from '@/app/lib/region';
 import { useFavorites } from '@/app/lib/favorites';
 import { useRecent } from '@/app/lib/recent';
+import { useGenreAffinity } from '@/app/lib/taste';
+import { usePlayCounts } from '@/app/lib/playCounts';
 import { getContextState, getEnergy } from '@/app/lib/audioBus';
 
 type Props = {
@@ -34,6 +36,18 @@ export function DebugPanel({ station, playState, currentTrack, active }: Props) 
   const { region } = useRegion();
   const { favorites } = useFavorites();
   const { recent } = useRecent();
+  const { scores, top, bySource } = useGenreAffinity();
+  const { counts } = usePlayCounts();
+
+  const topGenres = Object.entries(scores)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6);
+  const playEntries = Object.entries(counts)
+    .sort((a, b) => b[1].count - a[1].count);
+  const sourceLabel = (src: Record<string, number>) => {
+    const ks = Object.keys(src);
+    return ks.length ? `${ks.length} genre${ks.length === 1 ? '' : 's'}` : '—';
+  };
   const [detected] = useState(() => userRegion() ?? '—');
 
   // Poll the recognizer health while the panel is visible.
@@ -99,6 +113,21 @@ export function DebugPanel({ station, playState, currentTrack, active }: Props) 
         </Row>
         <Row label="Favorites">{favorites.length}</Row>
         <Row label="Recent">{recent.length}</Row>
+        <div className="mt-1 pt-1 border-t border-[var(--color-line)]" />
+        <Row label="Top genres">
+          {topGenres.length
+            ? topGenres.map(([g, v]) => `${g} ${v.toFixed(2)}`).join(' · ')
+            : '—'}
+        </Row>
+        <Row label="Sent genres">{top.join(',') || '—'}</Row>
+        <Row label="By source">
+          fav {sourceLabel(bySource.favorites)} · trk {sourceLabel(bySource.tracked)} · rec {sourceLabel(bySource.recent)} · play {sourceLabel(bySource.play)}
+        </Row>
+        <Row label="Play tally">
+          {playEntries.length
+            ? `${playEntries.length} stations · top ${playEntries.slice(0, 3).map(([, p]) => p.count).join('/')}`
+            : '—'}
+        </Row>
       </div>
     </div>
   );

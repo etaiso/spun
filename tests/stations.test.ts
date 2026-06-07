@@ -97,3 +97,25 @@ describe('parseStoredStations', () => {
     expect(parseStoredStations('not json')).toEqual([]);
   });
 });
+
+describe('normalizeStation tags', () => {
+  const raw = {
+    stationuuid: 'x', name: 'X', url_resolved: 'http://x', url: '',
+    favicon: '', country: '', countrycode: '', bitrate: 0, codec: '',
+  };
+
+  it('parses comma-separated tags into a lowercased, trimmed array', () => {
+    expect(normalizeStation({ ...raw, tags: 'Pop, Rock ,news' }).tags).toEqual(['pop', 'rock', 'news']);
+  });
+
+  it('omits the tags field entirely when there are none', () => {
+    expect('tags' in normalizeStation(raw)).toBe(false);
+    expect('tags' in normalizeStation({ ...raw, tags: '' })).toBe(false);
+    expect('tags' in normalizeStation({ ...raw, tags: ' , , ' })).toBe(false);
+  });
+
+  it('dedupes and caps tags at 8', () => {
+    const tags = 'a,a,b,c,d,e,f,g,h,i,j';
+    expect(normalizeStation({ ...raw, tags }).tags).toEqual(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']);
+  });
+});

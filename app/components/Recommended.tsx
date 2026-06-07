@@ -5,6 +5,8 @@ import type { Station } from '@/app/lib/stations';
 import { useFavorites } from '@/app/lib/favorites';
 import { useRegion, useRegionFilter } from '@/app/lib/region';
 import { useHiddenFilter } from '@/app/lib/hidden';
+import { useGenreAffinity } from '@/app/lib/taste';
+import { scorePopular } from '@/app/lib/popularRank';
 import { StationRow } from './StationRow';
 import { CollapsibleSection } from './CollapsibleSection';
 
@@ -25,38 +27,49 @@ function SkeletonRow() {
 }
 
 export function Recommended({ onSelect }: Props) {
-  const [stations, setStations] = useState<Station[] | null>(null);
+  // The raw candidate pool from the API (≈40), pre-ranking.
+  const [pool, setPool] = useState<Station[] | null>(null);
   const [errored, setErrored] = useState(false);
   const { isFavorite, toggle } = useFavorites();
   const { region } = useRegion();
   const filterByRegion = useRegionFilter();
   const filterHidden = useHiddenFilter();
+  const { scores, top } = useGenreAffinity();
+
+  // Refetch when the region or our top genres change. A string key keeps the
+  // dependency stable (arrays change identity every render).
+  const genresKey = top.join(',');
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const url = region ? `/api/popular?region=${encodeURIComponent(region)}` : '/api/popular';
-        const res = await fetch(url);
+        if (!cancelled) setErrored(false);
+        const params = new URLSearchParams();
+        if (region) params.set('region', region);
+        if (genresKey) params.set('genres', genresKey);
+        const qs = params.toString();
+        const res = await fetch(qs ? `/api/popular?${qs}` : '/api/popular');
         if (!res.ok) { if (!cancelled) setErrored(true); return; }
         const data = (await res.json()) as unknown;
-        if (!cancelled) {
-          setStations(Array.isArray(data) ? (data as Station[]) : []);
-        }
+        if (!cancelled) setPool(Array.isArray(data) ? (data as Station[]) : []);
       } catch {
         if (!cancelled) setErrored(true);
       }
     })();
     return () => { cancelled = true; };
-  }, [region]);
+  }, [region, genresKey]);
 
-  // Drop favorites — they already have their own sidebar section, so showing
-  // them in Popular too would be a duplicate. (Updates live as you star/unstar.)
-  const shown = filterHidden(filterByRegion(stations ?? [])).filter(s => !isFavorite(s.id));
+  // Filter, then re-rank live by genre affinity + popularity + region, then drop
+  // favorites (they have their own section). Re-runs every render, so the order
+  // updates instantly as you star/play a station — no refetch.
+  const filtered = filterHidden(filterByRegion(pool ?? []));
+  const ranked = scorePopular(filtered, { region: region || null, affinity: scores });
+  const shown = ranked.filter(s => !isFavorite(s.id));
 
   return (
     <CollapsibleSection title="✦ Popular">
-      {stations === null && !errored && (
+      {pool === null && !errored && (
         <>
           <SkeletonRow /><SkeletonRow /><SkeletonRow />
         </>
@@ -66,12 +79,12 @@ export function Recommended({ onSelect }: Props) {
           Couldn&apos;t load popular stations.
         </div>
       )}
-      {stations !== null && !errored && shown.length === 0 && (
+      {pool !== null && !errored && shown.length === 0 && (
         <div className="text-sm text-[var(--color-ink-3)] px-1 py-2">
           No popular stations in this region.
         </div>
       )}
-      {shown.map(s => (
+      {shown.slice(0, 15).map(s => (
         <StationRow
           key={s.id}
           station={s}

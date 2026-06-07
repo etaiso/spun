@@ -42,6 +42,15 @@ export function dedupeStations(stations: Station[]): Station[] {
     if (!owner.aliases.includes(n)) owner.aliases.push(n);
   };
 
+  const mergeTags = (owner: Station, tags: string[] | undefined) => {
+    if (!tags || tags.length === 0) return;
+    const set = new Set(owner.tags ?? []);
+    for (const t of tags) set.add(t);
+    // Keep the same 8-tag cap parseTags applies, so a heavily-duplicated
+    // station can't accumulate an unbounded tag list via merges.
+    owner.tags = [...set].slice(0, 8);
+  };
+
   for (const s of stations) {
     const u = urlKey(s.streamUrl);
     const nk = nameKey(s.name, s.countrycode);
@@ -52,6 +61,7 @@ export function dedupeStations(stations: Station[]): Station[] {
     if (owner) {
       addAlias(owner, s.name);
       for (const a of s.aliases ?? []) addAlias(owner, a);
+      mergeTags(owner, s.tags);
       // Point both keys at the owner so future dupes matching either collapse too.
       if (u && !urlOwner.has(u)) urlOwner.set(u, owner);
       if (nk && !nameOwner.has(nk)) nameOwner.set(nk, owner);
