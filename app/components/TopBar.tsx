@@ -13,6 +13,8 @@ type Props = {
   // Open the Explore destination + reflect whether it's the active view.
   onToggleExplore: () => void;
   exploreActive: boolean;
+  // Click the logo to return to the now-playing home.
+  onGoHome: () => void;
 };
 
 // Platform detection that's hydration-safe: the server (and the first client
@@ -28,7 +30,7 @@ function useIsMac(): boolean {
   );
 }
 
-export function TopBar({ onOpenSearch, onOpenSettings, onOpenSaved, settingsActive, onToggleExplore, exploreActive }: Props) {
+export function TopBar({ onOpenSearch, onOpenSettings, onOpenSaved, settingsActive, onToggleExplore, exploreActive, onGoHome }: Props) {
   const isMac = useIsMac();
 
   // Surface the active region alongside the settings cog (one merged control —
@@ -44,7 +46,12 @@ export function TopBar({ onOpenSearch, onOpenSettings, onOpenSaved, settingsActi
 
   return (
     <header className="flex items-center gap-4 px-6 h-16 border-b border-[var(--color-line)] bg-[var(--color-bg-2)] shrink-0">
-      <div className="flex items-center gap-1.5 text-[15px] font-extrabold tracking-tight text-[var(--color-ink)]">
+      <button
+        onClick={onGoHome}
+        aria-label="spun — back to now playing"
+        title="Back to now playing"
+        className="flex items-center gap-1.5 text-[15px] font-extrabold tracking-tight text-[var(--color-ink)] cursor-pointer rounded-lg hover:opacity-80 transition-opacity"
+      >
         {/* App logo: concentric pulse rings, matching the desktop app icon. */}
         <svg viewBox="0 0 24 24" aria-hidden="true" className="w-10 h-10">
           <defs>
@@ -72,7 +79,7 @@ export function TopBar({ onOpenSearch, onOpenSettings, onOpenSaved, settingsActi
           </defs>
           <text x="0" y="25" fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" fontSize="26" fontWeight="800" letterSpacing="-1.4" fill="url(#wordmarkGradient)">spun</text>
         </svg>
-      </div>
+      </button>
       {/* Explore destination — browse the catalogue by country or genre. */}
       <button
         onClick={onToggleExplore}

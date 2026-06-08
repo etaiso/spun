@@ -46,7 +46,7 @@ export function RegionPicker() {
         <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-[var(--color-ink-3)]">▾</span>
       </div>
       <span className="text-xs text-[var(--color-ink-4)]">
-        Stations from this region rank higher in search.
+        Stations from this region are prioritized in search and Popular.
       </span>
 
       <label

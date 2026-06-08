@@ -9,7 +9,6 @@ import { useHiddenFilter } from '@/app/lib/hidden';
 import { flagEmoji } from '@/app/lib/flag';
 import type { ExploreCountry } from '@/app/lib/explorePaths';
 import { StationRow } from './StationRow';
-import { RegionLockBanner } from './RegionLockBanner';
 
 type Props = { onSelect: (s: Station) => void };
 
@@ -73,8 +72,6 @@ export function ExploreView({ onSelect }: Props) {
             {country && <ShowOnlyToggle country={country} />}
           </div>
 
-          <RegionLockBanner country={country} />
-
           <FilterBar
             countries={countries}
             availableCodes={availableCodes}
@@ -95,8 +92,6 @@ export function ExploreView({ onSelect }: Props) {
             <h1 className="text-[36px] font-bold tracking-tight">Find your next station</h1>
             <p className="text-base text-[var(--color-ink-3)] mt-2">Browse by genre or country — combine them to narrow it down.</p>
           </div>
-
-          <RegionLockBanner country={null} />
 
           <Landing
             countries={countries}

@@ -194,6 +194,7 @@ export default function Home() {
           else { setExploredOnce(true); setView('explore'); }
         }}
         exploreActive={view === 'explore'}
+        onGoHome={() => setView('home')}
       />
       <div className="flex flex-1 min-h-0">
         <Sidebar selected={currentStation} onSelect={handleSelect} nowPlaying={currentTrack} hidden={view === 'explore'} />
@@ -205,8 +206,8 @@ export default function Home() {
               fixed bottom dock via `dock`. Wrappers are keyed by station so a
               station change still remounts them; a view change does not. */}
           {currentStation && (
-            <div className={view === 'explore' ? '' : 'p-10 min-h-full'}>
-              <div className={view === 'explore' ? '' : 'w-full flex flex-col lg:flex-row gap-8 min-h-full'}>
+            <div className={view === 'explore' ? '' : 'p-10 min-h-full flex flex-col'}>
+              <div className={view === 'explore' ? '' : 'w-full flex-1 flex flex-col lg:flex-row gap-8'}>
                 <div className={view === 'explore' ? '' : 'flex-1 min-w-0 flex flex-col justify-center'}>
                   <div className={view === 'explore' ? '' : 'w-full max-w-4xl mx-auto flex flex-col gap-6'}>
                     <div className={view === 'explore' ? 'hidden' : ''}>
