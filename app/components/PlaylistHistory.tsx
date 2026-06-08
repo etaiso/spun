@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { splitArtistTitle } from '@/app/lib/track';
 import { humanizeGap } from '@/app/lib/trackingHistory';
 import { isGap, historyRowKey } from '@/app/lib/nowPlayingTypes';
@@ -27,11 +27,6 @@ export function PlaylistHistory({ history }: { history: HistoryItem[] }) {
   // on click and kept for the session (history rows stay lean — nothing persisted).
   const [resolved, setResolved] = useState<Record<string, string | null>>({});
   const [resolvingKey, setResolvingKey] = useState<string | null>(null);
-  // One AbortController for the component's lifetime; aborts any in-flight iTunes
-  // lookups on unmount. Lazy useState init so it's created once, not per render.
-  const [aborter] = useState(() => new AbortController());
-  useEffect(() => () => aborter.abort(), [aborter]);
-
   if (history.length === 0) return null;
 
   const onPreview = (key: string, raw: string) => {
@@ -40,8 +35,7 @@ export function PlaylistHistory({ history }: { history: HistoryItem[] }) {
     const cached = resolved[term];
     if (cached !== undefined) { if (cached) toggle(key, cached); return; } // cached miss → no-op
     setResolvingKey(key);
-    lookupITunesSong(term, aborter.signal).then(m => {
-      if (aborter.signal.aborted) return;
+    lookupITunesSong(term).then(m => {
       const url = m?.previewUrl || null;
       setResolved(r => ({ ...r, [term]: url }));
       setResolvingKey(k => (k === key ? null : k));
