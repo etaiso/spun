@@ -92,6 +92,8 @@ export function SavedSongsDialog({ open, onOpenChange }: Props) {
     return () => window.removeEventListener('mousedown', onDown);
   }, [exportOpen]);
 
+  // Stamped on open. If the dialog is left open across midnight the date
+  // buckets can go stale until the next open — acceptable for this UI.
   // Refresh the date reference whenever the dialog opens.
   useEffect(() => {
     if (!open) return;
@@ -188,7 +190,7 @@ export function SavedSongsDialog({ open, onOpenChange }: Props) {
                         onClick={() => setRange(key)}
                         aria-pressed={range === key}
                         className={[
-                          'text-[11px] font-bold rounded-full px-3 py-1 cursor-pointer border transition-colors',
+                          'text-[11px] font-bold rounded-full px-3 py-1 cursor-pointer border transition-colors focus-visible:ring-2 focus-visible:ring-[var(--color-brand-pink)] focus-visible:outline-none',
                           range === key
                             ? 'bg-brand text-white border-transparent'
                             : 'text-[var(--color-ink-3)] border-[var(--color-line)] hover:border-[var(--color-brand-pink)]',

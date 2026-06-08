@@ -67,6 +67,8 @@ old `--color-accent` red forward under a name that says what it's for.)
 - Primary actions / primary CTA fills
 - The active/"on" state of a selected control (active filter pill, "Saved" state)
 
+Gradient **fills** must pair the gradient with a solid `background-color` fallback (the `.bg-brand` helper does this with `--color-brand-pink`), mirroring the gradient-text fallback in §4.
+
 **Solid brand colors — everyday accents.** Use `--color-brand-pink` (primary)
 or `--color-brand-purple` (secondary) for:
 - Icons, hearts, small glyphs

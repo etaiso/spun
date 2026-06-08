@@ -21,7 +21,7 @@
 }
 
 /* Brand gradient fill (primary actions, active states). */
-.bg-brand { background-image: var(--grad-brand); }
+.bg-brand { background-color: var(--color-brand-pink); background-image: var(--grad-brand); }
 
 /* Brand gradient text (brand-moment titles). Solid fallback first so the
    text is readable if background-clip is unsupported (see DESIGN_SYSTEM §4). */

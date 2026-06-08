@@ -67,9 +67,9 @@ export function groupByDate(songs: SavedSong[], now: number): DateGroup[] {
 }
 
 /** The row's time label. The list is always grouped (the header states the
- *  day), so today/yesterday rows show only the time; this-week rows add the
- *  weekday; older rows add the date; legacy songs (no playedAt) read
- *  "Saved <date>" so they're never mislabeled as a known play time. */
+ *  day), so: today/yesterday → time only ("HH:MM"); this-week (2–6 days ago) →
+ *  "Weekday HH:MM"; earlier → "Mon D · HH:MM"; legacy songs (no playedAt) →
+ *  "Saved Mon D" so they're never mislabeled as a known play time. */
 export function formatPlayed(song: SavedSong, now: number): string {
   const t = playedTime(song);
   if (song.playedAt == null) return `Saved ${monDay(t)}`;
