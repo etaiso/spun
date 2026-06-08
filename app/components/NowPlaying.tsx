@@ -10,7 +10,11 @@ import { loadSession, saveSession } from '@/app/lib/session';
 import { splitArtistTitle } from '@/app/lib/track';
 import { lookupITunesSong } from '@/app/lib/itunes';
 import type { TrackSource, HistoryEntry } from '@/app/lib/nowPlayingTypes';
+import type { HistoryItem } from '@/app/lib/nowPlayingTypes';
+import { isGap } from '@/app/lib/nowPlayingTypes';
 import type { PlayState } from './Player';
+import { useTracking } from '@/app/lib/tracking';
+import { loadTrackingHistory, recordTrack, noteConnect, heartbeat, HEARTBEAT_MS } from '@/app/lib/trackingHistory';
 import { useSavedSongs } from '@/app/lib/savedSongs';
 
 type MetaState = 'waiting' | 'playing' | 'no-metadata' | 'no-song' | 'recognizing';
@@ -32,11 +36,13 @@ type Props = {
   onTrack?: (title: string | null) => void;
   // Reports the playlist history up to the page, which renders it below the
   // player controls (so the controls stay put as history grows).
-  onHistory?: (history: HistoryEntry[]) => void;
+  onHistory?: (history: HistoryItem[]) => void;
 };
 
 export function NowPlaying({ station, playState, everPlayed, onTrack, onHistory }: Props) {
   const { isFavorite, toggle: toggleFavorite } = useFavorites();
+  const { isTracked } = useTracking();
+  const tracked = isTracked(station.id);
 
   // Restore a recent session for this station (current track + history) so a
   // reload picks up where it left off — unless it's gone stale (>5 min), in
@@ -55,7 +61,11 @@ export function NowPlaying({ station, playState, everPlayed, onTrack, onHistory 
     { shazamUrl: '', appleMusicUrl: '', previewUrl: '', key: '' },
   );
   const { isSaved, save, remove } = useSavedSongs();
-  const [history, setHistory] = useState<HistoryEntry[]>(restored?.history ?? []);
+  // Tracked stations restore their durable, gap-aware history; everyone else
+  // restores the (≤5-min) session history as before.
+  const [history, setHistory] = useState<HistoryItem[]>(() =>
+    isTracked(station.id) ? loadTrackingHistory(station.id) : (restored?.history ?? []),
+  );
   const [lastUpdate, setLastUpdate] = useState<string | null>(restored?.lastUpdate ?? null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
@@ -70,6 +80,11 @@ export function NowPlaying({ station, playState, everPlayed, onTrack, onHistory 
   const onTrackRef = useRef(onTrack);
   useEffect(() => { onTrackRef.current = onTrack; });
 
+  // Live tracked-state for the SSE handler (avoids re-opening the stream when
+  // tracking toggles).
+  const trackedRef = useRef(tracked);
+  useEffect(() => { trackedRef.current = tracked; });
+
   // Report the playlist history up to the page for rendering below the player.
   const onHistoryRef = useRef(onHistory);
   useEffect(() => { onHistoryRef.current = onHistory; });
@@ -80,10 +95,14 @@ export function NowPlaying({ station, playState, everPlayed, onTrack, onHistory 
   useEffect(() => {
     saveSession(station.id, {
       current: currentRaw ? { raw: currentRaw, source: currentSource, cover: currentCover } : null,
-      history,
+      // Tracked stations persist history to the durable trackingHistory store
+      // instead; keep the ephemeral session for `current` only (its quick-restore
+      // seed). Gaps never occur for non-tracked stations, so the filter is a
+      // type-narrowing no-op there.
+      history: tracked ? [] : history.filter((h): h is HistoryEntry => !isGap(h)),
       lastUpdate,
     });
-  }, [station.id, currentRaw, currentSource, currentCover, history, lastUpdate]);
+  }, [station.id, currentRaw, currentSource, currentCover, history, lastUpdate, tracked]);
 
   // Look up album art for the current track when we don't already have a cover
   // from Shazam — broadcast metadata only gives a text title, so most songs
@@ -126,6 +145,14 @@ export function NowPlaying({ station, playState, everPlayed, onTrack, onHistory 
     onTrackRef.current?.(null); // reset the sidebar marquee for the new station
     const es = new EventSource(`/api/now-playing?url=${encodeURIComponent(station.streamUrl)}`);
 
+    // When this station is tracked, the active player is its only watcher — so
+    // keep its tracking history alive here too (gap on reconnect, heartbeat
+    // while open).
+    es.onopen = () => { if (trackedRef.current) noteConnect(station.id); };
+    const hb = setInterval(() => {
+      if (trackedRef.current && es.readyState === EventSource.OPEN) heartbeat(station.id);
+    }, HEARTBEAT_MS);
+
     es.onmessage = (ev) => {
       try {
         const msg = JSON.parse(ev.data) as
@@ -161,7 +188,13 @@ export function NowPlaying({ station, playState, everPlayed, onTrack, onHistory 
           const prev = prevTitleRef.current;
           if (prev === msg.title) return;
           if (prev !== null && !isNonTrack(prev, station.name)) {
-            setHistory(h => [{ time: nowHHMM(), title: prev }, ...h].slice(0, 50));
+            if (trackedRef.current) {
+              // Durable, gap-aware store; reflect it back into local state.
+              recordTrack(station.id, prev);
+              setHistory(loadTrackingHistory(station.id));
+            } else {
+              setHistory(h => [{ time: nowHHMM(), title: prev }, ...h].slice(0, 50));
+            }
           }
           prevTitleRef.current = msg.title;
           setCurrentRaw(msg.title);
@@ -172,7 +205,7 @@ export function NowPlaying({ station, playState, everPlayed, onTrack, onHistory 
       } catch {}
     };
 
-    return () => es.close();
+    return () => { es.close(); clearInterval(hb); };
   }, [station.id, station.streamUrl, station.name, refreshKey]);
 
   // Seed the sidebar marquee + tab title from the restored session on mount so
