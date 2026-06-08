@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { PersistenceBootstrap } from "./components/PersistenceBootstrap";
+import { SplashScreen } from "./components/SplashScreen";
 
 export const metadata: Metadata = {
   // Title is managed client-side (app/page.tsx) to reflect the current station
@@ -14,6 +15,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
+        <SplashScreen />
         <PersistenceBootstrap />
         {children}
       </body>
