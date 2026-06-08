@@ -65,12 +65,12 @@ body {
 .pulse-soft { animation: pulse-soft 1.8s ease-in-out infinite; }
 .spin-warm {
   display: inline-block; width: 14px; height: 14px;
-  border: 2px solid var(--color-line); border-top-color: var(--color-warm);
+  border: 2px solid var(--color-line); border-top-color: var(--color-brand-purple);
   border-radius: 50%; animation: spin 0.8s linear infinite;
 }
 .dots span {
   display: inline-block; width: 5px; height: 5px; border-radius: 50%;
-  background: var(--color-warm); margin: 0 1px; animation: bounce-dot 1.2s ease-in-out infinite;
+  background: var(--color-brand-purple); margin: 0 1px; animation: bounce-dot 1.2s ease-in-out infinite;
 }
 .dots span:nth-child(2) { animation-delay: 0.15s; }
 .dots span:nth-child(3) { animation-delay: 0.3s; }
@@ -90,14 +90,14 @@ body {
 .radio-waves span {
   --k: 0.20;
   position: absolute; left: 50%; top: 50%; border-radius: 50%;
-  border: 1px solid rgba(210, 105, 30, calc(0.16 + var(--wave, 0) * 0.22));
+  border: 1px solid rgba(168, 85, 247, calc(0.16 + var(--wave, 0) * 0.22));
   transform: translate(-50%, -50%) scale(calc(1 + var(--wave, 0) * var(--k)));
   transition: transform 0.07s ease-out;
 }
 .radio-waves span:nth-child(1) { width: 250px; height: 250px; }
-.radio-waves span:nth-child(2) { width: 330px; height: 330px; border-color: rgba(210, 105, 30, calc(0.11 + var(--wave, 0) * 0.16)); --k: 0.16; }
-.radio-waves span:nth-child(3) { width: 420px; height: 420px; border-color: rgba(210, 105, 30, calc(0.07 + var(--wave, 0) * 0.11)); --k: 0.12; }
-.radio-waves span:nth-child(4) { width: 520px; height: 520px; border-color: rgba(210, 105, 30, calc(0.045 + var(--wave, 0) * 0.08)); --k: 0.09; }
+.radio-waves span:nth-child(2) { width: 330px; height: 330px; border-color: rgba(168, 85, 247, calc(0.11 + var(--wave, 0) * 0.16)); --k: 0.16; }
+.radio-waves span:nth-child(3) { width: 420px; height: 420px; border-color: rgba(168, 85, 247, calc(0.07 + var(--wave, 0) * 0.11)); --k: 0.12; }
+.radio-waves span:nth-child(4) { width: 520px; height: 520px; border-color: rgba(168, 85, 247, calc(0.045 + var(--wave, 0) * 0.08)); --k: 0.09; }
 
 @keyframes ring-pulse {
   0%, 100% { transform: translate(-50%, -50%) scale(1); }
