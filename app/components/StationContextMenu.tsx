@@ -82,7 +82,7 @@ export function StationContextMenu({ station, position, onClose }: Props) {
             </button>
             <button
               onClick={() => { hide(station); onClose(); }}
-              className="px-3.5 py-1.5 rounded-full text-sm font-semibold text-white bg-[var(--color-accent)] hover:opacity-90 cursor-pointer transition-opacity"
+              className="px-3.5 py-1.5 rounded-full text-sm font-semibold text-white bg-[var(--color-danger)] hover:opacity-90 cursor-pointer transition-opacity"
             >
               Hide station
             </button>

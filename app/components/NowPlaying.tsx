@@ -216,11 +216,11 @@ export function NowPlaying({ station, playState, everPlayed, onTrack, onHistory 
   if (playState === 'error') {
     return (
       <div className="flex flex-col gap-6">
-        <div className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-accent)]">
+        <div className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-danger)]">
           ⚠ {station.name} unreachable
         </div>
         <div className="flex gap-5 items-end">
-          <div className="w-[140px] h-[140px] rounded-2xl bg-[rgba(192,57,43,0.1)] border-2 border-dashed border-[rgba(192,57,43,0.4)] flex items-center justify-center text-4xl text-[var(--color-accent)]">⚠</div>
+          <div className="w-[140px] h-[140px] rounded-2xl bg-[rgba(192,57,43,0.1)] border-2 border-dashed border-[rgba(192,57,43,0.4)] flex items-center justify-center text-4xl text-[var(--color-danger)]">⚠</div>
           <div className="flex-1 pb-1">
             <div className="text-[26px] font-bold tracking-tight">Couldn&apos;t connect</div>
             <div className="text-sm text-[var(--color-ink-3)] mt-2">The station server may be down. Reconnecting…</div>
