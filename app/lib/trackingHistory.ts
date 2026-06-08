@@ -78,3 +78,52 @@ export function applyTrack(s: StationHistory, finishedTitle: string, at: number)
   items = [{ time: hhmm(at), title: finishedTitle, at }, ...items].slice(0, CAP);
   return { items, lastActiveAt: at }; // gapFromAt dropped (consumed)
 }
+
+const KEY = 'radio:trackingHistory';
+const EMPTY: HistoryItem[] = [];
+
+type Store = Record<string, StationHistory>;
+
+function readStore(): Store {
+  if (typeof window === 'undefined') return {};
+  try {
+    return JSON.parse(window.localStorage.getItem(KEY) || '{}') as Store;
+  } catch {
+    return {};
+  }
+}
+
+function writeStore(store: Store): void {
+  try {
+    window.localStorage.setItem(KEY, JSON.stringify(store));
+  } catch {
+    // best-effort persistence
+  }
+}
+
+function mutate(stationId: string, fn: (s: StationHistory) => StationHistory): void {
+  if (typeof window === 'undefined') return;
+  const store = readStore();
+  store[stationId] = fn(store[stationId] ?? emptyStation());
+  writeStore(store);
+}
+
+/** The persisted history items for a station (newest first), or empty. */
+export function loadTrackingHistory(stationId: string): HistoryItem[] {
+  return readStore()[stationId]?.items ?? EMPTY;
+}
+
+/** Call when a tracked station's SSE (re)opens. */
+export function noteConnect(stationId: string): void {
+  mutate(stationId, s => applyConnect(s, Date.now()));
+}
+
+/** Call on the heartbeat interval while the SSE is OPEN. */
+export function heartbeat(stationId: string): void {
+  mutate(stationId, s => applyHeartbeat(s, Date.now()));
+}
+
+/** Call when a new real track replaces `finishedTitle` (which just ended). */
+export function recordTrack(stationId: string, finishedTitle: string): void {
+  mutate(stationId, s => applyTrack(s, finishedTitle, Date.now()));
+}
