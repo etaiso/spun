@@ -27,7 +27,7 @@ export function PlaylistHistory({ history, stationName }: { history: HistoryEntr
         return (
           <div
             key={i}
-            className="grid grid-cols-[64px_1fr_auto] gap-4 py-3 border-b border-[var(--color-line)] items-baseline last:border-none"
+            className="grid grid-cols-[64px_1fr_auto] gap-4 py-3 border-b border-[var(--color-line)] items-center last:border-none"
           >
             <div className="text-[13px] text-[var(--color-ink-4)] font-semibold tracking-[0.5px] tabular-nums">{h.time}</div>
             <div className="text-base text-[var(--color-ink-2)]">
@@ -41,11 +41,11 @@ export function PlaylistHistory({ history, stationName }: { history: HistoryEntr
               aria-label={saved ? `Remove ${title} from saved` : `Save ${title}`}
               title={saved ? 'Saved — click to remove' : 'Save this song'}
               className={[
-                'self-center w-7 h-7 flex items-center justify-center text-base leading-none cursor-pointer transition-transform hover:scale-125',
+                'w-7 h-7 flex items-center justify-center text-base leading-none cursor-pointer transition-transform hover:scale-125',
                 saved ? 'text-[var(--color-brand-pink)]' : 'text-[var(--color-ink-4)] hover:text-[var(--color-brand-pink)]',
               ].join(' ')}
             >
-              {saved ? '♥' : '♡'}
+              <span aria-hidden="true">{saved ? '♥' : '♡'}</span>
             </button>
           </div>
         );
