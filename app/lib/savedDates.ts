@@ -3,7 +3,6 @@ import type { SavedSong } from './savedSongs';
 export type DateRange = 'all' | 'today' | 'week' | 'month';
 export type DateGroup = { label: string; songs: SavedSong[] };
 
-const DAY = 86_400_000;
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -13,11 +12,18 @@ export function playedTime(song: SavedSong): number {
   return song.playedAt ?? song.savedAt;
 }
 
-/** Local midnight (00:00) of the day containing `ts`. */
-function startOfDay(ts: number): number {
+/** Local midnight `days` days before the day containing `ts` (DST-safe — uses
+ *  calendar arithmetic, not fixed 24h offsets). */
+function dayStartBack(ts: number, days: number): number {
   const d = new Date(ts);
+  d.setDate(d.getDate() - days);
   d.setHours(0, 0, 0, 0);
   return d.getTime();
+}
+
+/** Local midnight (00:00) of the day containing `ts`. */
+function startOfDay(ts: number): number {
+  return dayStartBack(ts, 0);
 }
 
 function hhmm(ts: number): string {
@@ -36,8 +42,8 @@ export function rangeFilter(songs: SavedSong[], range: DateRange, now: number): 
   const today = startOfDay(now);
   const min =
     range === 'today' ? today :
-    range === 'week' ? today - 6 * DAY :   // today + previous 6 days = 7 calendar days
-    today - 29 * DAY;                       // 30 calendar days
+    range === 'week' ? dayStartBack(now, 6) :   // today + previous 6 days = 7 calendar days
+    dayStartBack(now, 29);                        // 30 calendar days
   return songs.filter(s => playedTime(s) >= min);
 }
 
@@ -45,8 +51,8 @@ export function rangeFilter(songs: SavedSong[], range: DateRange, now: number): 
  *  Input order is preserved within each bucket; empty buckets are dropped. */
 export function groupByDate(songs: SavedSong[], now: number): DateGroup[] {
   const today = startOfDay(now);
-  const yesterday = today - DAY;
-  const weekStart = today - 6 * DAY;
+  const yesterday = dayStartBack(now, 1);
+  const weekStart = dayStartBack(now, 6);
   const buckets: Record<string, SavedSong[]> = { Today: [], Yesterday: [], 'This week': [], Earlier: [] };
   for (const s of songs) {
     const t = playedTime(s);
@@ -67,9 +73,8 @@ export function groupByDate(songs: SavedSong[], now: number): DateGroup[] {
 export function formatPlayed(song: SavedSong, now: number): string {
   const t = playedTime(song);
   if (song.playedAt == null) return `Saved ${monDay(t)}`;
-  const today = startOfDay(now);
-  const yesterday = today - DAY;
-  const weekStart = today - 6 * DAY;
+  const yesterday = dayStartBack(now, 1);
+  const weekStart = dayStartBack(now, 6);
   if (t >= yesterday) return hhmm(t);                                  // Today / Yesterday
   if (t >= weekStart) return `${WEEKDAYS[new Date(t).getDay()]} ${hhmm(t)}`; // This week
   return `${monDay(t)} · ${hhmm(t)}`;                                  // Earlier

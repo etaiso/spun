@@ -42,6 +42,18 @@ describe('rangeFilter', () => {
   it('month → last 30 days', () => {
     expect(rangeFilter(all, 'month', now).map(s => s.id)).toEqual(['today', 'yest', 'week', 'earlier']);
   });
+  it('filters legacy songs (no playedAt) by their savedAt', () => {
+    // `legacy` has savedAt = Jun 8 07:00 (today) and no playedAt.
+    expect(rangeFilter([legacy], 'today', now).map(s => s.id)).toEqual(['legacy']);
+    expect(rangeFilter([song('old', { savedAt: at(4, 1, 9, 0) })], 'today', now)).toEqual([]);
+  });
+  it('returns [] for empty input', () => {
+    expect(rangeFilter([], 'week', now)).toEqual([]);
+  });
+  it('includes a song exactly at today midnight (>= boundary)', () => {
+    const midnight = song('midnight', { playedAt: at(5, 8, 0, 0) });
+    expect(rangeFilter([midnight], 'today', now).map(s => s.id)).toEqual(['midnight']);
+  });
 });
 
 describe('groupByDate', () => {
@@ -54,6 +66,9 @@ describe('groupByDate', () => {
     const groups = groupByDate([today, earlier], now);
     expect(groups.map(g => g.label)).toEqual(['Today', 'Earlier']);
   });
+  it('returns [] for empty input', () => {
+    expect(groupByDate([], now)).toEqual([]);
+  });
 });
 
 describe('formatPlayed', () => {
@@ -62,7 +77,7 @@ describe('formatPlayed', () => {
     expect(formatPlayed(yest, now)).toBe('22:00');
   });
   it('this-week shows weekday + time', () => {
-    expect(formatPlayed(thisWeek, now)).toMatch(/^\w{3} 10:00$/);
+    expect(formatPlayed(thisWeek, now)).toBe('Fri 10:00');
   });
   it('earlier shows month/day + time', () => {
     expect(formatPlayed(earlier, now)).toBe('May 29 · 08:00');
