@@ -17,7 +17,7 @@ type Props = {
 //  • no country filter (landing / genre only) → informational + "Turn off"
 //  • the filtered country IS your locked region → no banner (nothing to reconcile)
 export function RegionLockBanner({ country }: Props) {
-  const { region, setRegion } = useRegion();
+  const { region } = useRegion();
   const { locked, setLocked } = useRegionLock();
 
   const regionName = useMemo(() => {
@@ -45,14 +45,6 @@ export function RegionLockBanner({ country }: Props) {
           <>Explore reaches every region. Your search, favorites &amp; popular stay focused on {regionName}.</>
         )}
       </div>
-      {mismatch && (
-        <button
-          onClick={() => setRegion(country!.code)}
-          className="shrink-0 px-3 h-8 rounded-full text-[13px] font-semibold bg-brand text-white cursor-pointer hover:opacity-90 transition-opacity"
-        >
-          Make {country!.name} my region
-        </button>
-      )}
       <button
         onClick={() => setLocked(false)}
         className="shrink-0 px-3 h-8 rounded-full text-[13px] font-semibold border border-[var(--color-line)] bg-white text-[var(--color-ink-2)] hover:border-[var(--color-brand-pink)] cursor-pointer transition-colors"

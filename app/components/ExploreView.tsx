@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Station } from '@/app/lib/stations';
 import { useCountries, useTags, fetchStations, GENRES } from '@/app/lib/explore';
-import { useRegion } from '@/app/lib/region';
+import { useRegion, useRegionLock } from '@/app/lib/region';
 import { useFavorites } from '@/app/lib/favorites';
 import { useHiddenFilter } from '@/app/lib/hidden';
 import { flagEmoji } from '@/app/lib/flag';
@@ -45,11 +45,14 @@ export function ExploreView({ onSelect }: Props) {
           >
             ← Explore
           </button>
-          <h1 className="text-[32px] font-bold tracking-tight mb-1">
-            {tags.length > 0 && <span className="capitalize">{tags.join(' + ')}</span>}
-            {tags.length > 0 && country ? ' in ' : ''}
-            {country ? country.name : ''}
-          </h1>
+          <div className="flex items-center justify-between gap-4 flex-wrap mb-2">
+            <h1 className="text-[32px] font-bold tracking-tight">
+              {tags.length > 0 && <span className="capitalize">{tags.join(' + ')}</span>}
+              {tags.length > 0 && country ? ' in ' : ''}
+              {country ? country.name : ''}
+            </h1>
+            {country && <LockToggle country={country} />}
+          </div>
 
           <RegionLockBanner country={country} />
 
@@ -148,6 +151,39 @@ function FilterBar({ countries, countryCode, tags, tagCount, onCountry, onTags }
         />
       )}
     </div>
+  );
+}
+
+// Lock/unlock the active country as the app-wide Region-only region — straight
+// from Explore, regardless of the current lock state (you no longer have to
+// already be locked to switch). Locking sets region + turns the lock on; if
+// you're already locked to this country, it unlocks.
+function LockToggle({ country }: { country: ExploreCountry }) {
+  const { region, setRegion } = useRegion();
+  const { locked, setLocked } = useRegionLock();
+  const lockedHere = locked && region === country.code;
+
+  return (
+    <button
+      onClick={() => {
+        if (lockedHere) { setLocked(false); }
+        else { setRegion(country.code); setLocked(true); }
+      }}
+      aria-pressed={lockedHere}
+      title={lockedHere ? `Stop showing only ${country.name} stations` : `Show only ${country.name} stations across spun (Region-only mode)`}
+      className={[
+        'shrink-0 inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full text-[13px] font-semibold border transition-colors cursor-pointer',
+        lockedHere
+          ? 'bg-brand text-white border-transparent shadow-[0_2px_8px_rgba(168,85,247,0.3)]'
+          : 'bg-white text-[var(--color-ink-2)] border-[var(--color-line)] hover:border-[var(--color-brand-pink)]',
+      ].join(' ')}
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5" aria-hidden="true">
+        <rect x="5" y="11" width="14" height="9" rx="2" />
+        <path d={lockedHere ? 'M8 11V7a4 4 0 0 1 8 0v4' : 'M8 11V7a4 4 0 0 1 7.5-2'} />
+      </svg>
+      {lockedHere ? 'Region locked' : `Lock to ${country.name}`}
+    </button>
   );
 }
 
