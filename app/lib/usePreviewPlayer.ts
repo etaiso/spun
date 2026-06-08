@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
-import { pauseRadio, resumeRadio } from './playbackBus';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { pauseRadio, resumeRadio, subscribeStopPreview } from './playbackBus';
 import { readStoredVolume } from './volume';
 
 // Shared preview-audio controller. Owns one hidden <audio>, tracks which entry
@@ -17,6 +17,13 @@ export function usePreviewPlayer({ resumeRadioOnStop }: { resumeRadioOnStop: boo
     setPreviewId(null);
     if (resumeRadioOnStop) resumeRadio();
   }, [resumeRadioOnStop]);
+
+  // The live radio (re)started — abandon any preview so they never overlap. No
+  // resumeRadio here: the radio is already the thing playing.
+  useEffect(() => subscribeStopPreview(() => {
+    audioRef.current?.pause();
+    setPreviewId(null);
+  }), []);
 
   const toggle = useCallback((id: string, url: string) => {
     const a = audioRef.current;
