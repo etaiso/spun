@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  emptyStation, applyTrack, applyConnect, applyHeartbeat, CAP, GAP_MS,
+  emptyStation, applyTrack, applyConnect, applyHeartbeat, CAP, GAP_MS, humanizeGap,
   type StationHistory,
 } from '../app/lib/trackingHistory';
 import { isGap } from '../app/lib/nowPlayingTypes';
@@ -100,5 +100,18 @@ describe('applyHeartbeat', () => {
     const beat = applyHeartbeat(base, 1000 + 10 * 60_000); // 10 min of heartbeats
     const s = applyConnect(beat, 1000 + 10 * 60_000 + 30_000); // reconnect 30s later
     expect(s.gapFromAt).toBeUndefined(); // no false gap
+  });
+});
+
+describe('humanizeGap', () => {
+  const MS = 60_000;
+  it('formats minutes, hours, and days', () => {
+    expect(humanizeGap(0, 5 * MS)).toBe('~5 min');
+    expect(humanizeGap(0, 2 * 60 * MS)).toBe('~2 hr');
+    expect(humanizeGap(0, 25 * 60 * MS)).toBe('~1 day');
+    expect(humanizeGap(0, 72 * 60 * MS)).toBe('~3 days');
+  });
+  it('never shows less than ~1 min', () => {
+    expect(humanizeGap(0, 10_000)).toBe('~1 min');
   });
 });

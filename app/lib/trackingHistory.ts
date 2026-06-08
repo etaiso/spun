@@ -49,6 +49,16 @@ export function applyHeartbeat(s: StationHistory, at: number): StationHistory {
   return { ...s, lastActiveAt: at };
 }
 
+/** A short, friendly label for a gap's duration: "~5 min", "~2 hr", "~3 days". */
+export function humanizeGap(fromAt: number, toAt: number): string {
+  const min = Math.max(1, Math.round((toAt - fromAt) / 60_000));
+  if (min < 60) return `~${min} min`;
+  const hr = Math.round(min / 60);
+  if (hr < 24) return `~${hr} hr`;
+  const days = Math.round(hr / 24);
+  return `~${days} day${days === 1 ? '' : 's'}`;
+}
+
 /** Record a finished song. Dedupes consecutive re-broadcasts, consumes an armed
  *  gap (placing it beneath the resumed song), and caps the list. */
 export function applyTrack(s: StationHistory, finishedTitle: string, at: number): StationHistory {
