@@ -200,7 +200,7 @@ export default function Home() {
                   <Fragment key={currentStation.id}>
                     <NowPlaying station={currentStation} playState={playState} everPlayed={everPlayed} onTrack={setCurrentTrack} onHistory={setPlaylistHistory} />
                     <Player station={currentStation} onPlayStateChange={handlePlayState} />
-                    <PlaylistHistory history={playlistHistory} />
+                    <PlaylistHistory history={playlistHistory} stationName={currentStation.name} />
                   </Fragment>
                 ) : (
                   <div className="flex items-center justify-center text-center">
