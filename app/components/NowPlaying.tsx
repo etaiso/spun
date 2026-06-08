@@ -202,6 +202,7 @@ export function NowPlaying({ station, playState, everPlayed, onTrack, onHistory 
     // the client suppresses the "recognizing" state and ignores an identical
     // result, so the reload looks like a no-op). History is left intact.
     prevTitleRef.current = null;
+    currentStartRef.current = null;
     setCurrentRaw(null);
     setCurrentCover(null);
     setMetaState('waiting');
