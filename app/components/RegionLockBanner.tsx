@@ -34,15 +34,15 @@ export function RegionLockBanner({ country }: Props) {
 
   return (
     <div className="flex items-center gap-3 mb-6 px-4 py-3 rounded-xl border border-[rgba(168,85,247,0.28)] bg-[rgba(168,85,247,0.07)]">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4 shrink-0 text-[var(--color-brand-purple)]" aria-hidden="true">
-        <rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" />
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 shrink-0 text-[var(--color-brand-purple)]" aria-hidden="true">
+        <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z" />
       </svg>
       <div className="flex-1 min-w-0 text-[13px] text-[var(--color-ink-2)]">
-        <span className="font-semibold">Region-only mode is on ({regionName}).</span>{' '}
+        <span className="font-semibold">Showing only {regionName} in search &amp; Popular.</span>{' '}
         {mismatch ? (
-          <>You&apos;re exploring <b>{flagEmoji(country!.code)} {country!.name}</b> — playing a station here won&apos;t change your filter.</>
+          <>You&apos;re exploring <b>{flagEmoji(country!.code)} {country!.name}</b> here — that won&apos;t change it.</>
         ) : (
-          <>Explore reaches every region. Your search, favorites &amp; popular stay focused on {regionName}.</>
+          <>Explore still reaches every region.</>
         )}
       </div>
       <button

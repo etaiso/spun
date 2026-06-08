@@ -70,7 +70,7 @@ export function ExploreView({ onSelect }: Props) {
               {tags.length > 0 && country ? ' in ' : ''}
               {country ? country.name : ''}
             </h1>
-            {country && <LockToggle country={country} />}
+            {country && <ShowOnlyToggle country={country} />}
           </div>
 
           <RegionLockBanner country={country} />
@@ -194,35 +194,33 @@ function FilterBar({ countries, availableCodes, countryCode, tags, tagCount, onC
   );
 }
 
-// Lock/unlock the active country as the app-wide Region-only region — straight
-// from Explore, regardless of the current lock state (you no longer have to
-// already be locked to switch). Locking sets region + turns the lock on; if
-// you're already locked to this country, it unlocks.
-function LockToggle({ country }: { country: ExploreCountry }) {
+// Toggle "show only this country" for search + Popular (Favorites, Recently
+// played and Explore stay unaffected) — straight from Explore, from any state:
+// turn it on for this country, switch to it, or turn it back off.
+function ShowOnlyToggle({ country }: { country: ExploreCountry }) {
   const { region, setRegion } = useRegion();
   const { locked, setLocked } = useRegionLock();
-  const lockedHere = locked && region === country.code;
+  const showingOnly = locked && region === country.code;
 
   return (
     <button
       onClick={() => {
-        if (lockedHere) { setLocked(false); }
+        if (showingOnly) { setLocked(false); }
         else { setRegion(country.code); setLocked(true); }
       }}
-      aria-pressed={lockedHere}
-      title={lockedHere ? `Stop showing only ${country.name} stations` : `Show only ${country.name} stations across spun (Region-only mode)`}
+      aria-pressed={showingOnly}
+      title={showingOnly ? `Stop showing only ${country.name}` : `Show only ${country.name} in search & Popular`}
       className={[
         'shrink-0 inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full text-[13px] font-semibold border transition-colors cursor-pointer',
-        lockedHere
+        showingOnly
           ? 'bg-brand text-white border-transparent shadow-[0_2px_8px_rgba(168,85,247,0.3)]'
           : 'bg-white text-[var(--color-ink-2)] border-[var(--color-line)] hover:border-[var(--color-brand-pink)]',
       ].join(' ')}
     >
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5" aria-hidden="true">
-        <rect x="5" y="11" width="14" height="9" rx="2" />
-        <path d={lockedHere ? 'M8 11V7a4 4 0 0 1 8 0v4' : 'M8 11V7a4 4 0 0 1 7.5-2'} />
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5" aria-hidden="true">
+        <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z" />
       </svg>
-      {lockedHere ? 'Region locked' : `Lock to ${country.name}`}
+      {showingOnly ? `Showing only ${country.name}` : `Show only ${country.name}`}
     </button>
   );
 }

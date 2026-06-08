@@ -126,8 +126,8 @@ export function TopBar({ onOpenSearch, onOpenSettings, onOpenSaved, settingsActi
           one button. Highlighted only while the modal is open. */}
       <button
         onClick={onOpenSettings}
-        aria-label={showRegion ? `Settings — region: ${regionName}` : 'Settings'}
-        title={showRegion ? `Region · ${regionName} — open settings` : 'Settings'}
+        aria-label={showRegion ? `Settings — showing only ${regionName}` : 'Settings'}
+        title={showRegion ? `Showing only ${regionName} · open settings` : 'Settings'}
         className={[
           'flex items-center h-10 rounded-full border bg-white transition-colors cursor-pointer shrink-0',
           showRegion ? 'gap-2 pl-3 pr-2.5' : 'w-10 justify-center',

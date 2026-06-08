@@ -56,10 +56,10 @@ export function RegionPicker() {
         ].join(' ')}
       >
         <span className="flex flex-col">
-          <span className="text-sm font-medium text-[var(--color-ink)]">Region-only mode</span>
+          <span className="text-sm font-medium text-[var(--color-ink)]">Show only this region</span>
           <span className="text-xs text-[var(--color-ink-4)]">
             {region
-              ? 'Focus discovery on this region — search results and Popular. Favorites, Recently played and Explore are never filtered.'
+              ? 'Show only this region in search and Popular. Favorites, Recently played and Explore are never limited.'
               : 'Pick a region above to enable this.'}
           </span>
         </span>
