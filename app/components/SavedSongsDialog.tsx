@@ -135,7 +135,7 @@ export function SavedSongsDialog({ open, onOpenChange }: Props) {
           >
             <div className="overflow-y-auto p-7">
               <div className="flex items-center justify-between mb-5">
-                <h2 className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-warm)]">★ Saved songs</h2>
+                <h2 className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-brand-gradient">♥ Saved songs</h2>
                 <div className="flex items-center gap-2">
                   {saved.length > 0 && (
                     <div className="relative" ref={exportRef}>
@@ -144,7 +144,7 @@ export function SavedSongsDialog({ open, onOpenChange }: Props) {
                         aria-haspopup="menu"
                         aria-expanded={exportOpen}
                         title="Export your saved songs to import into Apple Music, Spotify, or YouTube Music"
-                        className="flex items-center gap-1.5 text-[11px] font-semibold rounded-full px-3 py-1 border border-[var(--color-line)] text-[var(--color-ink-2)] hover:border-[var(--color-warm)] cursor-pointer"
+                        className="flex items-center gap-1.5 text-[11px] font-semibold rounded-full px-3 py-1 border border-[var(--color-line)] text-[var(--color-ink-2)] hover:border-[var(--color-brand-pink)] cursor-pointer"
                       >
                         Export <span aria-hidden="true" className="text-[7px] translate-y-px">▼</span>
                       </button>
