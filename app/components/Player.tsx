@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Station } from '@/app/lib/stations';
 import { resumeAudio, connectIfRunning, disconnectElement } from '@/app/lib/audioBus';
-import { subscribePauseRadio, subscribeResumeRadio } from '@/app/lib/playbackBus';
+import { subscribePauseRadio, subscribeResumeRadio, stopPreview } from '@/app/lib/playbackBus';
 import { VOLUME_KEY, readStoredVolume } from '@/app/lib/volume';
 import { persistSet } from '@/app/lib/persist';
 
@@ -274,7 +274,10 @@ export function Player({ station, onPlayStateChange }: Props) {
     resumeAudio().then(() => connectIfRunning(a));
   }
 
-  function handlePlay() { setPaused(false); cbRef.current('playing'); setupAnalysis(); }
+  // Fires whenever the live stream actually begins playing (button, keyboard,
+  // media keys, autoplay, or resume) — the single point to ensure no preview
+  // keeps playing alongside it.
+  function handlePlay() { stopPreview(); setPaused(false); cbRef.current('playing'); setupAnalysis(); }
   function handlePause() { setPaused(true); }
   function handleWaiting() { cbRef.current('connecting'); }
   function handleError() { cbRef.current('error'); }
