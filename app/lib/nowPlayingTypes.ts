@@ -17,3 +17,12 @@ export type HistoryItem = HistoryEntry | HistoryGap;
 export function isGap(i: HistoryItem): i is HistoryGap {
   return 'gap' in i;
 }
+
+/** A stable, content-based key for a history row — survives the list growing
+ *  (new entries prepend), unlike an array index. Used as the React key and the
+ *  active-preview id in PlaylistHistory. */
+export function historyRowKey(item: HistoryItem): string {
+  return isGap(item)
+    ? `gap::${item.fromAt}::${item.toAt}`
+    : `${item.at ?? item.time}::${item.title}`;
+}
