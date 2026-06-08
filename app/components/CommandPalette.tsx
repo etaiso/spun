@@ -8,6 +8,7 @@ import { useTracking } from '@/app/lib/tracking';
 import { useRegion, useRegionFilter } from '@/app/lib/region';
 import { useHiddenFilter } from '@/app/lib/hidden';
 import { rankStations } from '@/app/lib/rank';
+import { showTitleIfTruncated } from '@/app/lib/dom';
 import { StationLogo } from './StationLogo';
 import { StationContextMenu } from './StationContextMenu';
 
@@ -172,7 +173,7 @@ export function CommandPalette({ onClose, onSelect }: Props) {
             >
               <StationLogo name={s.name} favicon={s.favicon} />
               <div className="flex-1 min-w-0">
-                <div className="text-[15px] font-semibold tracking-tight truncate">{s.name}</div>
+                <div className="text-[15px] font-semibold tracking-tight truncate" onMouseEnter={showTitleIfTruncated}>{s.name}</div>
                 <div className="text-xs text-[var(--color-ink-3)] truncate">
                   {[s.country, s.bitrate > 0 ? `${s.bitrate} kbps` : null].filter(Boolean).join(' · ')}
                 </div>

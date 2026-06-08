@@ -6,6 +6,7 @@ import { resumeAudio, connectIfRunning, disconnectElement } from '@/app/lib/audi
 import { subscribePauseRadio, subscribeResumeRadio, stopPreview } from '@/app/lib/playbackBus';
 import { VOLUME_KEY, readStoredVolume } from '@/app/lib/volume';
 import { persistSet } from '@/app/lib/persist';
+import { showTitleIfTruncated } from '@/app/lib/dom';
 import { StationLogo } from './StationLogo';
 
 export type PlayState = 'idle' | 'connecting' | 'playing' | 'error';
@@ -375,7 +376,7 @@ export function Player({ station, onPlayStateChange, dock = false, nowPlaying = 
     return (
       <>
         {audioEl}
-        <div className="fixed bottom-0 left-0 lg:left-[360px] right-0 z-30 h-[72px] flex items-center gap-4 px-5 border-t border-[var(--color-line)] bg-[var(--color-bg-2)] shadow-[0_-4px_24px_rgba(60,30,10,0.08)]">
+        <div className="fixed bottom-0 left-0 right-0 z-30 h-[72px] flex items-center gap-4 px-5 border-t border-[var(--color-line)] bg-[var(--color-bg-2)] shadow-[0_-4px_24px_rgba(60,30,10,0.08)]">
           <button
             onClick={togglePlay}
             data-autoplay-ignore
@@ -391,7 +392,7 @@ export function Player({ station, onPlayStateChange, dock = false, nowPlaying = 
           >
             <StationLogo name={station.name} favicon={station.favicon} size={44} />
             <div className="min-w-0">
-              <div className="text-[14px] font-bold tracking-tight truncate group-hover:text-[var(--color-brand-purple)] transition-colors">{station.name}</div>
+              <div className="text-[14px] font-bold tracking-tight truncate group-hover:text-[var(--color-brand-purple)] transition-colors" onMouseEnter={showTitleIfTruncated}>{station.name}</div>
               <div className="text-xs text-[var(--color-ink-3)] truncate">{nowPlaying ?? 'Live'}</div>
             </div>
           </button>

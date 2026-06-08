@@ -29,7 +29,7 @@ export function RegionPicker() {
   return (
     <div className="flex flex-col gap-2">
       <label htmlFor="region-select" className="text-[11px] tracking-[1.2px] uppercase font-bold text-[var(--color-ink-3)]">
-        Search region
+        Prioritized region
       </label>
       <div className="relative">
         <select
@@ -46,7 +46,7 @@ export function RegionPicker() {
         <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-[var(--color-ink-3)]">▾</span>
       </div>
       <span className="text-xs text-[var(--color-ink-4)]">
-        Stations from your region rank higher in search.
+        Stations from this region rank higher in search.
       </span>
 
       <label

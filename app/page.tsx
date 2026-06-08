@@ -196,7 +196,7 @@ export default function Home() {
         exploreActive={view === 'explore'}
       />
       <div className="flex flex-1 min-h-0">
-        <Sidebar selected={currentStation} onSelect={handleSelect} nowPlaying={currentTrack} />
+        <Sidebar selected={currentStation} onSelect={handleSelect} nowPlaying={currentTrack} hidden={view === 'explore'} />
         <main className="flex-1 bg-[var(--color-bg)] overflow-y-auto overflow-x-hidden">
           {/* Now-playing stage. It stays mounted while Explore is open — the
               cover, history and tracking panel hide, and the stage wrappers
