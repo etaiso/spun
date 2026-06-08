@@ -28,6 +28,9 @@ export type UpdateStatus =
 // it only exists in the desktop shell.
 type SpunShell = {
   setAutoUpdate: (enabled: boolean) => void;
+  // Whether closing the window hides to the tray instead of quitting (see
+  // app/lib/closeToTray.ts). Optional/Windows-only — absent on web & macOS.
+  setCloseToTray?: (enabled: boolean) => void;
   checkForUpdate: () => void;
   downloadUpdate: () => void;
   quitAndInstall: () => void;

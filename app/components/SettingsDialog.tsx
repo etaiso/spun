@@ -10,6 +10,7 @@ import { UpdateModal } from './UpdateModal';
 import { useRingsEnabled } from '@/app/lib/visualizer';
 import { useHidden } from '@/app/lib/hidden';
 import { persistSet } from '@/app/lib/persist';
+import { useCloseToTray, canCloseToTray } from '@/app/lib/closeToTray';
 import {
   useAutoUpdate,
   canCheckForUpdate,
@@ -66,6 +67,10 @@ export function SettingsDialog({ open, onOpenChange, station, playState, current
   // from the Electron updater. The toggle/status only mean anything in the
   // desktop build; on web `window.spun` is absent and onUpdateStatus is a no-op.
   const { enabled: autoUpdateOn, toggle: toggleAutoUpdate } = useAutoUpdate();
+
+  // Close-to-tray preference (persisted, on by default). Windows desktop only —
+  // the shell exposes the setter there; hidden everywhere else.
+  const { enabled: closeToTrayOn, toggle: toggleCloseToTray } = useCloseToTray();
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>({ state: 'idle' });
   // "Check now" UX: a spinner while the check is in flight, then a modal with the
   // result. `manualRef` distinguishes a user-initiated check (which gets the
@@ -129,6 +134,8 @@ export function SettingsDialog({ open, onOpenChange, station, playState, current
   // desktop shell, where Electron exposes the updater on window.spun. Hide it
   // entirely on the web build — there's nothing to update there.
   const isDesktop = canCheckForUpdate();
+  // The close-to-tray toggle only means anything on the Windows desktop shell.
+  const showTrayToggle = canCloseToTray();
   // On unsigned macOS the shell can't self-install — it detects updates and the
   // user downloads them manually. Drives the copy and the modal's primary action.
   const selfInstall = canSelfInstallUpdate();
@@ -248,6 +255,39 @@ export function SettingsDialog({ open, onOpenChange, station, playState, current
                       Checking…
                     </span>
                   ) : 'Check now'}
+                </button>
+              </div>
+            </section>
+          )}
+
+          {showTrayToggle && (
+            <section className="mt-7 flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-[var(--color-ink)]">Close to tray</h3>
+                  <p className="text-xs text-[var(--color-ink-3)] mt-0.5">
+                    {closeToTrayOn
+                      ? 'Closing the window keeps Spun running in the system tray.'
+                      : 'Closing the window quits Spun.'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={closeToTrayOn}
+                  aria-label="Close to tray"
+                  onClick={toggleCloseToTray}
+                  className={[
+                    'relative h-5 w-9 rounded-full transition-colors cursor-pointer shrink-0',
+                    closeToTrayOn ? 'bg-[var(--color-brand-purple)]' : 'bg-[var(--color-line)]',
+                  ].join(' ')}
+                >
+                  <span
+                    className={[
+                      'absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all',
+                      closeToTrayOn ? 'left-[18px]' : 'left-0.5',
+                    ].join(' ')}
+                  />
                 </button>
               </div>
             </section>

@@ -11,7 +11,7 @@
 //
 // Dev: skip spawning; load the separately-running `next dev` at localhost:3000.
 
-const { app, BrowserWindow, Menu, shell, utilityProcess, ipcMain } = require('electron');
+const { app, BrowserWindow, Menu, Tray, nativeImage, shell, utilityProcess, ipcMain } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const http = require('node:http');
@@ -22,6 +22,30 @@ const isDev = !app.isPackaged;
 let win = null;
 let serverProc = null;
 let recognizerProc = null;
+
+// --- System tray (Windows) --------------------------------------------------
+// On Windows the title-bar ✕ hides the window to the tray by default instead of
+// quitting, so playback/tracking keeps running in the background. The renderer
+// owns the on/off setting (Settings → "Close to tray") and reports it over IPC;
+// `closeToTray` mirrors it here. `isQuitting` distinguishes a real quit (tray
+// menu, updater restart, before-quit) from a tray-hide so the 'close' handler
+// knows whether to swallow the event. macOS keeps its own last-window-closed
+// behavior and has no tray.
+const hasTray = process.platform === 'win32';
+let tray = null;
+let closeToTray = true;   // default on; renderer pushes the persisted value after boot
+let isQuitting = false;   // set true once a genuine quit is underway
+
+// Single-instance lock (Windows). Once the app is hidden in the tray, launching
+// the shortcut again must reveal the existing window — not boot a second copy
+// (which would spawn its own Next server + recognizer on fresh ports). The
+// second instance fails the lock, quits, and the first gets 'second-instance'.
+const gotSingleInstanceLock = !hasTray || app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  app.quit();
+} else if (hasTray) {
+  app.on('second-instance', () => showWindow());
+}
 
 // Diagnostics log — a Finder-launched app has no terminal, so child stdio and
 // our own messages go here: <userData>/desktop.log.
@@ -269,16 +293,68 @@ async function startNextServer(recognizerPort) {
   return port;
 }
 
+// Bring the (possibly hidden/minimized) main window back to the foreground.
+// Used by the tray, the tray's double-click, and the second-instance handler.
+function showWindow() {
+  if (!win) return;
+  if (win.isMinimized()) win.restore();
+  win.show();
+  win.focus();
+}
+
+// Create the Windows tray icon + context menu. The icon (electron/tray-icon.png,
+// bundled in the asar via the `files` glob) is downscaled to 16px — the tray
+// renders it at the system DPI. Idempotent: only ever one tray.
+function createTray() {
+  if (!hasTray || tray) return;
+  try {
+    const img = nativeImage
+      .createFromPath(path.join(__dirname, 'tray-icon.png'))
+      .resize({ width: 16, height: 16 });
+    tray = new Tray(img.isEmpty() ? path.join(__dirname, 'tray-icon.png') : img);
+    tray.setToolTip('Spun');
+    const menu = Menu.buildFromTemplate([
+      { label: 'Open Spun', click: showWindow },
+      { type: 'separator' },
+      // A real quit: flip isQuitting so the 'close' handler doesn't re-hide,
+      // then app.quit() tears down the sidecars via the before-quit handler.
+      { label: 'Quit Spun', click: () => { isQuitting = true; app.quit(); } },
+    ]);
+    tray.setContextMenu(menu);
+    // Left-click / double-click the tray icon to reopen the window — the gesture
+    // Windows users expect from a tray app.
+    tray.on('click', showWindow);
+    tray.on('double-click', showWindow);
+    log('tray: created');
+  } catch (e) {
+    log(`tray: creation failed: ${e}`);
+  }
+}
+
 async function createWindow() {
   win = new BrowserWindow({
     width: 1280,
     height: 860,
     backgroundColor: '#faf7f2',
+    // Give the BrowserWindow an explicit icon on Windows (taskbar + Alt-Tab);
+    // packaged builds also get the NSIS .ico, but this covers the dev run.
+    ...(hasTray ? { icon: path.join(__dirname, 'tray-icon.png') } : {}),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
     },
+  });
+
+  // Close-to-tray: when enabled, the title-bar ✕ hides the window instead of
+  // destroying it (preventDefault), so the app keeps running in the tray. A
+  // genuine quit (tray "Quit", updater restart, before-quit) sets isQuitting
+  // first and falls through. No-op where there's no tray.
+  win.on('close', (e) => {
+    if (hasTray && closeToTray && !isQuitting) {
+      e.preventDefault();
+      win.hide();
+    }
   });
   // Open external links (Apple Music, Shazam, etc.) in the system browser.
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -298,6 +374,7 @@ async function createWindow() {
 }
 
 app.whenReady().then(async () => {
+  if (!gotSingleInstanceLock) return;   // a copy is already running; this one is quitting
   try {
     logFd = fs.openSync(path.join(app.getPath('userData'), 'desktop.log'), 'a');
   } catch { /* logging is best-effort */ }
@@ -316,6 +393,11 @@ app.whenReady().then(async () => {
   ipcMain.handle('spun:quit-and-install', () => { quitAndInstall(); return true; });
   // Open the GitHub releases page for a manual download (unsigned macOS path).
   ipcMain.handle('spun:open-release-page', () => { openReleasePage(); return true; });
+  // Close-to-tray preference (Windows). The renderer pushes the persisted value
+  // after it hydrates (see app/components/PersistenceBootstrap.tsx); main uses
+  // it in the window 'close' handler.
+  ipcMain.handle('spun:set-close-to-tray', (_event, enabled) => { closeToTray = !!enabled; return true; });
+  if (hasTray) createTray();
   await createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -327,6 +409,9 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
+  // A real teardown is underway (menu Quit, updater restart, OS shutdown) — let
+  // the window actually close instead of re-hiding to the tray.
+  isQuitting = true;
   try { serverProc?.kill(); } catch { /* already gone */ }
   try { recognizerProc?.kill(); } catch { /* already gone */ }
   // On macOS the recognizer is launched detached via `open`, so recognizerProc

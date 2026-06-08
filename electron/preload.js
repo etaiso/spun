@@ -11,6 +11,13 @@ contextBridge.exposeInMainWorld('spun', {
   // Renderer reports the user's auto-update preference; main gates the updater.
   setAutoUpdate: (enabled) => ipcRenderer.invoke('spun:set-auto-update', !!enabled),
 
+  // Renderer reports the "close to tray" preference; main owns the tray and the
+  // window 'close' handler. Exposed only on Windows, where the tray lives, so
+  // the renderer can feature-detect it (see app/lib/closeToTray.ts).
+  ...(process.platform === 'win32'
+    ? { setCloseToTray: (enabled) => ipcRenderer.invoke('spun:set-close-to-tray', !!enabled) }
+    : {}),
+
   // Renderer asks the shell to check for an update now (manual "Check now").
   checkForUpdate: () => ipcRenderer.invoke('spun:check-for-update'),
 
