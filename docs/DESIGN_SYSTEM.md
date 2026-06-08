@@ -14,6 +14,8 @@ use the legacy terracotta accents until their turn comes.
 Spun's identity is the **logo gradient**: a 135° sweep from indigo through
 purple to pink, taken directly from `docs/spun-logo.svg`.
 
+![brand gradient](assets/grad-brand.svg)
+
 ```
 indigo  #6366F1  →  purple  #A855F7  →  pink  #EC4899
 ```
@@ -31,29 +33,30 @@ Defined in `app/globals.css` under `:root`.
 
 The warm cream/ink palette is Spun's surface. It is **not** changing.
 
-| Token | Value | Use |
-|---|---|---|
-| `--color-bg` | `#fbf7f3` | App background (warm cream) |
-| `--color-bg-2` | `#ffffff` | Cards, dialogs, raised surfaces |
-| `--color-ink` | `#1a1410` | Primary text |
-| `--color-ink-2` | `#4a3f37` | Secondary text |
-| `--color-ink-3` | `#8a7a6e` | Muted text, meta |
-| `--color-ink-4` | `#b8a99a` | Faint text, icons, placeholders |
-| `--color-line` | `#ece2d8` | Borders, dividers |
+| | Token | Value | Use |
+|---|---|---|---|
+| ![](assets/c-fbf7f3.svg) | `--color-bg` | `#fbf7f3` | App background (warm cream) |
+| ![](assets/c-ffffff.svg) | `--color-bg-2` | `#ffffff` | Cards, dialogs, raised surfaces |
+| ![](assets/c-1a1410.svg) | `--color-ink` | `#1a1410` | Primary text |
+| ![](assets/c-4a3f37.svg) | `--color-ink-2` | `#4a3f37` | Secondary text |
+| ![](assets/c-8a7a6e.svg) | `--color-ink-3` | `#8a7a6e` | Muted text, meta |
+| ![](assets/c-b8a99a.svg) | `--color-ink-4` | `#b8a99a` | Faint text, icons, placeholders |
+| ![](assets/c-ece2d8.svg) | `--color-line` | `#ece2d8` | Borders, dividers |
 
 ### Brand — the accent identity
 
-| Token | Value | Use |
-|---|---|---|
-| `--grad-brand` | `linear-gradient(135deg, #6366F1, #A855F7, #EC4899)` | Brand moments & primary actions only |
-| `--color-brand-indigo` | `#6366F1` | Gradient start; rarely used solo |
-| `--color-brand-purple` | `#A855F7` | Secondary accent — play controls, hovers |
-| `--color-brand-pink` | `#EC4899` | **Primary interactive accent** — icons, hearts, active text, focus rings |
-| `--color-danger` | `#c0392b` | Destructive & error states only |
+| | Token | Value | Use |
+|---|---|---|---|
+| ![](assets/grad-brand.svg) | `--grad-brand` | `linear-gradient(135deg, #6366F1, #A855F7, #EC4899)` | Brand moments & primary actions only |
+| ![](assets/c-6366F1.svg) | `--color-brand-indigo` | `#6366F1` | Gradient start; rarely used solo |
+| ![](assets/c-A855F7.svg) | `--color-brand-purple` | `#A855F7` | Secondary accent — play controls, hovers |
+| ![](assets/c-EC4899.svg) | `--color-brand-pink` | `#EC4899` | **Primary interactive accent** — icons, hearts, active text, focus rings |
+| ![](assets/c-c0392b.svg) | `--color-danger` | `#c0392b` | Destructive & error states only |
 
 ### Legacy (being phased out)
 
-`--color-warm` (`#d2691e`) and `--color-accent` (`#c0392b`) remain defined so
+`--color-warm` (![](assets/c-d2691e.svg) `#d2691e`) and `--color-accent`
+(![](assets/c-c0392b.svg) `#c0392b`) remain defined so
 un-migrated components keep working. **Do not use them in new or migrated
 surfaces** — reach for the brand tokens instead. (`--color-danger` carries the
 old `--color-accent` red forward under a name that says what it's for.)
