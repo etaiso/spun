@@ -3,9 +3,8 @@
 The single source of truth for Spun's look and feel. Every feature should pull
 from these tokens and patterns rather than inventing one-off colors or styles.
 
-The system is **adopted incrementally** — components migrate to it feature by
-feature. The Saved Songs surfaces are the first adopter; other components still
-use the legacy terracotta accents until their turn comes.
+The system has been rolled out across the whole app — every surface uses these
+brand tokens; the legacy terracotta accents have been removed.
 
 ---
 
@@ -51,12 +50,11 @@ The warm cream/ink palette is Spun's surface. It is **not** changing.
 | `--color-brand-pink` | `#EC4899` | **Primary interactive accent** — icons, hearts, active text, focus rings |
 | `--color-danger` | `#c0392b` | Destructive & error states only |
 
-### Legacy (being phased out)
+### Legacy (removed)
 
-`--color-warm` (`#d2691e`) and `--color-accent` (`#c0392b`) remain defined so
-un-migrated components keep working. **Do not use them in new or migrated
-surfaces** — reach for the brand tokens instead. (`--color-danger` carries the
-old `--color-accent` red forward under a name that says what it's for.)
+The terracotta `--color-warm` and `--color-accent` / `--color-accent-2` tokens
+have been fully removed — every surface now uses the brand tokens. Destructive
+and error states use `--color-danger`.
 
 ---
 

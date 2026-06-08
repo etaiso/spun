@@ -136,7 +136,7 @@ export function CommandPalette({ onClose, onSelect }: Props) {
             placeholder="Search stations…"
             className="flex-1 bg-transparent outline-none text-[17px] text-[var(--color-ink)] placeholder:text-[var(--color-ink-4)]"
           />
-          {loading && <span className="spin-warm" aria-label="Searching" />}
+          {loading && <span className="spin-brand" aria-label="Searching" />}
         </div>
 
         {/* Results */}
