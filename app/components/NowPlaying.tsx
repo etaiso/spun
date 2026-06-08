@@ -9,8 +9,7 @@ import { RadioWaves } from './RadioWaves';
 import { loadSession, saveSession } from '@/app/lib/session';
 import { splitArtistTitle } from '@/app/lib/track';
 import { lookupITunesSong } from '@/app/lib/itunes';
-import type { TrackSource, HistoryEntry } from '@/app/lib/nowPlayingTypes';
-import type { HistoryItem } from '@/app/lib/nowPlayingTypes';
+import type { TrackSource, HistoryEntry, HistoryItem } from '@/app/lib/nowPlayingTypes';
 import { isGap } from '@/app/lib/nowPlayingTypes';
 import type { PlayState } from './Player';
 import { useTracking } from '@/app/lib/tracking';
@@ -64,7 +63,7 @@ export function NowPlaying({ station, playState, everPlayed, onTrack, onHistory 
   // Tracked stations restore their durable, gap-aware history; everyone else
   // restores the (≤5-min) session history as before.
   const [history, setHistory] = useState<HistoryItem[]>(() =>
-    isTracked(station.id) ? loadTrackingHistory(station.id) : (restored?.history ?? []),
+    tracked ? loadTrackingHistory(station.id) : (restored?.history ?? []),
   );
   const [lastUpdate, setLastUpdate] = useState<string | null>(restored?.lastUpdate ?? null);
   const [refreshKey, setRefreshKey] = useState(0);
