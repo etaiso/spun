@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { splitArtistTitle } from '@/app/lib/track';
 import { humanizeGap } from '@/app/lib/trackingHistory';
 import { isGap, historyRowKey } from '@/app/lib/nowPlayingTypes';
@@ -27,9 +27,10 @@ export function PlaylistHistory({ history }: { history: HistoryItem[] }) {
   // on click and kept for the session (history rows stay lean — nothing persisted).
   const [resolved, setResolved] = useState<Record<string, string | null>>({});
   const [resolvingKey, setResolvingKey] = useState<string | null>(null);
-  // Abort any in-flight lookups on unmount.
-  const abortRef = useRef<AbortController>(new AbortController());
-  useEffect(() => () => abortRef.current.abort(), []);
+  // One AbortController for the component's lifetime; aborts any in-flight iTunes
+  // lookups on unmount. Lazy useState init so it's created once, not per render.
+  const [aborter] = useState(() => new AbortController());
+  useEffect(() => () => aborter.abort(), [aborter]);
 
   if (history.length === 0) return null;
 
@@ -39,8 +40,8 @@ export function PlaylistHistory({ history }: { history: HistoryItem[] }) {
     const cached = resolved[term];
     if (cached !== undefined) { if (cached) toggle(key, cached); return; } // cached miss → no-op
     setResolvingKey(key);
-    lookupITunesSong(term, abortRef.current.signal).then(m => {
-      if (abortRef.current.signal.aborted) return;
+    lookupITunesSong(term, aborter.signal).then(m => {
+      if (aborter.signal.aborted) return;
       const url = m?.previewUrl || null;
       setResolved(r => ({ ...r, [term]: url }));
       setResolvingKey(k => (k === key ? null : k));
@@ -110,7 +111,7 @@ function PreviewButton({ state, onClick }: { state: PreviewState; onClick: () =>
     <button
       type="button"
       onClick={onClick}
-      aria-label={state === 'playing' ? 'Pause preview' : 'Play preview'}
+      aria-label={state === 'playing' ? 'Pause preview' : state === 'resolving' ? 'Loading preview' : 'Play preview'}
       className={[
         'self-center w-7 h-7 flex items-center justify-center rounded-full text-[11px] cursor-pointer transition-colors border',
         state === 'playing'

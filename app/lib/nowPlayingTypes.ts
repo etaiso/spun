@@ -20,7 +20,9 @@ export function isGap(i: HistoryItem): i is HistoryGap {
 
 /** A stable, content-based key for a history row — survives the list growing
  *  (new entries prepend), unlike an array index. Used as the React key and the
- *  active-preview id in PlaylistHistory. */
+ *  active-preview id in PlaylistHistory. Note: two pre-`at` session entries with
+ *  the same title at the same HH:MM minute would collide — harmless here (both
+ *  rows resolve to the same preview), and tracking entries carry a unique `at`. */
 export function historyRowKey(item: HistoryItem): string {
   return isGap(item)
     ? `gap::${item.fromAt}::${item.toAt}`
