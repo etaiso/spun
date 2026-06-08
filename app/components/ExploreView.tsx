@@ -63,6 +63,7 @@ export function ExploreView({ onSelect }: Props) {
             tagCount={tagCount}
             onCountry={setCountryCode}
             onTags={setTags}
+            onReset={() => { setCountryCode(null); setTags([]); }}
           />
 
           <Results countryCode={countryCode} tags={tags} onSelect={onSelect} />
@@ -94,13 +95,14 @@ export function ExploreView({ onSelect }: Props) {
 
 // ── Filter bar (results view): combine / change the facets ──────────────────
 
-function FilterBar({ countries, countryCode, tags, tagCount, onCountry, onTags }: {
+function FilterBar({ countries, countryCode, tags, tagCount, onCountry, onTags, onReset }: {
   countries: ExploreCountry[];
   countryCode: string | null;
   tags: string[];
   tagCount: Map<string, number>;
   onCountry: (code: string | null) => void;
   onTags: (tags: string[]) => void;
+  onReset: () => void;
 }) {
   // Alphabetical for findability (the landing grid stays count-sorted).
   const countryOptions = useMemo(
@@ -142,6 +144,7 @@ function FilterBar({ countries, countryCode, tags, tagCount, onCountry, onTags }
 
       {available.length > 0 && (
         <Combobox
+          keepOpen
           ariaLabel={tags.length ? 'Add another genre' : 'Filter by genre'}
           searchPlaceholder="Search genres…"
           trigger={tags.length ? '+ Add genre' : 'All genres'}
@@ -149,6 +152,19 @@ function FilterBar({ countries, countryCode, tags, tagCount, onCountry, onTags }
           options={available.map(g => ({ value: g, label: tagCount.get(g) ? `${g} · ${fmt(tagCount.get(g)!)}` : g }))}
           onSelect={(v) => { if (v) onTags([...tags, v]); }}
         />
+      )}
+
+      {(countryCode || tags.length > 0) && (
+        <button
+          onClick={onReset}
+          title="Clear all filters"
+          className="ml-auto inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full text-[13px] font-semibold text-[var(--color-ink-3)] border border-transparent hover:text-[var(--color-ink)] hover:border-[var(--color-line)] hover:bg-white cursor-pointer transition-colors"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5" aria-hidden="true">
+            <path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" />
+          </svg>
+          Reset
+        </button>
       )}
     </div>
   );
@@ -191,13 +207,17 @@ function LockToggle({ country }: { country: ExploreCountry }) {
 // with ↑/↓, pick with Enter/click, dismiss with Esc/click-away. Replaces a
 // native <select> so a 200-country list is searchable — and so flags actually
 // render in the list (native <option>s don't use the Twemoji font on Windows).
-function Combobox({ trigger, value, options, onSelect, searchPlaceholder, ariaLabel }: {
+function Combobox({ trigger, value, options, onSelect, searchPlaceholder, ariaLabel, keepOpen = false }: {
   trigger: React.ReactNode;
   value: string;
   options: { value: string; label: string }[];
   onSelect: (v: string) => void;
   searchPlaceholder: string;
   ariaLabel: string;
+  // Stay open after a pick so several options can be added in one go
+  // (genre multiselect); the picked option leaves the list. Single-select
+  // (country) closes on pick.
+  keepOpen?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -239,7 +259,15 @@ function Combobox({ trigger, value, options, onSelect, searchPlaceholder, ariaLa
   function choose(o: { value: string } | undefined) {
     if (!o) return;
     onSelect(o.value);
-    setOpen(false);
+    if (keepOpen) {
+      // Multiselect: keep the menu open and clear the search so the (now
+      // shorter) list is ready for the next pick without reopening.
+      setQuery('');
+      setActive(0);
+      inputRef.current?.focus();
+    } else {
+      setOpen(false);
+    }
   }
 
   function onKeyDown(e: React.KeyboardEvent) {

@@ -36,6 +36,9 @@ export default function Home() {
   const [savedOpen, setSavedOpen] = useState(false);
   // Top-level view: the now-playing home, or the Explore browse destination.
   const [view, setView] = useState<'home' | 'explore'>('home');
+  // Once Explore has been opened we keep it mounted (just hidden) so its filters
+  // and loaded results survive leaving for the now-playing view and coming back.
+  const [exploredOnce, setExploredOnce] = useState(false);
   const { recent, add: addRecent } = useRecent();
   const { bump: bumpPlay } = usePlayCounts();
   const { favorites } = useFavorites();
@@ -186,7 +189,10 @@ export default function Home() {
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenSaved={() => setSavedOpen(true)}
         settingsActive={settingsOpen}
-        onToggleExplore={() => setView(v => (v === 'explore' ? 'home' : 'explore'))}
+        onToggleExplore={() => {
+          if (view === 'explore') setView('home');
+          else { setExploredOnce(true); setView('explore'); }
+        }}
         exploreActive={view === 'explore'}
       />
       <div className="flex flex-1 min-h-0">
@@ -232,11 +238,12 @@ export default function Home() {
             </div>
           )}
 
-          {/* Explore destination. Bottom padding clears the fixed player dock
-              when something is playing. Selecting a station keeps you in
-              Explore — the dock just updates to the new station. */}
-          {view === 'explore' && (
-            <div className={currentStation ? 'pb-24' : ''}>
+          {/* Explore destination. Kept mounted (just hidden) once opened so its
+              filters + loaded results persist when you pop out to the now-playing
+              view and back. Bottom padding clears the fixed player dock when
+              something is playing. Selecting a station keeps you in Explore. */}
+          {exploredOnce && (
+            <div className={view === 'explore' ? (currentStation ? 'pb-24' : '') : 'hidden'}>
               <ExploreView onSelect={handleSelect} />
             </div>
           )}
