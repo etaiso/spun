@@ -47,6 +47,12 @@ export function localOnlyKeys(serverKeys: string[], localKeys: string[]): string
   return localKeys.filter(k => k.startsWith('radio:') && !onServer.has(k));
 }
 
+/** radio:* caches that live only in localStorage and must never be synced to
+ *  the server (ephemeral now-playing cache + durable-but-local tracking history). */
+export function isEphemeralKey(key: string): boolean {
+  return key === 'radio:sessions' || key === 'radio:trackingHistory';
+}
+
 let hydrated = false;
 
 /** Pull the server DB into localStorage (server wins) + import local-only keys. Runs once. */
@@ -76,7 +82,7 @@ export async function hydrateFromServer(): Promise<void> {
     if (k) local.push(k);
   }
   for (const key of localOnlyKeys(Object.keys(server), local)) {
-    if (key === 'radio:sessions') continue; // ephemeral now-playing cache, not synced
+    if (isEphemeralKey(key)) continue; // localStorage-only caches, not synced
     const raw = window.localStorage.getItem(key);
     if (raw != null) persistSet(key, raw);
   }
