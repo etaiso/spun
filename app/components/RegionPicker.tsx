@@ -40,7 +40,7 @@ export function RegionPicker() {
           id="region-select"
           value={region}
           onChange={(e) => setRegion(e.target.value)}
-          className="appearance-none cursor-pointer w-full rounded-full border border-[var(--color-line)] bg-white pl-3 pr-8 py-2 text-sm text-[var(--color-ink)] hover:border-[var(--color-warm)] transition-colors"
+          className="appearance-none cursor-pointer w-full rounded-full border border-[var(--color-line)] bg-white pl-3 pr-8 py-2 text-sm text-[var(--color-ink)] hover:border-[var(--color-brand-pink)] transition-colors"
         >
           <option value="">🌐 Global (no preference)</option>
           {options.map(o => (
@@ -75,7 +75,7 @@ export function RegionPicker() {
           onClick={() => setLocked(!locked)}
           className={[
             'shrink-0 relative h-5 w-9 rounded-full transition-colors',
-            locked && region ? 'bg-[var(--color-warm)]' : 'bg-[var(--color-line)]',
+            locked && region ? 'bg-[var(--color-brand-purple)]' : 'bg-[var(--color-line)]',
             region ? 'cursor-pointer' : 'cursor-not-allowed',
           ].join(' ')}
         >

@@ -24,7 +24,7 @@ export function ShortcutsHelp({ open, onOpenChange }: Props) {
         onClick={() => onOpenChange(true)}
         aria-label="Keyboard shortcuts"
         title="Keyboard shortcuts (?)"
-        className="fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-white border border-[var(--color-line)] shadow-[0_6px_18px_rgba(0,0,0,0.15)] flex items-center justify-center text-[34px] leading-none text-[var(--color-ink-3)] hover:text-[var(--color-ink)] hover:border-[var(--color-warm)] cursor-pointer transition-colors"
+        className="fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-white border border-[var(--color-line)] shadow-[0_6px_18px_rgba(0,0,0,0.15)] flex items-center justify-center text-[34px] leading-none text-[var(--color-ink-3)] hover:text-[var(--color-ink)] hover:border-[var(--color-brand-pink)] cursor-pointer transition-colors"
       >
         <span aria-hidden="true">⌨</span>
       </button>
@@ -42,7 +42,7 @@ export function ShortcutsHelp({ open, onOpenChange }: Props) {
             className="bg-white rounded-2xl shadow-[0_24px_64px_rgba(0,0,0,0.25)] max-w-md w-full p-7"
           >
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-warm)]">
+              <h2 className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-brand-purple)]">
                 Keyboard shortcuts
               </h2>
               <button

@@ -87,7 +87,7 @@ export function DebugPanel({ station, playState, currentTrack, active }: Props) 
           ) : health.up ? (
             <span className="text-green-600 font-semibold">● up</span>
           ) : (
-            <span className="text-[var(--color-accent)] font-semibold">○ down</span>
+            <span className="text-[var(--color-danger)] font-semibold">○ down</span>
           )}
           {health && <span className="text-[var(--color-ink-4)]"> ({health.ms}ms)</span>}
         </Row>
@@ -106,7 +106,7 @@ export function DebugPanel({ station, playState, currentTrack, active }: Props) 
         <Row label="Energy">
           <span className="inline-flex items-center gap-2">
             <span className="inline-block h-1.5 w-24 rounded-full bg-[var(--color-line)] overflow-hidden align-middle">
-              <span className="block h-full bg-[var(--color-warm)]" style={{ width: `${Math.round(audio.energy * 100)}%` }} />
+              <span className="block h-full bg-[var(--color-brand-purple)]" style={{ width: `${Math.round(audio.energy * 100)}%` }} />
             </span>
             {audio.energy.toFixed(2)}
           </span>

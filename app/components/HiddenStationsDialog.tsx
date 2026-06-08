@@ -37,7 +37,7 @@ export function HiddenStationsDialog({ open, onOpenChange }: Props) {
       >
         <div className="overflow-y-auto p-7">
           <div className="flex items-center justify-between mb-5">
-            <h2 className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-warm)]">
+            <h2 className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-brand-purple)]">
               Hidden stations
             </h2>
             <button

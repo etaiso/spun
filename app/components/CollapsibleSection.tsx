@@ -17,7 +17,7 @@ export function CollapsibleSection({ title, defaultCollapsed = false, count, chi
       <button
         onClick={() => setCollapsed(c => !c)}
         aria-expanded={!collapsed}
-        className="w-full flex items-center gap-2 mb-3.5 text-[11px] tracking-[1.4px] text-[var(--color-warm)] font-extrabold uppercase cursor-pointer hover:opacity-75 transition-opacity"
+        className="w-full flex items-center gap-2 mb-3.5 text-[11px] tracking-[1.4px] text-[var(--color-brand-purple)] font-extrabold uppercase cursor-pointer hover:opacity-75 transition-opacity"
       >
         <span
           className="text-[9px] transition-transform duration-150 inline-block"

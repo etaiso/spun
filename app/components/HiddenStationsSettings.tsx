@@ -30,7 +30,7 @@ export function HiddenStationsSettings() {
               </div>
               <button
                 onClick={() => unhide(s.id)}
-                className="shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold text-[var(--color-warm)] border border-[var(--color-line)] hover:border-[var(--color-warm)] hover:bg-white cursor-pointer transition-colors"
+                className="shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold text-[var(--color-brand-purple)] border border-[var(--color-line)] hover:border-[var(--color-brand-pink)] hover:bg-white cursor-pointer transition-colors"
               >
                 Unhide
               </button>
