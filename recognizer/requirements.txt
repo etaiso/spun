@@ -1,4 +1,4 @@
-shazamio>=0.5
+shazamio>=0.8.1
 fastapi>=0.110
 uvicorn>=0.29
 aiohttp>=3.9
