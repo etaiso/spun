@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  emptyStation, applyTrack, CAP,
+  emptyStation, applyTrack, applyConnect, applyHeartbeat, CAP, GAP_MS,
   type StationHistory,
 } from '../app/lib/trackingHistory';
 import { isGap } from '../app/lib/nowPlayingTypes';
@@ -70,5 +70,35 @@ describe('applyTrack', () => {
     expect(s.items).toHaveLength(CAP);
     const newest = s.items[0];
     expect(isGap(newest) ? '' : newest.title).toBe(`song ${CAP + 9}`);
+  });
+});
+
+describe('applyConnect', () => {
+  it('does not arm a gap on the very first connect (no items yet)', () => {
+    const s = applyConnect(emptyStation(), 1_000_000);
+    expect(s.gapFromAt).toBeUndefined();
+    expect(s.lastActiveAt).toBe(1_000_000);
+  });
+
+  it('arms a gap when reconnecting after longer than GAP_MS', () => {
+    const base: StationHistory = { items: [{ time: '08:00', title: 'old', at: 1000 }], lastActiveAt: 1000 };
+    const s = applyConnect(base, 1000 + GAP_MS + 1);
+    expect(s.gapFromAt).toBe(1000);
+    expect(s.lastActiveAt).toBe(1000 + GAP_MS + 1);
+  });
+
+  it('does NOT arm a gap for a short blip under GAP_MS', () => {
+    const base: StationHistory = { items: [{ time: '08:00', title: 'old', at: 1000 }], lastActiveAt: 1000 };
+    const s = applyConnect(base, 1000 + GAP_MS - 1);
+    expect(s.gapFromAt).toBeUndefined();
+  });
+});
+
+describe('applyHeartbeat', () => {
+  it('bumps lastActiveAt so a long quiet song is not mistaken for a gap', () => {
+    const base: StationHistory = { items: [{ time: '08:00', title: 'old', at: 1000 }], lastActiveAt: 1000 };
+    const beat = applyHeartbeat(base, 1000 + 10 * 60_000); // 10 min of heartbeats
+    const s = applyConnect(beat, 1000 + 10 * 60_000 + 30_000); // reconnect 30s later
+    expect(s.gapFromAt).toBeUndefined(); // no false gap
   });
 });

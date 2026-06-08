@@ -36,6 +36,19 @@ export function hhmm(at: number): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+/** On (re)connect: arm a gap if we have history and were away longer than
+ *  GAP_MS. Always refresh lastActiveAt. */
+export function applyConnect(s: StationHistory, at: number): StationHistory {
+  const away = s.items.length > 0 && at - s.lastActiveAt > GAP_MS;
+  return away ? { ...s, gapFromAt: s.lastActiveAt, lastActiveAt: at } : { ...s, lastActiveAt: at };
+}
+
+/** Heartbeat while connected — keeps lastActiveAt fresh so a long quiet song
+ *  isn't later mistaken for a tracking gap. */
+export function applyHeartbeat(s: StationHistory, at: number): StationHistory {
+  return { ...s, lastActiveAt: at };
+}
+
 /** Record a finished song. Dedupes consecutive re-broadcasts, consumes an armed
  *  gap (placing it beneath the resumed song), and caps the list. */
 export function applyTrack(s: StationHistory, finishedTitle: string, at: number): StationHistory {
