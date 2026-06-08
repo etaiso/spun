@@ -13,6 +13,7 @@ import { Player } from './components/Player';
 import { NowPlaying } from './components/NowPlaying';
 import { PlaylistHistory } from './components/PlaylistHistory';
 import { CommandPalette } from './components/CommandPalette';
+import { ExploreView } from './components/ExploreView';
 import { TrackingPanel } from './components/TrackingPanel';
 import { useTracking } from './lib/tracking';
 import { ShortcutsHelp } from './components/ShortcutsHelp';
@@ -33,6 +34,8 @@ export default function Home() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [savedOpen, setSavedOpen] = useState(false);
+  // Top-level view: the now-playing home, or the Explore browse destination.
+  const [view, setView] = useState<'home' | 'explore'>('home');
   const { recent, add: addRecent } = useRecent();
   const { bump: bumpPlay } = usePlayCounts();
   const { favorites } = useFavorites();
@@ -114,6 +117,7 @@ export default function Home() {
         setSavedOpen(o => !o);
       } else if (e.key === 'Escape') {
         setShowHelp(false);
+        setView('home');
       } else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
         if (favorites.length === 0) return;
         e.preventDefault();
@@ -182,10 +186,16 @@ export default function Home() {
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenSaved={() => setSavedOpen(true)}
         settingsActive={settingsOpen}
+        onToggleExplore={() => setView(v => (v === 'explore' ? 'home' : 'explore'))}
+        exploreActive={view === 'explore'}
       />
       <div className="flex flex-1 min-h-0">
         <Sidebar selected={currentStation} onSelect={handleSelect} nowPlaying={currentTrack} />
-        <main className="flex-1 p-10 bg-[var(--color-bg)] overflow-y-auto overflow-x-hidden">
+        <main className="flex-1 bg-[var(--color-bg)] overflow-y-auto overflow-x-hidden">
+          {view === 'explore' ? (
+          <ExploreView onSelect={(s) => { handleSelect(s); setView('home'); }} />
+          ) : (
+          <div className="p-10 min-h-full">
           {/* Full-width stage so the Tracking monitor hugs the right edge.
               When stations are tracked it splits into the player column + the
               aside (stacks below on narrow screens); the player content is
@@ -227,6 +237,8 @@ export default function Home() {
               </aside>
             )}
           </div>
+          </div>
+          )}
         </main>
       </div>
       {paletteOpen && (

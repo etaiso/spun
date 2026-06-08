@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { useRegion, useRegionLock } from '@/app/lib/region';
+import { flagEmoji } from '@/app/lib/flag';
 
 // A practical spread of countries for the picker. The user's detected region
 // is always included even if it's not in this list.
@@ -11,11 +12,6 @@ const CODES = [
   'RU', 'UA', 'TR', 'BR', 'MX', 'AR', 'CL', 'CO', 'JP', 'KR', 'CN', 'IN',
   'ID', 'TH', 'VN', 'PH', 'ZA', 'EG', 'MA', 'NG', 'KE', 'AE', 'SA',
 ];
-
-function flagEmoji(code: string): string {
-  if (code.length !== 2) return '🌐';
-  return code.toUpperCase().replace(/./g, c => String.fromCodePoint(127397 + c.charCodeAt(0)));
-}
 
 export function RegionPicker() {
   const { region, setRegion } = useRegion();
@@ -63,7 +59,7 @@ export function RegionPicker() {
           <span className="text-sm font-medium text-[var(--color-ink)]">Region-only mode</span>
           <span className="text-xs text-[var(--color-ink-4)]">
             {region
-              ? 'Show only stations from this region everywhere — search, favorites, popular and recent.'
+              ? 'Focus discovery on this region — search results and Popular. Favorites, Recently played and Explore are never filtered.'
               : 'Pick a region above to enable this.'}
           </span>
         </span>

@@ -87,9 +87,11 @@ export function CommandPalette({ onClose, onSelect }: Props) {
   }, [active]);
 
   // With an empty query, the palette shows recently-played as a jumping-off
-  // point; once you type, it shows ranked search results.
+  // point; once you type, it shows ranked search results. Recently-played isn't
+  // region-filtered (Region-only mode focuses discovery, not your history) — but
+  // the search candidate pool above still is.
   const showingRecent = query.trim() === '';
-  const displayed = showingRecent ? filterHidden(filterByRegion(recent)) : results;
+  const displayed = showingRecent ? filterHidden(recent) : results;
 
   function choose(s: Station | undefined) {
     if (!s) return;
