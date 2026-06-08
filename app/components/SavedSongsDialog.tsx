@@ -30,7 +30,7 @@ export function SavedSongsDialog({ open, onOpenChange }: Props) {
   // Date reference for grouping/labels. The component stays mounted app-long,
   // so refresh it each time the dialog opens (see effect below) rather than
   // capturing mount time.
-  const [now, setNow] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const exportRef = useRef<HTMLDivElement | null>(null);
@@ -78,6 +78,7 @@ export function SavedSongsDialog({ open, onOpenChange }: Props) {
     setPreviewId(null);
     setExportOpen(false);
     setRange('all');
+    setQuery('');
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [open]);
 
@@ -185,6 +186,7 @@ export function SavedSongsDialog({ open, onOpenChange }: Props) {
                       <button
                         key={key}
                         onClick={() => setRange(key)}
+                        aria-pressed={range === key}
                         className={[
                           'text-[11px] font-bold rounded-full px-3 py-1 cursor-pointer border transition-colors',
                           range === key
@@ -207,7 +209,7 @@ export function SavedSongsDialog({ open, onOpenChange }: Props) {
                         </div>
                         <ul className="flex flex-col">
                           {group.songs.map(s => (
-                            <li key={s.id} className="flex items-center gap-3 py-2.5 border-b border-[var(--color-line)] last:border-none">
+                            <li key={s.id} className="flex items-center gap-3 py-2.5 border-b border-[var(--color-line)]">
                               <StationLogo name={s.artist || s.title} favicon={s.cover} />
                               <div className="flex-1 min-w-0">
                                 <div className="text-[15px] leading-tight truncate">
