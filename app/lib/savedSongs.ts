@@ -70,9 +70,18 @@ export function buildSavedSong(input: BuildInput): SavedSong {
   };
 }
 
-/** Prepend a song, de-duping by id (existing entry wins; no reorder churn). */
+/** Normalized cross-source identity. The now-playing card saves with a Shazam
+ *  key as `id` while playlist history saves with `${artist}|${title}` — without
+ *  this the same song would dedupe-miss and be stored twice. */
+export const matchKey = (artist: string, title: string) =>
+  `${artist.trim().toLowerCase()}|${title.trim().toLowerCase()}`;
+
+/** Prepend a song, de-duping by id *or* artist/title (existing entry wins; no
+ *  reorder churn). The matchKey check catches the same track saved from
+ *  different sources whose ids differ (Shazam key vs. artist|title). */
 export function addSong(list: SavedSong[], song: SavedSong): SavedSong[] {
-  if (list.some(s => s.id === song.id)) return list;
+  const mk = matchKey(song.artist, song.title);
+  if (list.some(s => s.id === song.id || matchKey(s.artist, s.title) === mk)) return list;
   return [song, ...list];
 }
 
@@ -138,6 +147,16 @@ function write(next: SavedSong[]) {
 export function useSavedSongs() {
   const saved = useSyncExternalStore(subscribe, read, () => EMPTY);
   const isSaved = useCallback((id: string) => saved.some(s => s.id === id), [saved]);
+  // Find a saved entry by song identity (artist/title), regardless of which
+  // source saved it or what its stored `id` is. Lets the now-playing card and
+  // playlist-history rows agree on saved-state and remove the right entry.
+  const savedSong = useCallback(
+    (artist: string, title: string) => {
+      const mk = matchKey(artist, title);
+      return saved.find(s => matchKey(s.artist, s.title) === mk);
+    },
+    [saved],
+  );
   // Stamp savedAt at call time; build + de-dupe via the pure helpers.
   const save = useCallback((input: Omit<BuildInput, 'savedAt'>) => {
     write(addSong(read(), buildSavedSong({ ...input, savedAt: Date.now() })));
@@ -146,5 +165,5 @@ export function useSavedSongs() {
   const update = useCallback((id: string, patch: Partial<SavedSong>) => {
     write(updateSong(read(), id, patch));
   }, []);
-  return { saved, isSaved, save, remove, update };
+  return { saved, isSaved, savedSong, save, remove, update };
 }

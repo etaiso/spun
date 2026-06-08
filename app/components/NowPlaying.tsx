@@ -59,7 +59,7 @@ export function NowPlaying({ station, playState, everPlayed, onTrack, onHistory 
   const [links, setLinks] = useState<{ shazamUrl: string; appleMusicUrl: string; previewUrl: string; key: string }>(
     { shazamUrl: '', appleMusicUrl: '', previewUrl: '', key: '' },
   );
-  const { isSaved, save, remove } = useSavedSongs();
+  const { savedSong, save, remove } = useSavedSongs();
   // Tracked stations restore their durable, gap-aware history; everyone else
   // restores the (≤5-min) session history as before.
   const [history, setHistory] = useState<HistoryItem[]>(() =>
@@ -400,10 +400,10 @@ export function NowPlaying({ station, playState, everPlayed, onTrack, onHistory 
             </span>
           )}
           <SaveSongButton
-            saved={isSaved(links.key || `${artist.trim().toLowerCase()}|${title.trim().toLowerCase()}`)}
+            saved={!!savedSong(artist, title)}
             onToggle={() => {
-              const id = links.key || `${artist.trim().toLowerCase()}|${title.trim().toLowerCase()}`;
-              if (isSaved(id)) { remove(id); return; }
+              const existing = savedSong(artist, title);
+              if (existing) { remove(existing.id); return; }
               save({
                 raw: currentRaw ?? '', artist, title, cover: trackCover ?? undefined,
                 shazamUrl: links.shazamUrl || undefined,
