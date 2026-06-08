@@ -46,7 +46,7 @@ The warm cream/ink palette is Spun's surface. It is **not** changing.
 |---|---|---|
 | `--grad-brand` | `linear-gradient(135deg, #6366F1, #A855F7, #EC4899)` | Brand moments & primary actions only |
 | `--color-brand-indigo` | `#6366F1` | Gradient start; rarely used solo |
-| `--color-brand-purple` | `#A855F7` | Secondary accent — play controls, hovers |
+| `--color-brand-purple` | `#A855F7` | Section labels, status (dots/"playing"), toggle "on" fills, favorites ★, play controls |
 | `--color-brand-pink` | `#EC4899` | **Primary interactive accent** — icons, hearts, active text, focus rings |
 | `--color-danger` | `#c0392b` | Destructive & error states only |
 
