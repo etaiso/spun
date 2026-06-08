@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSavedSongs, searchSavedSongs } from '@/app/lib/savedSongs';
 import { rangeFilter, groupByDate, formatPlayed, type DateRange } from '@/app/lib/savedDates';
 import { pauseRadio } from '@/app/lib/playbackBus';
@@ -27,6 +27,10 @@ export function SavedSongsDialog({ open, onOpenChange }: Props) {
   const { saved, remove, update } = useSavedSongs();
   const [query, setQuery] = useState('');
   const [range, setRange] = useState<DateRange>('all');
+  // Date reference for grouping/labels. The component stays mounted app-long,
+  // so refresh it each time the dialog opens (see effect below) rather than
+  // capturing mount time.
+  const [now, setNow] = useState(0);
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const exportRef = useRef<HTMLDivElement | null>(null);
@@ -87,10 +91,13 @@ export function SavedSongsDialog({ open, onOpenChange }: Props) {
     return () => window.removeEventListener('mousedown', onDown);
   }, [exportOpen]);
 
-  // Date labels/buckets are relative to "now"; snapshot once per render is fine.
-  /* eslint-disable react-hooks/purity */
-  const now = useMemo(() => Date.now(), []);
-  /* eslint-enable react-hooks/purity */
+  // Refresh the date reference whenever the dialog opens.
+  useEffect(() => {
+    if (!open) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setNow(Date.now());
+  }, [open]);
+
   const filtered = rangeFilter(searchSavedSongs(saved, query), range, now);
   const groups = groupByDate(filtered, now);
 
