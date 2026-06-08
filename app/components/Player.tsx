@@ -337,7 +337,7 @@ export function Player({ station, onPlayStateChange }: Props) {
           step={0.01}
           value={volume}
           onChange={(e) => setVolume(parseFloat(e.target.value))}
-          className="flex-1 w-40 accent-[var(--color-warm)] cursor-pointer"
+          className="flex-1 w-40 accent-[var(--color-brand-pink)] cursor-pointer"
           aria-label="Volume"
         />
       </div>
@@ -349,8 +349,8 @@ export function Player({ station, onPlayStateChange }: Props) {
         className={[
           'text-[11px] tracking-[1px] uppercase font-bold px-3 py-1.5 rounded-full border transition-colors cursor-pointer',
           autoplay
-            ? 'bg-[var(--color-warm)] text-white border-[var(--color-warm)] shadow-[0_2px_6px_rgba(210,105,30,0.3)]'
-            : 'text-[var(--color-ink-3)] border-[var(--color-line)] hover:border-[var(--color-warm)] hover:text-[var(--color-ink)]',
+            ? 'bg-[var(--color-brand-purple)] text-white border-[var(--color-brand-purple)] shadow-[0_2px_6px_rgba(168,85,247,0.3)]'
+            : 'text-[var(--color-ink-3)] border-[var(--color-line)] hover:border-[var(--color-brand-pink)] hover:text-[var(--color-ink)]',
         ].join(' ')}
       >
         Auto-play {autoplay ? 'on' : 'off'}
