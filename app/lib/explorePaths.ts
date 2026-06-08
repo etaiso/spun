@@ -6,17 +6,20 @@ export type ExploreCountry = { code: string; name: string; count: number };
 export type ExploreTag = { name: string; count: number };
 
 // ── Station-list path (drill-in) ────────────────────────────────────────────
-// Filters by country and/or tag — radio-browser ANDs them when both are given
-// (e.g. German jazz stations). Orders by clickcount so the most-played surface
-// first; the client doesn't re-rank Explore results (unlike search/popular).
+// Filters by country and/or genre tags — all facets are ANDed (e.g. German
+// stations tagged both jazz AND blues). `tagList` is radio-browser's AND-match
+// for multiple tags (a single tag behaves like the `tag` param). Orders by
+// clickcount so the most-played surface first; the client doesn't re-rank
+// Explore results (unlike search/popular).
 
 export function buildStationsPath(
-  { country, tag }: { country?: string | null; tag?: string | null },
+  { country, tags }: { country?: string | null; tags?: string[] },
   limit = 100,
 ): string {
   const parts: string[] = [];
   if (country && country.trim()) parts.push(`countrycode=${encodeURIComponent(country.trim().toUpperCase())}`);
-  if (tag && tag.trim()) parts.push(`tag=${encodeURIComponent(tag.trim().toLowerCase())}`);
+  const cleanTags = (tags ?? []).map(t => t.trim().toLowerCase()).filter(Boolean);
+  if (cleanTags.length) parts.push(`tagList=${cleanTags.map(encodeURIComponent).join(',')}`);
   parts.push('order=clickcount', 'reverse=true', `limit=${limit}`, 'hidebroken=true');
   return `/json/stations/search?${parts.join('&')}`;
 }

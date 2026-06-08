@@ -9,29 +9,34 @@ describe('buildStationsPath', () => {
   it('filters by country only (uppercased) with ordering + hidebroken', () => {
     const p = buildStationsPath({ country: 'de' });
     expect(p).toContain('countrycode=DE');
-    expect(p).not.toContain('tag=');
+    expect(p).not.toContain('tagList=');
     expect(p).toContain('order=clickcount');
     expect(p).toContain('reverse=true');
     expect(p).toContain('hidebroken=true');
     expect(p).toContain('limit=100');
   });
 
-  it('filters by tag only (lowercased + url-encoded)', () => {
-    const p = buildStationsPath({ tag: 'Hip Hop' });
-    expect(p).toContain('tag=hip%20hop');
+  it('filters by a single tag via tagList (lowercased + url-encoded)', () => {
+    const p = buildStationsPath({ tags: ['Hip Hop'] });
+    expect(p).toContain('tagList=hip%20hop');
     expect(p).not.toContain('countrycode=');
   });
 
-  it('ANDs country + tag when both are given', () => {
-    const p = buildStationsPath({ country: 'US', tag: 'jazz' });
+  it('ANDs multiple tags as a comma-separated tagList', () => {
+    const p = buildStationsPath({ tags: ['jazz', 'blues'] });
+    expect(p).toContain('tagList=jazz,blues');
+  });
+
+  it('ANDs country + tags when both are given', () => {
+    const p = buildStationsPath({ country: 'US', tags: ['jazz', 'soul'] });
     expect(p).toContain('countrycode=US');
-    expect(p).toContain('tag=jazz');
+    expect(p).toContain('tagList=jazz,soul');
   });
 
   it('ignores empty/nullish facets and honours a custom limit', () => {
-    const p = buildStationsPath({ country: '', tag: 'rock' }, 25);
+    const p = buildStationsPath({ country: '', tags: ['rock', '', '  '] }, 25);
     expect(p).not.toContain('countrycode=');
-    expect(p).toContain('tag=rock');
+    expect(p).toContain('tagList=rock');
     expect(p).toContain('limit=25');
   });
 });

@@ -60,15 +60,16 @@ async function getStations(url: string, signal?: AbortSignal): Promise<Station[]
   return Array.isArray(json) ? (json as Station[]) : [];
 }
 
-// Stations matching a country and/or tag (combined = AND, e.g. German jazz).
-// At least one facet should be set; with neither the API returns [].
+// Stations matching a country and/or one-or-more genre tags — all ANDed (e.g.
+// German stations tagged jazz AND blues). At least one facet should be set;
+// with none the API returns [].
 export function fetchStations(
-  { country, tag }: { country?: string | null; tag?: string | null },
+  { country, tags }: { country?: string | null; tags?: string[] },
   signal?: AbortSignal,
 ): Promise<Station[]> {
   const params = new URLSearchParams();
   if (country) params.set('country', country);
-  if (tag) params.set('tag', tag);
+  for (const t of tags ?? []) params.append('tag', t);
   return getStations(`/api/stations?${params.toString()}`, signal);
 }
 

@@ -17,35 +17,38 @@ const nf = new Intl.NumberFormat();
 const fmt = (n: number) => nf.format(n);
 
 export function ExploreView({ onSelect }: Props) {
-  // Two independent facets. Either, both, or neither can be set; both set =
-  // intersection (e.g. jazz in Germany). Neither = the discovery landing.
+  // Independent facets: a single country and any number of genre tags. Multiple
+  // tags are ANDed (jazz + blues = tagged both); combined with a country too.
+  // Neither set = the discovery landing.
   const [countryCode, setCountryCode] = useState<string | null>(null);
-  const [tag, setTag] = useState<string | null>(null);
+  const [tags, setTags] = useState<string[]>([]);
   const { data: countries, loading: countriesLoading, error: countriesError } = useCountries();
-  const { data: tags } = useTags();
+  const { data: tagsData } = useTags();
   const { region } = useRegion();
 
   const tagCount = useMemo(() => {
     const m = new Map<string, number>();
-    for (const t of tags) m.set(t.name, t.count);
+    for (const t of tagsData) m.set(t.name, t.count);
     return m;
-  }, [tags]);
+  }, [tagsData]);
 
   const country = useMemo(() => countries.find(c => c.code === countryCode) ?? null, [countries, countryCode]);
-  const hasFilter = !!(countryCode || tag);
+  const hasFilter = !!(countryCode || tags.length);
 
   return (
     <div className="p-10">
       {hasFilter ? (
         <>
           <button
-            onClick={() => { setCountryCode(null); setTag(null); }}
+            onClick={() => { setCountryCode(null); setTags([]); }}
             className="flex items-center gap-2 text-sm font-semibold text-[var(--color-brand-purple)] mb-5 cursor-pointer hover:opacity-75 transition-opacity"
           >
             ← Explore
           </button>
           <h1 className="text-[32px] font-bold tracking-tight mb-1">
-            {country && tag ? <><span className="capitalize">{tag}</span> in {country.name}</> : country ? country.name : <span className="capitalize">{tag}</span>}
+            {tags.length > 0 && <span className="capitalize">{tags.join(' + ')}</span>}
+            {tags.length > 0 && country ? ' in ' : ''}
+            {country ? country.name : ''}
           </h1>
 
           <RegionLockBanner country={country} />
@@ -53,20 +56,20 @@ export function ExploreView({ onSelect }: Props) {
           <FilterBar
             countries={countries}
             countryCode={countryCode}
-            tag={tag}
+            tags={tags}
             tagCount={tagCount}
             onCountry={setCountryCode}
-            onTag={setTag}
+            onTags={setTags}
           />
 
-          <Results countryCode={countryCode} tag={tag} onSelect={onSelect} />
+          <Results countryCode={countryCode} tags={tags} onSelect={onSelect} />
         </>
       ) : (
         <>
           <div className="mb-8">
             <div className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-brand-purple)] mb-2">Explore</div>
             <h1 className="text-[36px] font-bold tracking-tight">Find your next station</h1>
-            <p className="text-base text-[var(--color-ink-3)] mt-2">Browse by genre or country — combine both to narrow it down.</p>
+            <p className="text-base text-[var(--color-ink-3)] mt-2">Browse by genre or country — combine them to narrow it down.</p>
           </div>
 
           <RegionLockBanner country={null} />
@@ -78,7 +81,7 @@ export function ExploreView({ onSelect }: Props) {
             tagCount={tagCount}
             region={region}
             onPickCountry={(c) => setCountryCode(c.code)}
-            onPickTag={(t) => setTag(t)}
+            onPickTag={(t) => setTags([t])}
           />
         </>
       )}
@@ -86,25 +89,27 @@ export function ExploreView({ onSelect }: Props) {
   );
 }
 
-// ── Filter bar (results view): combine / change the two facets ──────────────
+// ── Filter bar (results view): combine / change the facets ──────────────────
 
-function FilterBar({ countries, countryCode, tag, tagCount, onCountry, onTag }: {
+function FilterBar({ countries, countryCode, tags, tagCount, onCountry, onTags }: {
   countries: ExploreCountry[];
   countryCode: string | null;
-  tag: string | null;
+  tags: string[];
   tagCount: Map<string, number>;
   onCountry: (code: string | null) => void;
-  onTag: (tag: string | null) => void;
+  onTags: (tags: string[]) => void;
 }) {
   // Alphabetical for findability in the dropdown (the grid stays count-sorted).
   const countryOptions = useMemo(
     () => [...countries].sort((a, b) => a.name.localeCompare(b.name)),
     [countries],
   );
+  const available = GENRES.filter(g => !tags.includes(g));
 
   return (
-    <div className="flex flex-wrap items-center gap-3 mb-7">
-      <span className="text-[11px] tracking-[1.2px] uppercase font-bold text-[var(--color-ink-3)]">Filter</span>
+    <div className="flex flex-wrap items-center gap-2.5 mb-7">
+      <span className="text-[11px] tracking-[1.2px] uppercase font-bold text-[var(--color-ink-3)] mr-0.5">Filter</span>
+
       <FacetSelect
         ariaLabel="Filter by country"
         value={countryCode ?? ''}
@@ -114,15 +119,32 @@ function FilterBar({ countries, countryCode, tag, tagCount, onCountry, onTag }: 
           ...countryOptions.map(c => ({ value: c.code, label: `${flagEmoji(c.code)} ${c.name}` })),
         ]}
       />
-      <FacetSelect
-        ariaLabel="Filter by genre"
-        value={tag ?? ''}
-        onChange={(v) => onTag(v || null)}
-        options={[
-          { value: '', label: 'All genres' },
-          ...GENRES.map(g => ({ value: g, label: tagCount.get(g) ? `${g} · ${fmt(tagCount.get(g)!)}` : g })),
-        ]}
-      />
+
+      {/* Selected genres become removable chips; the dropdown adds more. */}
+      {tags.map(t => (
+        <span key={t} className="inline-flex items-center gap-1 h-9 pl-3.5 pr-1.5 rounded-full bg-[rgba(168,85,247,0.12)] text-[var(--color-brand-purple)] text-sm font-semibold">
+          {t}
+          <button
+            onClick={() => onTags(tags.filter(x => x !== t))}
+            aria-label={`Remove ${t}`}
+            className="w-5 h-5 flex items-center justify-center rounded-full text-base leading-none hover:bg-[rgba(168,85,247,0.22)] cursor-pointer"
+          >
+            ×
+          </button>
+        </span>
+      ))}
+
+      {available.length > 0 && (
+        <FacetSelect
+          ariaLabel={tags.length ? 'Add another genre' : 'Filter by genre'}
+          value=""
+          onChange={(v) => { if (v) onTags([...tags, v]); }}
+          options={[
+            { value: '', label: tags.length ? '+ Add genre' : 'All genres' },
+            ...available.map(g => ({ value: g, label: tagCount.get(g) ? `${g} · ${fmt(tagCount.get(g)!)}` : g })),
+          ]}
+        />
+      )}
     </div>
   );
 }
@@ -150,7 +172,7 @@ function FacetSelect({ value, onChange, options, ariaLabel }: {
 
 // ── Results: stations matching the active facet(s) ──────────────────────────
 
-function Results({ countryCode, tag, onSelect }: { countryCode: string | null; tag: string | null; onSelect: (s: Station) => void }) {
+function Results({ countryCode, tags, onSelect }: { countryCode: string | null; tags: string[]; onSelect: (s: Station) => void }) {
   const [stations, setStations] = useState<Station[] | null>(null);
   const [error, setError] = useState(false);
   const [atCap, setAtCap] = useState(false);
@@ -162,11 +184,11 @@ function Results({ countryCode, tag, onSelect }: { countryCode: string | null; t
     const ctrl = new AbortController();
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setStations(null); setError(false); setAtCap(false);
-    fetchStations({ country: countryCode, tag }, ctrl.signal)
+    fetchStations({ country: countryCode, tags }, ctrl.signal)
       .then(list => { if (!cancelled) { setStations(list); setAtCap(list.length >= 100); } })
       .catch((e: Error) => { if (!cancelled && e.name !== 'AbortError') setError(true); });
     return () => { cancelled = true; ctrl.abort(); };
-  }, [countryCode, tag]);
+  }, [countryCode, tags]);
 
   const shown = stations ? filterHidden(stations) : [];
 

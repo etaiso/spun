@@ -32,11 +32,15 @@ type RawStation = Parameters<typeof normalizeStation>[0] & { stationuuid: string
 
 export async function GET(req: NextRequest) {
   const country = (req.nextUrl.searchParams.get('country') ?? '').trim().toUpperCase();
-  const tag = (req.nextUrl.searchParams.get('tag') ?? '').trim().toLowerCase();
-  if (!country && !tag) return NextResponse.json([]);
+  // Multiple `tag` params are ANDed (e.g. ?tag=jazz&tag=blues). Dedupe + sort
+  // so the cache key is order-independent.
+  const tags = [...new Set(
+    req.nextUrl.searchParams.getAll('tag').map(t => t.trim().toLowerCase()).filter(Boolean),
+  )].sort();
+  if (!country && tags.length === 0) return NextResponse.json([]);
 
-  const path = buildStationsPath({ country, tag });
-  const cacheKey = `${country}|${tag}`;
+  const path = buildStationsPath({ country, tags });
+  const cacheKey = `${country}|${tags.join(',')}`;
   const cached = getCached(cacheKey);
   if (cached) return NextResponse.json(cached);
 
