@@ -1,6 +1,7 @@
 {
   "name": "spun",
   "version": "0.2.2",
+  "description": "Live internet radio that always knows what's playing — Shazam-powered recognition kicks in when the station won't say.",
   "private": true,
   "main": "electron/main.js",
   "scripts": {
