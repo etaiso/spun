@@ -15,16 +15,22 @@ const SHORTCUTS: Shortcut[] = [
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  // Lift the floating button above the bottom player dock (shown in Explore)
+  // so the two don't overlap.
+  dockVisible?: boolean;
 };
 
-export function ShortcutsHelp({ open, onOpenChange }: Props) {
+export function ShortcutsHelp({ open, onOpenChange, dockVisible }: Props) {
   return (
     <>
       <button
         onClick={() => onOpenChange(true)}
         aria-label="Keyboard shortcuts"
         title="Keyboard shortcuts (?)"
-        className="fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-white border border-[var(--color-line)] shadow-[0_6px_18px_rgba(0,0,0,0.15)] flex items-center justify-center text-[34px] leading-none text-[var(--color-ink-3)] hover:text-[var(--color-ink)] hover:border-[var(--color-brand-pink)] cursor-pointer transition-colors"
+        className={[
+          'fixed right-6 z-40 w-14 h-14 rounded-full bg-white border border-[var(--color-line)] shadow-[0_6px_18px_rgba(0,0,0,0.15)] flex items-center justify-center text-[34px] leading-none text-[var(--color-ink-3)] hover:text-[var(--color-ink)] hover:border-[var(--color-brand-pink)] cursor-pointer transition-all',
+          dockVisible ? 'bottom-24' : 'bottom-6',
+        ].join(' ')}
       >
         <span aria-hidden="true">⌨</span>
       </button>

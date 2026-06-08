@@ -267,7 +267,7 @@ export default function Home() {
       {paletteOpen && (
         <CommandPalette onClose={() => setPaletteOpen(false)} onSelect={handleSelect} />
       )}
-      <ShortcutsHelp open={showHelp} onOpenChange={setShowHelp} />
+      <ShortcutsHelp open={showHelp} onOpenChange={setShowHelp} dockVisible={view === 'explore' && !!currentStation} />
       <SettingsDialog
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
