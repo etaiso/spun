@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { Station } from '@/app/lib/stations';
 import { useFavorites } from '@/app/lib/favorites';
-import { useRegion, useRegionFilter } from '@/app/lib/region';
+import { useActiveRegion, useRegionFilter } from '@/app/lib/region';
 import { useHiddenFilter } from '@/app/lib/hidden';
 import { useGenreAffinity } from '@/app/lib/taste';
 import { scorePopular } from '@/app/lib/popularRank';
@@ -31,7 +31,7 @@ export function Recommended({ onSelect }: Props) {
   const [pool, setPool] = useState<Station[] | null>(null);
   const [errored, setErrored] = useState(false);
   const { isFavorite, toggle } = useFavorites();
-  const { region } = useRegion();
+  const region = useActiveRegion();
   const filterByRegion = useRegionFilter();
   const filterHidden = useHiddenFilter();
   const { scores, top } = useGenreAffinity();

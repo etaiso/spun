@@ -5,7 +5,7 @@ import type { Station } from '@/app/lib/stations';
 import { useFavorites } from '@/app/lib/favorites';
 import { useRecent } from '@/app/lib/recent';
 import { useTracking } from '@/app/lib/tracking';
-import { useRegion, useRegionFilter } from '@/app/lib/region';
+import { useActiveRegion, useRegionFilter } from '@/app/lib/region';
 import { useHiddenFilter } from '@/app/lib/hidden';
 import { rankStations } from '@/app/lib/rank';
 import { showTitleIfTruncated } from '@/app/lib/dom';
@@ -31,7 +31,7 @@ export function CommandPalette({ onClose, onSelect }: Props) {
   const { favorites, isFavorite, toggle } = useFavorites();
   const { recent } = useRecent();
   const { isTracked, track, untrack } = useTracking();
-  const { region } = useRegion();
+  const region = useActiveRegion();
   const filterByRegion = useRegionFilter();
   const filterHidden = useHiddenFilter();
 
