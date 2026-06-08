@@ -50,6 +50,20 @@ describe('applyTrack', () => {
     expect(s1.gapFromAt).toBeUndefined(); // gap consumed
   });
 
+  it('keeps an armed gap through a same-song re-broadcast, firing it on the next new song', () => {
+    const armed: StationHistory = {
+      items: [{ time: '08:00', title: 'old', at: 1000 }],
+      lastActiveAt: 1000,
+      gapFromAt: 1000,
+    };
+    let s = applyTrack(armed, 'old', 5000);   // re-broadcast of the latest song: deduped, gap preserved
+    expect(s.gapFromAt).toBe(1000);
+    expect(s.items).toHaveLength(1);
+    s = applyTrack(s, 'new', 9000);           // genuinely new song: gap fires now
+    expect(s.items.map(i => (isGap(i) ? 'GAP' : i.title))).toEqual(['new', 'GAP', 'old']);
+    expect(s.gapFromAt).toBeUndefined();
+  });
+
   it('caps the list at CAP items (gaps count)', () => {
     let s = emptyStation();
     for (let i = 0; i < CAP + 10; i++) s = applyTrack(s, `song ${i}`, i + 1);

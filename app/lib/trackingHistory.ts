@@ -43,6 +43,9 @@ export function applyTrack(s: StationHistory, finishedTitle: string, at: number)
   if (latestSong && latestSong.title === finishedTitle) {
     // Same song re-announced — don't log it again, but keep any armed gap for
     // the next genuinely new song, and record that we're still active.
+    // Consequence: gapFromAt is intentionally preserved here, so the gap's
+    // toAt will be the timestamp of the first genuinely-new song after
+    // reconnect, not the reconnect moment itself.
     return { ...s, lastActiveAt: at };
   }
   let items = s.items;
