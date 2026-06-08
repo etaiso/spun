@@ -71,6 +71,38 @@ body {
 .dots span:nth-child(2) { animation-delay: 0.15s; }
 .dots span:nth-child(3) { animation-delay: 0.3s; }
 
+/* First-paint splash (app/components/SplashScreen.tsx). Covers the window on
+   the same cream background as the app, so the transition in is seamless. The
+   rings ripple outward in brand purple — echoing the now-playing RadioWaves —
+   under the gently pulsing wordmark. Fades out and unmounts once hydrated. */
+.splash {
+  position: fixed; inset: 0; z-index: 9999;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 30px;
+  background: var(--color-bg);
+  opacity: 1; transition: opacity 0.4s ease;
+}
+.splash[data-hidden="true"] { opacity: 0; pointer-events: none; }
+.splash-rings { position: relative; width: 96px; height: 96px; }
+.splash-rings span {
+  position: absolute; inset: 0; margin: auto;
+  width: 96px; height: 96px; border-radius: 50%;
+  border: 2px solid var(--color-brand-purple);
+  opacity: 0;
+  animation: splash-ripple 1.8s cubic-bezier(0.2, 0.6, 0.3, 1) infinite;
+}
+.splash-rings span:nth-child(2) { animation-delay: 0.45s; }
+.splash-rings span:nth-child(3) { animation-delay: 0.9s; }
+.splash-word {
+  font-size: 26px; font-weight: 800; letter-spacing: -0.5px;
+  animation: pulse-soft 1.8s ease-in-out infinite;
+}
+@keyframes splash-ripple {
+  0% { transform: scale(0.35); opacity: 0; }
+  35% { opacity: 0.7; }
+  100% { transform: scale(1); opacity: 0; }
+}
+
 /* Marquee ticker for the now-playing line in the sidebar. The inner element
    holds two copies of the text; translating it -50% loops seamlessly. */
 @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
