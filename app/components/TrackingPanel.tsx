@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Station } from '@/app/lib/stations';
 import { useTracking } from '@/app/lib/tracking';
 import { isNonTrack } from '@/app/lib/nonTrack';
 import { loadSession, saveSession } from '@/app/lib/session';
+import { noteConnect, heartbeat, recordTrack, HEARTBEAT_MS } from '@/app/lib/trackingHistory';
 import type { TrackSource } from '@/app/lib/nowPlayingTypes';
 import { StationLogo } from './StationLogo';
 
@@ -92,11 +93,29 @@ function TrackedStationRow({
       : { kind: 'connecting' };
   });
 
+  const prevTitleRef = useRef<string | null>(
+    (() => {
+      const s = loadSession(station.id);
+      return s?.current && !isNonTrack(s.current.raw, station.name) ? s.current.raw : null;
+    })(),
+  );
+
   useEffect(() => {
     // The active station is recognised by NowPlaying; don't open a second SSE.
     if (active) return;
 
     const es = new EventSource(`/api/now-playing?url=${encodeURIComponent(station.streamUrl)}`);
+
+    // Fires on first connect AND on EventSource auto-reconnect, so a network
+    // drop longer than GAP_MS surfaces as a "no tracking" gap.
+    es.onopen = () => noteConnect(station.id);
+
+    // Keep lastActiveAt fresh while genuinely connected, so a long quiet song
+    // isn't later mistaken for a gap. Gated on OPEN so a silent drop doesn't.
+    const hb = setInterval(() => {
+      if (es.readyState === EventSource.OPEN) heartbeat(station.id);
+    }, HEARTBEAT_MS);
+
     es.onmessage = (ev) => {
       try {
         const msg = JSON.parse(ev.data) as
@@ -109,13 +128,19 @@ function TrackedStationRow({
           if (isNonTrack(msg.title, station.name)) {
             setStatus({ kind: 'idle' });
           } else {
+            // Log the song that just finished when a NEW real title arrives.
+            const prev = prevTitleRef.current;
+            if (prev !== null && prev !== msg.title && !isNonTrack(prev, station.name)) {
+              recordTrack(station.id, prev);
+            }
+            prevTitleRef.current = msg.title;
             setStatus({ kind: 'track', title: msg.title });
             // Seed the session cache so selecting this station shows the song
             // immediately (NowPlaying restores from the same store on mount).
-            const prev = loadSession(station.id);
+            const prevSession = loadSession(station.id);
             saveSession(station.id, {
               current: { raw: msg.title, source: msg.source ?? 'metadata', cover: msg.cover ?? null },
-              history: prev?.history ?? [],
+              history: prevSession?.history ?? [],
               lastUpdate: nowHHMM(),
             });
           }
@@ -126,7 +151,7 @@ function TrackedStationRow({
         }
       } catch { /* ignore malformed frames */ }
     };
-    return () => es.close();
+    return () => { es.close(); clearInterval(hb); };
   }, [active, station.streamUrl, station.name, station.id]);
 
   const subtitle = active

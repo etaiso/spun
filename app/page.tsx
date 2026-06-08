@@ -19,7 +19,7 @@ import { ShortcutsHelp } from './components/ShortcutsHelp';
 import { SettingsDialog } from './components/SettingsDialog';
 import { SavedSongsDialog } from './components/SavedSongsDialog';
 import type { PlayState } from './components/Player';
-import type { HistoryEntry } from './lib/nowPlayingTypes';
+import type { HistoryItem } from './lib/nowPlayingTypes';
 
 export default function Home() {
   const [selected, setSelected] = useState<Station | null>(null);
@@ -28,7 +28,7 @@ export default function Home() {
   const [currentTrack, setCurrentTrack] = useState<string | null>(null);
   // Playlist history, lifted out of NowPlaying so it renders below the player
   // controls — the controls stay anchored near the cover as history grows.
-  const [playlistHistory, setPlaylistHistory] = useState<HistoryEntry[]>([]);
+  const [playlistHistory, setPlaylistHistory] = useState<HistoryItem[]>([]);
   const [showHelp, setShowHelp] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);

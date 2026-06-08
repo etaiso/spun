@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Station } from '@/app/lib/stations';
 import { resumeAudio, connectIfRunning, disconnectElement } from '@/app/lib/audioBus';
-import { subscribePauseRadio } from '@/app/lib/playbackBus';
+import { subscribePauseRadio, subscribeResumeRadio } from '@/app/lib/playbackBus';
 import { VOLUME_KEY, readStoredVolume } from '@/app/lib/volume';
 import { persistSet } from '@/app/lib/persist';
 
@@ -28,6 +28,12 @@ function readStoredAutoplay(): boolean {
 
 export function Player({ station, onPlayStateChange }: Props) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  // True only while the live stream is paused because a preview asked it to —
+  // so we resume exactly that, never audio the user paused themselves. A single
+  // boolean suffices because at most one preview is ever on screen at a time
+  // (the Saved-Songs preview lives in a modal; the playlist-history preview in
+  // the main view — they can't both be active).
+  const pausedByPreviewRef = useRef(false);
   const volWrapRef = useRef<HTMLDivElement | null>(null);
   // Lazy init: Player is only rendered after a user gesture (selectedStation
   // starts null), so no SSR happens here — safe to read localStorage on
@@ -108,11 +114,27 @@ export function Player({ station, onPlayStateChange }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Pause the live stream when something else (a saved-song preview) starts.
+  // Pause the live stream when a preview starts; remember we did, so we can
+  // resume it when the preview ends.
   useEffect(() => {
     return subscribePauseRadio(() => {
       const a = audioRef.current;
-      if (a && !a.paused) { a.pause(); setPaused(true); }
+      if (a && !a.paused) { a.pause(); setPaused(true); pausedByPreviewRef.current = true; }
+    });
+  }, []);
+
+  // Resume the live stream when the preview that paused it ends — but only if a
+  // preview was what paused it, and only if it's still paused (so we never
+  // start playback the user didn't ask for).
+  useEffect(() => {
+    return subscribeResumeRadio(() => {
+      if (!pausedByPreviewRef.current) return;
+      pausedByPreviewRef.current = false;
+      const a = audioRef.current;
+      if (a && a.paused) {
+        setPaused(false);
+        a.play().catch(() => cbRef.current('error'));
+      }
     });
   }, []);
 

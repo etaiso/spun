@@ -3,9 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSavedSongs, searchSavedSongs } from '@/app/lib/savedSongs';
 import { rangeFilter, groupByDate, formatPlayed, type DateRange } from '@/app/lib/savedDates';
-import { pauseRadio } from '@/app/lib/playbackBus';
-import { readStoredVolume } from '@/app/lib/volume';
 import { lookupITunesSong } from '@/app/lib/itunes';
+import { usePreviewPlayer } from '@/app/lib/usePreviewPlayer';
 import { buildExport, type ExportFormat } from '@/app/lib/integrations/export';
 import { StationLogo } from './StationLogo';
 
@@ -25,19 +24,17 @@ function downloadText(filename: string, mime: string, text: string): void {
 
 export function SavedSongsDialog({ open, onOpenChange }: Props) {
   const { saved, remove, update } = useSavedSongs();
+  // Saved-Songs preview leaves the radio paused after a clip (resumeRadioOnStop:
+  // false) — matching the long-standing behavior of this dialog.
+  const { previewId, audioRef, onEnded, toggle, stop } = usePreviewPlayer({ resumeRadioOnStop: false });
   const [query, setQuery] = useState('');
   const [range, setRange] = useState<DateRange>('all');
   // Date reference for grouping/labels. The component stays mounted app-long,
   // so refresh it each time the dialog opens (see effect below) rather than
   // capturing mount time.
   const [now, setNow] = useState(() => Date.now());
-  const [previewId, setPreviewId] = useState<string | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const exportRef = useRef<HTMLDivElement | null>(null);
-  // The preview <audio> stays mounted regardless of `open` so this ref is always
-  // valid — letting us explicitly stop the preview when the dialog closes
-  // (rather than relying on the element being unmounted).
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   // Ids we've already tried to backfill a preview for this session (incl. ones
   // iTunes had no match for) so we don't re-query them on every open.
   const previewTried = useRef<Set<string>>(new Set());
@@ -73,14 +70,13 @@ export function SavedSongsDialog({ open, onOpenChange }: Props) {
   // Stop any preview when the dialog closes.
   useEffect(() => {
     if (open) return;
-    audioRef.current?.pause();
+    stop();
     /* eslint-disable react-hooks/set-state-in-effect */
-    setPreviewId(null);
     setExportOpen(false);
     setRange('all');
     setQuery('');
     /* eslint-enable react-hooks/set-state-in-effect */
-  }, [open]);
+  }, [open, stop]);
 
   // Dismiss the export menu on an outside click (without closing the dialog).
   useEffect(() => {
@@ -110,20 +106,9 @@ export function SavedSongsDialog({ open, onOpenChange }: Props) {
     downloadText(filename, mime, content);
   };
 
-  const togglePreview = (id: string, url: string) => {
-    const a = audioRef.current;
-    if (!a) return;
-    if (previewId === id) { a.pause(); setPreviewId(null); return; }
-    pauseRadio();           // never overlap the live stream
-    a.volume = readStoredVolume(); // match the player's volume setting
-    a.src = url;
-    a.play().catch(() => {});
-    setPreviewId(id);
-  };
-
   return (
     <>
-      <audio ref={audioRef} onEnded={() => setPreviewId(null)} className="hidden" />
+      <audio ref={audioRef} onEnded={onEnded} className="hidden" />
       {/* Modal anchored near the top (not vertically centered) so the header +
           search bar stay put as the filtered list grows/shrinks below them. */}
       {open && (
@@ -222,7 +207,7 @@ export function SavedSongsDialog({ open, onOpenChange }: Props) {
                               <div className="flex items-center gap-1.5 shrink-0">
                                 {s.previewUrl && (
                                   <button
-                                    onClick={() => togglePreview(s.id, s.previewUrl)}
+                                    onClick={() => toggle(s.id, s.previewUrl)}
                                     aria-label={previewId === s.id ? 'Pause preview' : 'Play preview'}
                                     className="w-8 h-8 rounded-full border border-[var(--color-line)] flex items-center justify-center text-[12px] text-[var(--color-brand-purple)] hover:border-[var(--color-brand-purple)] cursor-pointer"
                                   >
