@@ -205,7 +205,7 @@ export default function Home() {
                 ) : (
                   <div className="flex items-center justify-center text-center">
                     <div>
-                      <div className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-warm)] mb-3">
+                      <div className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-brand-purple)] mb-3">
                         Spun
                       </div>
                       <div className="text-[32px] font-bold tracking-tight">Pick a station to begin</div>

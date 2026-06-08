@@ -17,7 +17,7 @@ export function PlaylistHistory({ history, stationName }: { history: HistoryEntr
 
   return (
     <div className="relative z-10 bg-[var(--color-bg)]">
-      <div className="text-[11px] tracking-[1.4px] uppercase font-extrabold text-[var(--color-warm)] mb-3.5">
+      <div className="text-[11px] tracking-[1.4px] uppercase font-extrabold text-[var(--color-brand-purple)] mb-3.5">
         ▾ Playlist history
       </div>
       {history.map((h, i) => {

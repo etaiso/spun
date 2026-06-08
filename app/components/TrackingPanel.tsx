@@ -28,7 +28,7 @@ export function TrackingPanel({ onSelect, activeStationId, activeTrack }: Props)
 
   return (
     <div>
-      <div className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-warm)] mb-3 flex items-center gap-2">
+      <div className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-brand-purple)] mb-3 flex items-center gap-2">
         <span>📡 Tracking</span>
         <span className="text-[var(--color-ink-4)] font-bold">{tracked.length}</span>
       </div>
@@ -144,10 +144,10 @@ function TrackedStationRow({
       onClick={onSelect}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(); } }}
       className={[
-        'group flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-warm)]',
+        'group flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand-pink)]',
         active
-          ? 'bg-[rgba(210,105,30,0.12)] ring-1 ring-[var(--color-warm)]'
-          : 'hover:bg-[rgba(210,105,30,0.12)]',
+          ? 'bg-[rgba(168,85,247,0.12)] ring-1 ring-[var(--color-brand-pink)]'
+          : 'hover:bg-[rgba(168,85,247,0.12)]',
       ].join(' ')}
     >
       <StationLogo name={station.name} favicon={station.favicon} />
@@ -155,14 +155,14 @@ function TrackedStationRow({
         <div className="text-[15px] font-semibold tracking-tight truncate flex items-center gap-2">
           <span className="truncate">{station.name}</span>
           {active && (
-            <span className="shrink-0 text-[9px] uppercase tracking-[1px] font-bold text-[var(--color-warm)]">● Playing</span>
+            <span className="shrink-0 text-[9px] uppercase tracking-[1px] font-bold text-[var(--color-brand-purple)]">● Playing</span>
           )}
         </div>
         <div className="text-xs text-[var(--color-ink-3)] truncate flex items-center gap-1.5">
           <span
             className={[
               'inline-block w-1.5 h-1.5 rounded-full shrink-0',
-              showGreen ? 'bg-green-500' : 'bg-[var(--color-warm)] animate-pulse',
+              showGreen ? 'bg-green-500' : 'bg-[var(--color-brand-purple)] animate-pulse',
             ].join(' ')}
             aria-hidden="true"
           />
@@ -173,7 +173,7 @@ function TrackedStationRow({
         onClick={(e) => { e.stopPropagation(); onUntrack(); }}
         aria-label={`Stop tracking ${station.name}`}
         title="Stop tracking"
-        className="shrink-0 w-7 h-7 flex items-center justify-center text-base leading-none rounded-full text-[var(--color-ink-4)] hover:text-[var(--color-accent)] hover:bg-[rgba(192,57,43,0.08)] cursor-pointer transition-colors"
+        className="shrink-0 w-7 h-7 flex items-center justify-center text-base leading-none rounded-full text-[var(--color-ink-4)] hover:text-[var(--color-danger)] hover:bg-[rgba(192,57,43,0.08)] cursor-pointer transition-colors"
       >
         ✕
       </button>
