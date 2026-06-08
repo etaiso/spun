@@ -76,7 +76,7 @@ export function TopBar({ onOpenSearch, onOpenSettings, onOpenSaved, settingsActi
       </div>
       <button
         onClick={onOpenSearch}
-        className="ml-auto md:ml-6 flex-1 max-w-md flex items-center gap-2.5 h-10 px-4 rounded-full border border-[var(--color-line)] bg-white text-[var(--color-ink-3)] hover:border-[var(--color-warm)] transition-colors cursor-pointer text-left shadow-[0_1px_3px_rgba(0,0,0,0.03)]"
+        className="ml-auto md:ml-6 flex-1 max-w-md flex items-center gap-2.5 h-10 px-4 rounded-full border border-[var(--color-line)] bg-white text-[var(--color-ink-3)] hover:border-[var(--color-brand-pink)] transition-colors cursor-pointer text-left shadow-[0_1px_3px_rgba(0,0,0,0.03)]"
         aria-label="Search stations"
       >
         <span aria-hidden="true">🔍</span>
@@ -96,7 +96,7 @@ export function TopBar({ onOpenSearch, onOpenSettings, onOpenSaved, settingsActi
         onClick={onOpenSaved}
         aria-label="Saved songs"
         title="Saved songs (S)"
-        className="w-10 h-10 rounded-full border border-[var(--color-line)] bg-white text-[var(--color-ink-3)] hover:text-[var(--color-ink)] hover:border-[var(--color-warm)] transition-colors cursor-pointer flex items-center justify-center shrink-0"
+        className="w-10 h-10 rounded-full border border-[var(--color-line)] bg-white text-[var(--color-ink-3)] hover:text-[var(--color-ink)] hover:border-[var(--color-brand-pink)] transition-colors cursor-pointer flex items-center justify-center shrink-0"
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
           <path d="M9 18V5l12-2v13" />
@@ -115,8 +115,8 @@ export function TopBar({ onOpenSearch, onOpenSettings, onOpenSaved, settingsActi
           'flex items-center h-10 rounded-full border bg-white transition-colors cursor-pointer shrink-0',
           showRegion ? 'gap-2 pl-3 pr-2.5' : 'w-10 justify-center',
           settingsActive
-            ? 'border-[var(--color-warm)] text-[var(--color-ink)]'
-            : 'border-[var(--color-line)] text-[var(--color-ink-3)] hover:text-[var(--color-ink)] hover:border-[var(--color-warm)]',
+            ? 'border-[var(--color-brand-pink)] text-[var(--color-ink)]'
+            : 'border-[var(--color-line)] text-[var(--color-ink-3)] hover:text-[var(--color-ink)] hover:border-[var(--color-brand-pink)]',
         ].join(' ')}
       >
         {showRegion && (

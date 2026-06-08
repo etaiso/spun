@@ -158,7 +158,7 @@ export function SettingsDialog({ open, onOpenChange, station, playState, current
             the scrollbar. */}
         <div className="overflow-y-auto p-7">
           <div className="flex items-center justify-between mb-5">
-            <h2 className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-warm)]">
+            <h2 className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-brand-purple)]">
               Settings
             </h2>
             <button
@@ -189,7 +189,7 @@ export function SettingsDialog({ open, onOpenChange, station, playState, current
                 onClick={toggleRings}
                 className={[
                   'relative h-5 w-9 rounded-full transition-colors cursor-pointer shrink-0',
-                  ringsOn ? 'bg-[var(--color-warm)]' : 'bg-[var(--color-line)]',
+                  ringsOn ? 'bg-[var(--color-brand-purple)]' : 'bg-[var(--color-line)]',
                 ].join(' ')}
               >
                 <span
@@ -223,7 +223,7 @@ export function SettingsDialog({ open, onOpenChange, station, playState, current
                   onClick={toggleAutoUpdate}
                   className={[
                     'relative h-5 w-9 rounded-full transition-colors cursor-pointer shrink-0',
-                    autoUpdateOn ? 'bg-[var(--color-warm)]' : 'bg-[var(--color-line)]',
+                    autoUpdateOn ? 'bg-[var(--color-brand-purple)]' : 'bg-[var(--color-line)]',
                   ].join(' ')}
                 >
                   <span
@@ -240,7 +240,7 @@ export function SettingsDialog({ open, onOpenChange, station, playState, current
                   type="button"
                   onClick={onCheckNow}
                   disabled={checking}
-                  className="shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold text-[var(--color-warm)] border border-[var(--color-line)] hover:border-[var(--color-warm)] hover:bg-[var(--color-bg)] cursor-pointer transition-colors disabled:opacity-60 disabled:cursor-default disabled:hover:border-[var(--color-line)] disabled:hover:bg-transparent"
+                  className="shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold text-[var(--color-brand-purple)] border border-[var(--color-line)] hover:border-[var(--color-brand-pink)] hover:bg-[var(--color-bg)] cursor-pointer transition-colors disabled:opacity-60 disabled:cursor-default disabled:hover:border-[var(--color-line)] disabled:hover:bg-transparent"
                 >
                   {checking ? (
                     <span className="flex items-center gap-1.5">
@@ -266,7 +266,7 @@ export function SettingsDialog({ open, onOpenChange, station, playState, current
               {hidden.length > 0 && (
                 <button
                   onClick={() => setHiddenOpen(true)}
-                  className="shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold text-[var(--color-warm)] border border-[var(--color-line)] hover:border-[var(--color-warm)] hover:bg-[var(--color-bg)] cursor-pointer transition-colors"
+                  className="shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold text-[var(--color-brand-purple)] border border-[var(--color-line)] hover:border-[var(--color-brand-pink)] hover:bg-[var(--color-bg)] cursor-pointer transition-colors"
                 >
                   Manage
                 </button>
@@ -288,7 +288,7 @@ export function SettingsDialog({ open, onOpenChange, station, playState, current
                   onClick={toggleDebug}
                   className={[
                     'relative h-5 w-9 rounded-full transition-colors cursor-pointer shrink-0',
-                    showDebug ? 'bg-[var(--color-warm)]' : 'bg-[var(--color-line)]',
+                    showDebug ? 'bg-[var(--color-brand-purple)]' : 'bg-[var(--color-line)]',
                   ].join(' ')}
                 >
                   <span

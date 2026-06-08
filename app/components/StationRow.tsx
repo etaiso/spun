@@ -37,12 +37,12 @@ export function StationRow({ station, isActive, isFavorite, onSelect, onToggleFa
         // Keep the hover highlight while this row's right-click menu is open
         // (the cursor has moved off the row onto the menu). Inline so it wins
         // over the hover utility regardless of pointer position.
-        style={menu && !isActive ? { backgroundColor: 'rgba(210, 105, 30, 0.12)' } : undefined}
+        style={menu && !isActive ? { backgroundColor: 'rgba(168, 85, 247, 0.12)' } : undefined}
         className={[
-          'flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-colors mb-1 outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-warm)]',
+          'flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-colors mb-1 outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand-pink)]',
           isActive
             ? 'bg-white shadow-[0_2px_8px_rgba(0,0,0,0.06)] border border-[var(--color-line)]'
-            : 'hover:bg-[rgba(210,105,30,0.12)]',
+            : 'hover:bg-[rgba(168,85,247,0.12)]',
         ].join(' ')}
       >
         <StationLogo name={station.name} favicon={station.favicon} />
@@ -59,7 +59,7 @@ export function StationRow({ station, isActive, isFavorite, onSelect, onToggleFa
           className={[
             'shrink-0 w-8 h-8 flex items-center justify-center',
             'cursor-pointer transition-transform hover:scale-125',
-            tracked ? 'text-[var(--color-warm)]' : 'text-[var(--color-ink-4)] hover:text-[var(--color-warm)]',
+            tracked ? 'text-[var(--color-brand-purple)]' : 'text-[var(--color-ink-4)] hover:text-[var(--color-brand-purple)]',
           ].join(' ')}
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-[18px] h-[18px]">
@@ -75,7 +75,7 @@ export function StationRow({ station, isActive, isFavorite, onSelect, onToggleFa
           className={[
             'shrink-0 w-8 h-8 flex items-center justify-center text-xl leading-none',
             'cursor-pointer transition-transform hover:scale-125',
-            isFavorite ? 'text-[var(--color-warm)]' : 'text-[var(--color-ink-4)] hover:text-[var(--color-warm)]',
+            isFavorite ? 'text-[var(--color-brand-purple)]' : 'text-[var(--color-ink-4)] hover:text-[var(--color-brand-purple)]',
           ].join(' ')}
         >
           {isFavorite ? '★' : '☆'}

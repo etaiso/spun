@@ -75,6 +75,12 @@ export function NowPlaying({ station, playState, everPlayed, onTrack, onHistory 
   // same title doesn't duplicate it into history.
   const prevTitleRef = useRef<string | null>(restored?.current?.raw ?? null);
 
+  // Air time (epoch ms) of the track currently on screen. Used to stamp the
+  // playlist-history entry when it rolls off, and as playedAt when saved.
+  // null until the first live `track` event (a restored session has no known
+  // start time) → callers fall back to Date.now().
+  const currentStartRef = useRef<number | null>(null);
+
   // Keep the onTrack callback in a ref so the SSE effect doesn't depend on it.
   const onTrackRef = useRef(onTrack);
   useEffect(() => { onTrackRef.current = onTrack; });
@@ -188,14 +194,18 @@ export function NowPlaying({ station, playState, everPlayed, onTrack, onHistory 
           if (prev === msg.title) return;
           if (prev !== null && !isNonTrack(prev, station.name)) {
             if (trackedRef.current) {
-              // Durable, gap-aware store; reflect it back into local state.
+              // Durable, gap-aware store (stamps its own `at`); reflect it back.
               recordTrack(station.id, prev);
               setHistory(loadTrackingHistory(station.id));
             } else {
-              setHistory(h => [{ time: nowHHMM(), title: prev }, ...h].slice(0, 50));
+              // Session entry: stamp the outgoing track's air time so it can be
+              // saved from the history with an accurate playedAt.
+              const prevAt = currentStartRef.current ?? Date.now();
+              setHistory(h => [{ time: nowHHMM(), title: prev, at: prevAt }, ...h].slice(0, 50));
             }
           }
           prevTitleRef.current = msg.title;
+          currentStartRef.current = Date.now();
           setCurrentRaw(msg.title);
           // Report a real song up for the sidebar marquee (skip station IDs).
           onTrackRef.current?.(isNonTrack(msg.title, station.name) ? null : msg.title);
@@ -226,6 +236,7 @@ export function NowPlaying({ station, playState, everPlayed, onTrack, onHistory 
     // the client suppresses the "recognizing" state and ignores an identical
     // result, so the reload looks like a no-op). History is left intact.
     prevTitleRef.current = null;
+    currentStartRef.current = null;
     setCurrentRaw(null);
     setCurrentCover(null);
     setMetaState('waiting');
@@ -239,11 +250,11 @@ export function NowPlaying({ station, playState, everPlayed, onTrack, onHistory 
   if (playState === 'error') {
     return (
       <div className="flex flex-col gap-6">
-        <div className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-accent)]">
+        <div className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-danger)]">
           ⚠ {station.name} unreachable
         </div>
         <div className="flex gap-5 items-end">
-          <div className="w-[140px] h-[140px] rounded-2xl bg-[rgba(192,57,43,0.1)] border-2 border-dashed border-[rgba(192,57,43,0.4)] flex items-center justify-center text-4xl text-[var(--color-accent)]">⚠</div>
+          <div className="w-[140px] h-[140px] rounded-2xl bg-[rgba(192,57,43,0.1)] border-2 border-dashed border-[rgba(192,57,43,0.4)] flex items-center justify-center text-4xl text-[var(--color-danger)]">⚠</div>
           <div className="flex-1 pb-1">
             <div className="text-[26px] font-bold tracking-tight">Couldn&apos;t connect</div>
             <div className="text-sm text-[var(--color-ink-3)] mt-2">The station server may be down. Reconnecting…</div>
@@ -259,7 +270,7 @@ export function NowPlaying({ station, playState, everPlayed, onTrack, onHistory 
   if (playState === 'connecting' && !everPlayed && currentRaw === null && history.length === 0) {
     return (
       <div className="flex flex-col gap-5">
-        <div className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-warm)]">
+        <div className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-brand-purple)]">
           Connecting to {station.name} <span className="dots"><span /><span /><span /></span>
         </div>
         <div className="flex gap-5 items-end">
@@ -373,7 +384,7 @@ export function NowPlaying({ station, playState, everPlayed, onTrack, onHistory 
           favicon={station.favicon}
           cover={trackCover ?? undefined}
           size={220}
-          className="shadow-[0_16px_48px_rgba(192,57,43,0.28)]"
+          className="shadow-[0_16px_48px_rgba(168,85,247,0.28)]"
         />
       }
       title={title}
@@ -399,6 +410,7 @@ export function NowPlaying({ station, playState, everPlayed, onTrack, onHistory 
                 appleMusicUrl: (links.appleMusicUrl || matchedLookup?.appleUrl) || undefined,
                 previewUrl: (links.previewUrl || matchedLookup?.previewUrl) || undefined, key: links.key || undefined,
                 stationName: station.name,
+                playedAt: currentStartRef.current ?? Date.now(),
               });
             }}
           />
@@ -425,7 +437,7 @@ function NowPlayingHeaderControls({
         title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
         className={[
           'w-7 h-7 flex items-center justify-center text-xl leading-none cursor-pointer transition-transform hover:scale-125',
-          isFavorite ? 'text-[var(--color-warm)]' : 'text-[var(--color-ink-4)] hover:text-[var(--color-warm)]',
+          isFavorite ? 'text-[var(--color-brand-purple)]' : 'text-[var(--color-ink-4)] hover:text-[var(--color-brand-purple)]',
         ].join(' ')}
       >
         {isFavorite ? '★' : '☆'}
@@ -435,9 +447,9 @@ function NowPlayingHeaderControls({
         disabled={refreshing}
         aria-label="Check for song update"
         title="Check for song update"
-        className="w-7 h-7 rounded-full border border-[var(--color-line)] flex items-center justify-center text-[13px] text-[var(--color-ink-3)] hover:text-[var(--color-ink)] hover:border-[var(--color-warm)] hover:bg-white transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+        className="w-7 h-7 rounded-full border border-[var(--color-line)] flex items-center justify-center text-[13px] text-[var(--color-ink-3)] hover:text-[var(--color-ink)] hover:border-[var(--color-brand-pink)] hover:bg-white transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
       >
-        {refreshing ? <span className="spin-warm" /> : <span aria-hidden="true">↻</span>}
+        {refreshing ? <span className="spin-brand" /> : <span aria-hidden="true">↻</span>}
       </button>
       {lastUpdate && (
         <span className="text-[11px] tracking-[0.6px] uppercase font-semibold text-[var(--color-ink-3)] tabular-nums">
@@ -457,8 +469,8 @@ function SaveSongButton({ saved, onToggle }: { saved: boolean; onToggle: () => v
       className={[
         'inline-flex items-center gap-1.5 text-[11px] tracking-[0.8px] uppercase font-bold rounded-full px-2.5 py-1 cursor-pointer transition-colors border',
         saved
-          ? 'bg-[var(--color-warm)] text-white border-[var(--color-warm)]'
-          : 'text-[var(--color-warm)] border-[var(--color-line)] hover:border-[var(--color-warm)]',
+          ? 'bg-brand text-white border-transparent'
+          : 'text-[var(--color-brand-pink)] border-[var(--color-line)] hover:border-[var(--color-brand-pink)]',
       ].join(' ')}
     >
       <span aria-hidden="true">{saved ? '♥' : '♡'}</span>
@@ -482,7 +494,7 @@ function NowPlayingFrame({
   return (
     <div className="flex flex-col gap-6">
       <div className="relative z-10 flex items-center justify-between gap-4 flex-wrap">
-        <div className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-warm)]">
+        <div className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-brand-purple)]">
           Now playing on {stationName}
         </div>
         {headerExtras}

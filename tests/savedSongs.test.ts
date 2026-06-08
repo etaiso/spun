@@ -32,6 +32,11 @@ describe('buildSavedSong', () => {
     expect(buildSavedSong({ ...base, isrc: '  USCM51900012 ' }).isrc).toBe('USCM51900012');
     expect('isrc' in buildSavedSong(base)).toBe(false);
   });
+
+  it('passes playedAt through when supplied, and omits the field otherwise', () => {
+    expect(buildSavedSong({ ...base, playedAt: 5000 }).playedAt).toBe(5000);
+    expect('playedAt' in buildSavedSong(base)).toBe(false);
+  });
 });
 
 describe('addSong / removeSong', () => {

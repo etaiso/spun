@@ -22,6 +22,9 @@ export type SavedSong = {
   previewUrl: string;
   stationName: string;
   savedAt: number;
+  /** When the track aired (its play time). Absent on songs saved before
+   *  play-time tracking existed — callers fall back to savedAt. */
+  playedAt?: number;
   // --- Playlist-export integration (additive; iTunes fields above untouched) ---
   isrc?: string;         // exact cross-provider match key, when the recognizer supplies it
   spotifyTrackId?: string;
@@ -41,6 +44,7 @@ export type BuildInput = {
   isrc?: string;
   stationName: string;
   savedAt: number;
+  playedAt?: number;
 };
 
 /** Build a SavedSong, filling search-URL fallbacks for metadata-only tracks. */
@@ -61,6 +65,7 @@ export function buildSavedSong(input: BuildInput): SavedSong {
     previewUrl: input.previewUrl || '',
     stationName: input.stationName,
     savedAt: input.savedAt,
+    ...(input.playedAt != null ? { playedAt: input.playedAt } : {}),
     ...(input.isrc && input.isrc.trim() ? { isrc: input.isrc.trim() } : {}),
   };
 }

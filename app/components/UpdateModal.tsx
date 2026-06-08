@@ -30,9 +30,9 @@ export function UpdateModal({ open, status, currentVersion, canSelfInstall, onCl
   if (!open) return null;
 
   const primaryBtn =
-    'px-4 py-2 rounded-full text-sm font-semibold text-white bg-[var(--color-warm)] hover:opacity-90 cursor-pointer transition-opacity';
+    'px-4 py-2 rounded-full text-sm font-semibold text-white bg-brand hover:opacity-90 cursor-pointer transition-opacity';
   const secondaryBtn =
-    'px-4 py-2 rounded-full text-sm font-semibold text-[var(--color-ink-3)] border border-[var(--color-line)] hover:border-[var(--color-warm)] hover:text-[var(--color-ink)] cursor-pointer transition-colors';
+    'px-4 py-2 rounded-full text-sm font-semibold text-[var(--color-ink-3)] border border-[var(--color-line)] hover:border-[var(--color-brand-pink)] hover:text-[var(--color-ink)] cursor-pointer transition-colors';
 
   let title: string;
   let body: ReactNode;
@@ -66,7 +66,7 @@ export function UpdateModal({ open, status, currentVersion, canSelfInstall, onCl
           <span>Downloading… {status.percent ?? 0}%</span>
           <div className="h-1.5 w-full rounded-full bg-[var(--color-line)] overflow-hidden">
             <div
-              className="h-full bg-[var(--color-warm)] transition-[width] duration-200"
+              className="h-full bg-[var(--color-brand-purple)] transition-[width] duration-200"
               style={{ width: `${status.percent ?? 0}%` }}
             />
           </div>

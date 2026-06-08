@@ -136,13 +136,13 @@ export function CommandPalette({ onClose, onSelect }: Props) {
             placeholder="Search stations…"
             className="flex-1 bg-transparent outline-none text-[17px] text-[var(--color-ink)] placeholder:text-[var(--color-ink-4)]"
           />
-          {loading && <span className="spin-warm" aria-label="Searching" />}
+          {loading && <span className="spin-brand" aria-label="Searching" />}
         </div>
 
         {/* Results */}
         <div ref={listRef} className="max-h-[50vh] overflow-y-auto py-2">
           {showingRecent && recent.length > 0 && (
-            <div className="px-5 pt-1 pb-2 text-[11px] tracking-[1.4px] uppercase font-extrabold text-[var(--color-warm)]">
+            <div className="px-5 pt-1 pb-2 text-[11px] tracking-[1.4px] uppercase font-extrabold text-[var(--color-brand-purple)]">
               ↻ Recently played
             </div>
           )}
@@ -182,7 +182,7 @@ export function CommandPalette({ onClose, onSelect }: Props) {
                 className={[
                   'shrink-0 w-8 h-8 flex items-center justify-center',
                   'cursor-pointer transition-transform hover:scale-125',
-                  isTracked(s.id) ? 'text-[var(--color-warm)]' : 'text-[var(--color-ink-4)] hover:text-[var(--color-warm)]',
+                  isTracked(s.id) ? 'text-[var(--color-brand-purple)]' : 'text-[var(--color-ink-4)] hover:text-[var(--color-brand-purple)]',
                 ].join(' ')}
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-[18px] h-[18px]">
@@ -197,7 +197,7 @@ export function CommandPalette({ onClose, onSelect }: Props) {
                 className={[
                   'shrink-0 w-8 h-8 flex items-center justify-center text-xl leading-none',
                   'cursor-pointer transition-transform hover:scale-125',
-                  isFavorite(s.id) ? 'text-[var(--color-warm)]' : 'text-[var(--color-ink-4)] hover:text-[var(--color-warm)]',
+                  isFavorite(s.id) ? 'text-[var(--color-brand-purple)]' : 'text-[var(--color-ink-4)] hover:text-[var(--color-brand-purple)]',
                 ].join(' ')}
               >
                 {isFavorite(s.id) ? '★' : '☆'}
