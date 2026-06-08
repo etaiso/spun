@@ -66,6 +66,12 @@ export function NowPlaying({ station, playState, everPlayed, onTrack, onHistory 
   // same title doesn't duplicate it into history.
   const prevTitleRef = useRef<string | null>(restored?.current?.raw ?? null);
 
+  // Air time (epoch ms) of the track currently on screen. Used to stamp the
+  // playlist-history entry when it rolls off, and as playedAt when saved.
+  // null until the first live `track` event (a restored session has no known
+  // start time) → callers fall back to Date.now().
+  const currentStartRef = useRef<number | null>(null);
+
   // Keep the onTrack callback in a ref so the SSE effect doesn't depend on it.
   const onTrackRef = useRef(onTrack);
   useEffect(() => { onTrackRef.current = onTrack; });
@@ -161,9 +167,11 @@ export function NowPlaying({ station, playState, everPlayed, onTrack, onHistory 
           const prev = prevTitleRef.current;
           if (prev === msg.title) return;
           if (prev !== null && !isNonTrack(prev, station.name)) {
-            setHistory(h => [{ time: nowHHMM(), title: prev }, ...h].slice(0, 50));
+            const prevAt = currentStartRef.current ?? Date.now();
+            setHistory(h => [{ time: nowHHMM(), title: prev, at: prevAt }, ...h].slice(0, 50));
           }
           prevTitleRef.current = msg.title;
+          currentStartRef.current = Date.now();
           setCurrentRaw(msg.title);
           // Report a real song up for the sidebar marquee (skip station IDs).
           onTrackRef.current?.(isNonTrack(msg.title, station.name) ? null : msg.title);
@@ -367,6 +375,7 @@ export function NowPlaying({ station, playState, everPlayed, onTrack, onHistory 
                 appleMusicUrl: (links.appleMusicUrl || matchedLookup?.appleUrl) || undefined,
                 previewUrl: (links.previewUrl || matchedLookup?.previewUrl) || undefined, key: links.key || undefined,
                 stationName: station.name,
+                playedAt: currentStartRef.current ?? Date.now(),
               });
             }}
           />
@@ -425,8 +434,8 @@ function SaveSongButton({ saved, onToggle }: { saved: boolean; onToggle: () => v
       className={[
         'inline-flex items-center gap-1.5 text-[11px] tracking-[0.8px] uppercase font-bold rounded-full px-2.5 py-1 cursor-pointer transition-colors border',
         saved
-          ? 'bg-[var(--color-warm)] text-white border-[var(--color-warm)]'
-          : 'text-[var(--color-warm)] border-[var(--color-line)] hover:border-[var(--color-warm)]',
+          ? 'bg-brand text-white border-transparent'
+          : 'text-[var(--color-brand-pink)] border-[var(--color-line)] hover:border-[var(--color-brand-pink)]',
       ].join(' ')}
     >
       <span aria-hidden="true">{saved ? '♥' : '♡'}</span>

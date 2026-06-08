@@ -3,4 +3,4 @@
 
 export type TrackSource = 'metadata' | 'shazam';
 
-export type HistoryEntry = { time: string; title: string };
+export type HistoryEntry = { time: string; title: string; at: number };
