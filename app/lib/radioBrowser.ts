@@ -2,7 +2,11 @@
 // Both /api/search and /api/popular use this so the mirror is resolved
 // once per server process and the UA + timeout policies stay consistent.
 
-const UA = 'Spun/0.1';
+import { version } from '../../package.json';
+
+// Descriptive User-Agent so the radio-browser maintainer can identify spun's
+// traffic and reach us. Format is `appname/appversion` per their API docs.
+const UA = `spun/${version}`;
 const UPSTREAM_TIMEOUT_MS = 5_000;
 
 let mirrorPromise: Promise<string> | null = null;
