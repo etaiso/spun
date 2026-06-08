@@ -1,5 +1,5 @@
 shazamio>=0.5
 fastapi>=0.110
-uvicorn>=0.29
+uvicorn>=0.49.0
 aiohttp>=3.9
 certifi>=2026.5.20
