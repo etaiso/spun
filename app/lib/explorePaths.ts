@@ -5,18 +5,20 @@
 export type ExploreCountry = { code: string; name: string; count: number };
 export type ExploreTag = { name: string; count: number };
 
-// ── Station-list paths (drill-in) ──────────────────────────────────────────
-// Both order by clickcount so the most-played stations surface first; the
-// client doesn't re-rank Explore results (unlike search/popular).
+// ── Station-list path (drill-in) ────────────────────────────────────────────
+// Filters by country and/or tag — radio-browser ANDs them when both are given
+// (e.g. German jazz stations). Orders by clickcount so the most-played surface
+// first; the client doesn't re-rank Explore results (unlike search/popular).
 
-export function buildCountryStationsPath(code: string, limit = 100): string {
-  const c = encodeURIComponent(code.trim().toUpperCase());
-  return `/json/stations/search?countrycode=${c}&order=clickcount&reverse=true&limit=${limit}&hidebroken=true`;
-}
-
-export function buildTagStationsPath(tag: string, limit = 100): string {
-  const t = encodeURIComponent(tag.trim().toLowerCase());
-  return `/json/stations/search?tag=${t}&order=clickcount&reverse=true&limit=${limit}&hidebroken=true`;
+export function buildStationsPath(
+  { country, tag }: { country?: string | null; tag?: string | null },
+  limit = 100,
+): string {
+  const parts: string[] = [];
+  if (country && country.trim()) parts.push(`countrycode=${encodeURIComponent(country.trim().toUpperCase())}`);
+  if (tag && tag.trim()) parts.push(`tag=${encodeURIComponent(tag.trim().toLowerCase())}`);
+  parts.push('order=clickcount', 'reverse=true', `limit=${limit}`, 'hidebroken=true');
+  return `/json/stations/search?${parts.join('&')}`;
 }
 
 // ── List normalizers ───────────────────────────────────────────────────────

@@ -1,32 +1,38 @@
 import { describe, it, expect } from 'vitest';
 import {
-  buildCountryStationsPath,
-  buildTagStationsPath,
+  buildStationsPath,
   normalizeCountries,
   normalizeTags,
 } from '../app/lib/explorePaths';
 
-describe('buildCountryStationsPath', () => {
-  it('uppercases the code and sets ordering + hidebroken', () => {
-    const p = buildCountryStationsPath('de');
+describe('buildStationsPath', () => {
+  it('filters by country only (uppercased) with ordering + hidebroken', () => {
+    const p = buildStationsPath({ country: 'de' });
     expect(p).toContain('countrycode=DE');
+    expect(p).not.toContain('tag=');
     expect(p).toContain('order=clickcount');
     expect(p).toContain('reverse=true');
     expect(p).toContain('hidebroken=true');
     expect(p).toContain('limit=100');
   });
 
-  it('honours a custom limit', () => {
-    expect(buildCountryStationsPath('US', 25)).toContain('limit=25');
-  });
-});
-
-describe('buildTagStationsPath', () => {
-  it('lowercases + url-encodes the tag', () => {
-    const p = buildTagStationsPath('Hip Hop');
+  it('filters by tag only (lowercased + url-encoded)', () => {
+    const p = buildStationsPath({ tag: 'Hip Hop' });
     expect(p).toContain('tag=hip%20hop');
-    expect(p).toContain('order=clickcount');
-    expect(p).toContain('hidebroken=true');
+    expect(p).not.toContain('countrycode=');
+  });
+
+  it('ANDs country + tag when both are given', () => {
+    const p = buildStationsPath({ country: 'US', tag: 'jazz' });
+    expect(p).toContain('countrycode=US');
+    expect(p).toContain('tag=jazz');
+  });
+
+  it('ignores empty/nullish facets and honours a custom limit', () => {
+    const p = buildStationsPath({ country: '', tag: 'rock' }, 25);
+    expect(p).not.toContain('countrycode=');
+    expect(p).toContain('tag=rock');
+    expect(p).toContain('limit=25');
   });
 });
 

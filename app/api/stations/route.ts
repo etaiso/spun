@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { fetchRadioBrowser } from '@/app/lib/radioBrowser';
 import { normalizeStation } from '@/app/lib/stations';
 import { dedupeStations } from '@/app/lib/dedupe';
-import { buildCountryStationsPath, buildTagStationsPath } from '@/app/lib/explorePaths';
+import { buildStationsPath } from '@/app/lib/explorePaths';
 
-// Stations for an Explore drill-in: `?country=XX` or `?tag=Y` (country wins if
-// both are present). Results come back ordered by clickcount; unlike search,
-// the client doesn't re-rank them.
+// Stations for an Explore drill-in: `?country=XX` and/or `?tag=Y` (combined =
+// AND, e.g. German jazz). Results come back ordered by clickcount; unlike
+// search, the client doesn't re-rank them.
 
 type CacheEntry = { at: number; data: unknown };
 const cache = new Map<string, CacheEntry>();
@@ -35,8 +35,8 @@ export async function GET(req: NextRequest) {
   const tag = (req.nextUrl.searchParams.get('tag') ?? '').trim().toLowerCase();
   if (!country && !tag) return NextResponse.json([]);
 
-  const path = country ? buildCountryStationsPath(country) : buildTagStationsPath(tag);
-  const cacheKey = country ? `c:${country}` : `t:${tag}`;
+  const path = buildStationsPath({ country, tag });
+  const cacheKey = `${country}|${tag}`;
   const cached = getCached(cacheKey);
   if (cached) return NextResponse.json(cached);
 

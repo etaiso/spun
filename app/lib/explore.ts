@@ -53,19 +53,23 @@ function createListResource<T>(url: string) {
 export const useCountries = createListResource<ExploreCountry>('/api/countries');
 export const useTags = createListResource<ExploreTag>('/api/tags');
 
-async function fetchStations(url: string, signal?: AbortSignal): Promise<Station[]> {
+async function getStations(url: string, signal?: AbortSignal): Promise<Station[]> {
   const res = await fetch(url, { signal });
   if (!res.ok) throw new Error(String(res.status));
   const json = (await res.json()) as unknown;
   return Array.isArray(json) ? (json as Station[]) : [];
 }
 
-export function fetchStationsByCountry(code: string, signal?: AbortSignal): Promise<Station[]> {
-  return fetchStations(`/api/stations?country=${encodeURIComponent(code)}`, signal);
-}
-
-export function fetchStationsByTag(tag: string, signal?: AbortSignal): Promise<Station[]> {
-  return fetchStations(`/api/stations?tag=${encodeURIComponent(tag)}`, signal);
+// Stations matching a country and/or tag (combined = AND, e.g. German jazz).
+// At least one facet should be set; with neither the API returns [].
+export function fetchStations(
+  { country, tag }: { country?: string | null; tag?: string | null },
+  signal?: AbortSignal,
+): Promise<Station[]> {
+  const params = new URLSearchParams();
+  if (country) params.set('country', country);
+  if (tag) params.set('tag', tag);
+  return getStations(`/api/stations?${params.toString()}`, signal);
 }
 
 // Curated genres for the Explore landing chips — a clean, recognizable subset

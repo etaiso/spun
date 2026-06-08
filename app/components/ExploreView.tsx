@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import type { Station } from '@/app/lib/stations';
-import { useCountries, useTags, fetchStationsByCountry, fetchStationsByTag, GENRES } from '@/app/lib/explore';
+import { useCountries, useTags, fetchStations, GENRES } from '@/app/lib/explore';
 import { useRegion } from '@/app/lib/region';
 import { useFavorites } from '@/app/lib/favorites';
 import { useHiddenFilter } from '@/app/lib/hidden';
 import { flagEmoji } from '@/app/lib/flag';
+import type { ExploreCountry } from '@/app/lib/explorePaths';
 import { StationRow } from './StationRow';
-import { RegionLockBanner, type ExploreDrill } from './RegionLockBanner';
+import { RegionLockBanner } from './RegionLockBanner';
 
 type Props = { onSelect: (s: Station) => void };
 
@@ -16,23 +17,11 @@ const nf = new Intl.NumberFormat();
 const fmt = (n: number) => nf.format(n);
 
 export function ExploreView({ onSelect }: Props) {
-  const [drill, setDrill] = useState<ExploreDrill>(null);
-
-  return (
-    <div className="p-10">
-      {drill ? (
-        <DrillView drill={drill} onBack={() => setDrill(null)} onSelect={onSelect} />
-      ) : (
-        <Landing onDrill={setDrill} />
-      )}
-    </div>
-  );
-}
-
-// ── Landing: genre chips + country grid ────────────────────────────────────
-
-function Landing({ onDrill }: { onDrill: (d: ExploreDrill) => void }) {
-  const { data: countries, loading, error } = useCountries();
+  // Two independent facets. Either, both, or neither can be set; both set =
+  // intersection (e.g. jazz in Germany). Neither = the discovery landing.
+  const [countryCode, setCountryCode] = useState<string | null>(null);
+  const [tag, setTag] = useState<string | null>(null);
+  const { data: countries, loading: countriesLoading, error: countriesError } = useCountries();
   const { data: tags } = useTags();
   const { region } = useRegion();
 
@@ -42,6 +31,179 @@ function Landing({ onDrill }: { onDrill: (d: ExploreDrill) => void }) {
     return m;
   }, [tags]);
 
+  const country = useMemo(() => countries.find(c => c.code === countryCode) ?? null, [countries, countryCode]);
+  const hasFilter = !!(countryCode || tag);
+
+  return (
+    <div className="p-10">
+      {hasFilter ? (
+        <>
+          <button
+            onClick={() => { setCountryCode(null); setTag(null); }}
+            className="flex items-center gap-2 text-sm font-semibold text-[var(--color-brand-purple)] mb-5 cursor-pointer hover:opacity-75 transition-opacity"
+          >
+            ← Explore
+          </button>
+          <h1 className="text-[32px] font-bold tracking-tight mb-1">
+            {country && tag ? <><span className="capitalize">{tag}</span> in {country.name}</> : country ? country.name : <span className="capitalize">{tag}</span>}
+          </h1>
+
+          <RegionLockBanner country={country} />
+
+          <FilterBar
+            countries={countries}
+            countryCode={countryCode}
+            tag={tag}
+            tagCount={tagCount}
+            onCountry={setCountryCode}
+            onTag={setTag}
+          />
+
+          <Results countryCode={countryCode} tag={tag} onSelect={onSelect} />
+        </>
+      ) : (
+        <>
+          <div className="mb-8">
+            <div className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-brand-purple)] mb-2">Explore</div>
+            <h1 className="text-[36px] font-bold tracking-tight">Find your next station</h1>
+            <p className="text-base text-[var(--color-ink-3)] mt-2">Browse by genre or country — combine both to narrow it down.</p>
+          </div>
+
+          <RegionLockBanner country={null} />
+
+          <Landing
+            countries={countries}
+            loading={countriesLoading}
+            error={countriesError}
+            tagCount={tagCount}
+            region={region}
+            onPickCountry={(c) => setCountryCode(c.code)}
+            onPickTag={(t) => setTag(t)}
+          />
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Filter bar (results view): combine / change the two facets ──────────────
+
+function FilterBar({ countries, countryCode, tag, tagCount, onCountry, onTag }: {
+  countries: ExploreCountry[];
+  countryCode: string | null;
+  tag: string | null;
+  tagCount: Map<string, number>;
+  onCountry: (code: string | null) => void;
+  onTag: (tag: string | null) => void;
+}) {
+  // Alphabetical for findability in the dropdown (the grid stays count-sorted).
+  const countryOptions = useMemo(
+    () => [...countries].sort((a, b) => a.name.localeCompare(b.name)),
+    [countries],
+  );
+
+  return (
+    <div className="flex flex-wrap items-center gap-3 mb-7">
+      <span className="text-[11px] tracking-[1.2px] uppercase font-bold text-[var(--color-ink-3)]">Filter</span>
+      <FacetSelect
+        ariaLabel="Filter by country"
+        value={countryCode ?? ''}
+        onChange={(v) => onCountry(v || null)}
+        options={[
+          { value: '', label: '🌍 All countries' },
+          ...countryOptions.map(c => ({ value: c.code, label: `${flagEmoji(c.code)} ${c.name}` })),
+        ]}
+      />
+      <FacetSelect
+        ariaLabel="Filter by genre"
+        value={tag ?? ''}
+        onChange={(v) => onTag(v || null)}
+        options={[
+          { value: '', label: 'All genres' },
+          ...GENRES.map(g => ({ value: g, label: tagCount.get(g) ? `${g} · ${fmt(tagCount.get(g)!)}` : g })),
+        ]}
+      />
+    </div>
+  );
+}
+
+function FacetSelect({ value, onChange, options, ariaLabel }: {
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+  ariaLabel: string;
+}) {
+  return (
+    <div className="relative">
+      <select
+        aria-label={ariaLabel}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="appearance-none cursor-pointer rounded-full border border-[var(--color-line)] bg-white pl-4 pr-9 py-2 text-sm font-semibold text-[var(--color-ink-2)] hover:border-[var(--color-brand-pink)] transition-colors max-w-[240px] truncate"
+      >
+        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+      <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[10px] text-[var(--color-ink-3)]">▾</span>
+    </div>
+  );
+}
+
+// ── Results: stations matching the active facet(s) ──────────────────────────
+
+function Results({ countryCode, tag, onSelect }: { countryCode: string | null; tag: string | null; onSelect: (s: Station) => void }) {
+  const [stations, setStations] = useState<Station[] | null>(null);
+  const [error, setError] = useState(false);
+  const [atCap, setAtCap] = useState(false);
+  const filterHidden = useHiddenFilter();
+  const { isFavorite, toggle } = useFavorites();
+
+  useEffect(() => {
+    let cancelled = false;
+    const ctrl = new AbortController();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setStations(null); setError(false); setAtCap(false);
+    fetchStations({ country: countryCode, tag }, ctrl.signal)
+      .then(list => { if (!cancelled) { setStations(list); setAtCap(list.length >= 100); } })
+      .catch((e: Error) => { if (!cancelled && e.name !== 'AbortError') setError(true); });
+    return () => { cancelled = true; ctrl.abort(); };
+  }, [countryCode, tag]);
+
+  const shown = stations ? filterHidden(stations) : [];
+
+  if (error) return <div className="text-sm text-[var(--color-ink-3)] px-1 py-2">Couldn&apos;t load stations. Try again.</div>;
+  if (stations === null) return <ResultsSkeleton />;
+  if (shown.length === 0) return <div className="text-sm text-[var(--color-ink-3)] px-1 py-2">No stations match these filters.</div>;
+
+  return (
+    <>
+      <div className="text-xs text-[var(--color-ink-3)] mb-3">{fmt(shown.length)}{atCap ? '+' : ''} stations</div>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-x-5">
+        {shown.map(s => (
+          <StationRow
+            key={s.id}
+            station={s}
+            isActive={false}
+            isFavorite={isFavorite(s.id)}
+            onSelect={() => onSelect(s)}
+            onToggleFavorite={() => toggle(s)}
+          />
+        ))}
+      </div>
+    </>
+  );
+}
+
+// ── Landing: genre chips + country grid (each sets a facet) ─────────────────
+
+function Landing({ countries, loading, error, tagCount, region, onPickCountry, onPickTag }: {
+  countries: ExploreCountry[];
+  loading: boolean;
+  error: boolean;
+  tagCount: Map<string, number>;
+  region: string;
+  onPickCountry: (c: ExploreCountry) => void;
+  onPickTag: (tag: string) => void;
+}) {
   // Pin the user's region to the front of the grid so "my country" is first.
   const orderedCountries = useMemo(() => {
     if (!region) return countries;
@@ -54,15 +216,6 @@ function Landing({ onDrill }: { onDrill: (d: ExploreDrill) => void }) {
 
   return (
     <>
-      <div className="mb-8">
-        <div className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-brand-purple)] mb-2">Explore</div>
-        <h1 className="text-[36px] font-bold tracking-tight">Find your next station</h1>
-        <p className="text-base text-[var(--color-ink-3)] mt-2">Browse by genre or jump to a country.</p>
-      </div>
-
-      <RegionLockBanner drill={null} />
-
-      {/* Genres */}
       <SectionHead>🏷 Genres</SectionHead>
       <div className="flex flex-wrap gap-2.5 mb-10">
         {GENRES.map(g => {
@@ -70,7 +223,7 @@ function Landing({ onDrill }: { onDrill: (d: ExploreDrill) => void }) {
           return (
             <button
               key={g}
-              onClick={() => onDrill({ kind: 'tag', label: g, count })}
+              onClick={() => onPickTag(g)}
               className="px-4 py-2 rounded-full text-sm font-semibold border border-[var(--color-line)] bg-white text-[var(--color-ink-2)] hover:border-[var(--color-brand-pink)] hover:-translate-y-0.5 transition-all cursor-pointer"
             >
               {g}{count ? <span className="ml-1.5 text-[var(--color-ink-4)] font-medium">{fmt(count)}</span> : null}
@@ -79,7 +232,6 @@ function Landing({ onDrill }: { onDrill: (d: ExploreDrill) => void }) {
         })}
       </div>
 
-      {/* Countries */}
       <SectionHead>🌍 Countries</SectionHead>
       {error ? (
         <div className="text-sm text-[var(--color-ink-3)] px-1 py-2">Couldn&apos;t load countries.</div>
@@ -90,7 +242,7 @@ function Landing({ onDrill }: { onDrill: (d: ExploreDrill) => void }) {
           {orderedCountries.map(c => (
             <button
               key={c.code}
-              onClick={() => onDrill({ kind: 'country', label: c.name, code: c.code, count: c.count })}
+              onClick={() => onPickCountry(c)}
               className="flex items-center gap-3 p-4 rounded-2xl border border-[var(--color-line)] bg-white hover:shadow-[0_6px_20px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all cursor-pointer text-left"
             >
               <span className="text-3xl leading-none">{flagEmoji(c.code)}</span>
@@ -99,74 +251,6 @@ function Landing({ onDrill }: { onDrill: (d: ExploreDrill) => void }) {
                 <div className="text-xs text-[var(--color-ink-3)]">{fmt(c.count)} stations</div>
               </div>
             </button>
-          ))}
-        </div>
-      )}
-    </>
-  );
-}
-
-// ── Drill: station results for a country or tag ─────────────────────────────
-
-function DrillView({ drill, onBack, onSelect }: { drill: NonNullable<ExploreDrill>; onBack: () => void; onSelect: (s: Station) => void }) {
-  const [stations, setStations] = useState<Station[] | null>(null);
-  const [error, setError] = useState(false);
-  const filterHidden = useHiddenFilter();
-  const { isFavorite, toggle } = useFavorites();
-
-  // Re-fetch when the drill target changes. A string key keeps the dep stable.
-  const key = `${drill.kind}:${drill.code ?? drill.label}`;
-  useEffect(() => {
-    let cancelled = false;
-    const ctrl = new AbortController();
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setStations(null); setError(false);
-    const req = drill.kind === 'country'
-      ? fetchStationsByCountry(drill.code ?? '', ctrl.signal)
-      : fetchStationsByTag(drill.label, ctrl.signal);
-    req
-      .then(list => { if (!cancelled) setStations(list); })
-      .catch((e: Error) => { if (!cancelled && e.name !== 'AbortError') setError(true); });
-    return () => { cancelled = true; ctrl.abort(); };
-  }, [key, drill.kind, drill.code, drill.label]);
-
-  const shown = stations ? filterHidden(stations) : [];
-
-  return (
-    <>
-      <button onClick={onBack} className="flex items-center gap-2 text-sm font-semibold text-[var(--color-brand-purple)] mb-6 cursor-pointer hover:opacity-75 transition-opacity">
-        ← Explore
-      </button>
-
-      <RegionLockBanner drill={drill} />
-
-      <div className="flex items-center gap-3 mb-7">
-        <span className="text-4xl leading-none">{drill.kind === 'country' && drill.code ? flagEmoji(drill.code) : '🏷'}</span>
-        <div>
-          <h1 className="text-[32px] font-bold tracking-tight">{drill.label}</h1>
-          <div className="text-[var(--color-ink-3)]">
-            {typeof drill.count === 'number' ? `${fmt(drill.count)} stations` : ' '}
-          </div>
-        </div>
-      </div>
-
-      {error ? (
-        <div className="text-sm text-[var(--color-ink-3)] px-1 py-2">Couldn&apos;t load stations. Try again.</div>
-      ) : stations === null ? (
-        <ResultsSkeleton />
-      ) : shown.length === 0 ? (
-        <div className="text-sm text-[var(--color-ink-3)] px-1 py-2">No stations found.</div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-x-5">
-          {shown.map(s => (
-            <StationRow
-              key={s.id}
-              station={s}
-              isActive={false}
-              isFavorite={isFavorite(s.id)}
-              onSelect={() => onSelect(s)}
-              onToggleFavorite={() => toggle(s)}
-            />
           ))}
         </div>
       )}
