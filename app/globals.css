@@ -11,6 +11,26 @@
   --color-accent: #c0392b;
   --color-accent-2: #7a1f15;
   --color-warm: #d2691e;
+
+  /* Brand (design system — see docs/DESIGN_SYSTEM.md) */
+  --grad-brand: linear-gradient(135deg, #6366f1, #a855f7, #ec4899);
+  --color-brand-indigo: #6366f1;
+  --color-brand-purple: #a855f7;
+  --color-brand-pink: #ec4899;
+  --color-danger: #c0392b;
+}
+
+/* Brand gradient fill (primary actions, active states). */
+.bg-brand { background-image: var(--grad-brand); }
+
+/* Brand gradient text (brand-moment titles). Solid fallback first so the
+   text is readable if background-clip is unsupported (see DESIGN_SYSTEM §4). */
+.text-brand-gradient {
+  color: var(--color-brand-pink);
+  background-image: var(--grad-brand);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 /* Country-flag fallback. Windows' system emoji font has no flag glyphs, so
