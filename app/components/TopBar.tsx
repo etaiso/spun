@@ -140,7 +140,7 @@ export function TopBar({ onOpenSearch, onOpenSettings, onOpenSaved, settingsActi
           <>
             <span className="flex items-center gap-1.5">
               <span className="text-[15px] leading-none" aria-hidden="true">{flagEmoji(region)}</span>
-              <span className="text-[13px] font-semibold tracking-wide text-[var(--color-ink-2)]">{region}</span>
+              <span className="text-[13px] font-semibold text-[var(--color-ink-2)] whitespace-nowrap">{regionName}</span>
             </span>
             <span className="w-px self-stretch my-2 bg-[var(--color-line)]" aria-hidden="true" />
           </>
