@@ -29,6 +29,21 @@ export function buildStationsPath(
 type RawCountry = { name?: unknown; iso_3166_1?: unknown; stationcount?: unknown };
 type RawTag = { name?: unknown; stationcount?: unknown };
 
+/**
+ * Distinct, sorted ISO country codes present in a station list — used to narrow
+ * the country picker to only countries that actually have stations for the
+ * selected genre(s). Skips records with a missing/invalid countrycode.
+ */
+export function countryCodesFromStations(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  for (const r of raw as { countrycode?: unknown }[]) {
+    const code = (typeof r?.countrycode === 'string' ? r.countrycode : '').trim().toUpperCase();
+    if (/^[A-Z]{2}$/.test(code)) seen.add(code);
+  }
+  return [...seen].sort();
+}
+
 function asInt(v: unknown): number {
   return typeof v === 'number' && Number.isFinite(v) ? Math.trunc(v) : 0;
 }

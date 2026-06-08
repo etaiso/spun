@@ -3,6 +3,7 @@ import {
   buildStationsPath,
   normalizeCountries,
   normalizeTags,
+  countryCodesFromStations,
 } from '../app/lib/explorePaths';
 
 describe('buildStationsPath', () => {
@@ -89,5 +90,23 @@ describe('normalizeTags', () => {
 
   it('tolerates non-arrays', () => {
     expect(normalizeTags(null)).toEqual([]);
+  });
+});
+
+describe('countryCodesFromStations', () => {
+  it('returns distinct, uppercased, sorted codes; drops invalid/empty', () => {
+    const out = countryCodesFromStations([
+      { countrycode: 'de' },
+      { countrycode: 'US' },
+      { countrycode: 'DE' },   // dup
+      { countrycode: '' },     // empty
+      { countrycode: 'XYZ' },  // not 2 letters
+      {},                       // missing
+    ]);
+    expect(out).toEqual(['DE', 'US']);
+  });
+
+  it('tolerates non-arrays', () => {
+    expect(countryCodesFromStations(null)).toEqual([]);
   });
 });

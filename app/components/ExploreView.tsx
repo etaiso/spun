@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Station } from '@/app/lib/stations';
-import { useCountries, useTags, fetchStations, GENRES } from '@/app/lib/explore';
+import { useCountries, useTags, fetchStations, fetchCountryCodesForTags, GENRES } from '@/app/lib/explore';
 import { useRegion, useRegionLock } from '@/app/lib/region';
 import { useFavorites } from '@/app/lib/favorites';
 import { useHiddenFilter } from '@/app/lib/hidden';
@@ -22,6 +22,9 @@ export function ExploreView({ onSelect }: Props) {
   // Neither set = the discovery landing.
   const [countryCode, setCountryCode] = useState<string | null>(null);
   const [tags, setTags] = useState<string[]>([]);
+  // Codes of countries that have stations for the selected genres (null = no
+  // genre filter → all countries allowed). Narrows the country picker.
+  const [availableCodes, setAvailableCodes] = useState<Set<string> | null>(null);
   const { data: countries, loading: countriesLoading, error: countriesError } = useCountries();
   const { data: tagsData } = useTags();
   const { region } = useRegion();
@@ -34,6 +37,22 @@ export function ExploreView({ onSelect }: Props) {
 
   const country = useMemo(() => countries.find(c => c.code === countryCode) ?? null, [countries, countryCode]);
   const hasFilter = !!(countryCode || tags.length);
+
+  // Fetch which countries have stations for the active genres so the country
+  // picker can hide the rest. Re-runs when the genre set changes.
+  useEffect(() => {
+    if (tags.length === 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setAvailableCodes(null);
+      return;
+    }
+    let cancelled = false;
+    const ctrl = new AbortController();
+    fetchCountryCodesForTags(tags, ctrl.signal)
+      .then(codes => { if (!cancelled) setAvailableCodes(new Set(codes)); })
+      .catch((e: Error) => { if (!cancelled && e.name !== 'AbortError') setAvailableCodes(null); });
+    return () => { cancelled = true; ctrl.abort(); };
+  }, [tags]);
 
   return (
     <div className="p-10">
@@ -58,6 +77,7 @@ export function ExploreView({ onSelect }: Props) {
 
           <FilterBar
             countries={countries}
+            availableCodes={availableCodes}
             countryCode={countryCode}
             tags={tags}
             tagCount={tagCount}
@@ -95,8 +115,9 @@ export function ExploreView({ onSelect }: Props) {
 
 // ── Filter bar (results view): combine / change the facets ──────────────────
 
-function FilterBar({ countries, countryCode, tags, tagCount, onCountry, onTags, onReset }: {
+function FilterBar({ countries, availableCodes, countryCode, tags, tagCount, onCountry, onTags, onReset }: {
   countries: ExploreCountry[];
+  availableCodes: Set<string> | null;
   countryCode: string | null;
   tags: string[];
   tagCount: Map<string, number>;
@@ -104,11 +125,14 @@ function FilterBar({ countries, countryCode, tags, tagCount, onCountry, onTags, 
   onTags: (tags: string[]) => void;
   onReset: () => void;
 }) {
-  // Alphabetical for findability (the landing grid stays count-sorted).
-  const countryOptions = useMemo(
-    () => [...countries].sort((a, b) => a.name.localeCompare(b.name)),
-    [countries],
-  );
+  // Alphabetical for findability (the landing grid stays count-sorted). When
+  // genres are selected, drop countries that have no matching station — but
+  // always keep the currently-selected one so it stays visible/clearable.
+  const countryOptions = useMemo(() => {
+    const sorted = [...countries].sort((a, b) => a.name.localeCompare(b.name));
+    if (!availableCodes) return sorted;
+    return sorted.filter(c => availableCodes.has(c.code) || c.code === countryCode);
+  }, [countries, availableCodes, countryCode]);
   const selectedCountry = countries.find(c => c.code === countryCode) ?? null;
   const available = GENRES.filter(g => !tags.includes(g));
 

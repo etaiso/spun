@@ -73,6 +73,18 @@ export function fetchStations(
   return getStations(`/api/stations?${params.toString()}`, signal);
 }
 
+// The ISO codes of countries that have at least one station for these genre
+// tag(s) — used to narrow the country picker. Empty tags → empty (no filter).
+export async function fetchCountryCodesForTags(tags: string[], signal?: AbortSignal): Promise<string[]> {
+  if (tags.length === 0) return [];
+  const params = new URLSearchParams();
+  for (const t of tags) params.append('tag', t);
+  const res = await fetch(`/api/country-codes?${params.toString()}`, { signal });
+  if (!res.ok) throw new Error(String(res.status));
+  const json = (await res.json()) as unknown;
+  return Array.isArray(json) ? (json as string[]) : [];
+}
+
 // Curated genres for the Explore landing chips — a clean, recognizable subset
 // of radio-browser's (thousands of) tags. Station counts are joined in from
 // useTags() by name, and the same string is the drill-in query, so each entry
