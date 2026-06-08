@@ -8,7 +8,7 @@ import { HiddenStationsDialog } from './HiddenStationsDialog';
 import { DebugPanel } from './DebugPanel';
 import { UpdateModal } from './UpdateModal';
 import { useRingsEnabled } from '@/app/lib/visualizer';
-import { useHidden } from '@/app/lib/hidden';
+import { useHidden, useHideConfirm } from '@/app/lib/hidden';
 import { persistSet } from '@/app/lib/persist';
 import { useCloseToTray, canCloseToTray } from '@/app/lib/closeToTray';
 import {
@@ -55,6 +55,9 @@ export function SettingsDialog({ open, onOpenChange, station, playState, current
   // Hidden stations live in their own modal (opened below) so a long list
   // doesn't bloat Settings; here we only show the count + a way in.
   const { hidden } = useHidden();
+  // Surfaced so the Hidden-stations entry stays reachable when the only thing to
+  // manage is re-enabling the hide confirmation (no stations currently hidden).
+  const { skipConfirm } = useHideConfirm();
   const [hiddenOpen, setHiddenOpen] = useState(false);
 
   // Whether to show the debug readout (dev only). Persisted, default off.
@@ -124,11 +127,15 @@ export function SettingsDialog({ open, onOpenChange, station, playState, current
 
   if (!open) return null;
 
-  // Show the diagnostics panel in dev AND in the desktop (Electron) build —
-  // both are "power" contexts. It stays hidden in the plain production web build.
-  const isDev =
-    process.env.NODE_ENV === 'development' ||
-    (typeof navigator !== 'undefined' && /electron/i.test(navigator.userAgent));
+  // Gate the diagnostics panel behind the `?debug=true` query param, and never
+  // expose it in the desktop (Electron) build — there's no URL to opt in there,
+  // and we don't want diagnostics shipped to desktop users.
+  const isElectron =
+    typeof navigator !== 'undefined' && /electron/i.test(navigator.userAgent);
+  const debugEnabled =
+    !isElectron &&
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('debug') === 'true';
 
   // The update UI (auto-update toggle + "Check now") only does anything in the
   // desktop shell, where Electron exposes the updater on window.spun. Hide it
@@ -300,10 +307,12 @@ export function SettingsDialog({ open, onOpenChange, station, playState, current
                 <p className="text-xs text-[var(--color-ink-3)] mt-0.5">
                   {hidden.length > 0
                     ? `${hidden.length} hidden · manage to unhide`
-                    : 'Nothing hidden. Right-click a station to hide it.'}
+                    : skipConfirm
+                      ? 'Nothing hidden · hides skip confirmation'
+                      : 'Nothing hidden. Right-click a station to hide it.'}
                 </p>
               </div>
-              {hidden.length > 0 && (
+              {(hidden.length > 0 || skipConfirm) && (
                 <button
                   onClick={() => setHiddenOpen(true)}
                   className="shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold text-[var(--color-brand-purple)] border border-[var(--color-line)] hover:border-[var(--color-brand-pink)] hover:bg-[var(--color-bg)] cursor-pointer transition-colors"
@@ -314,7 +323,7 @@ export function SettingsDialog({ open, onOpenChange, station, playState, current
             </div>
           </section>
 
-          {isDev && (
+          {debugEnabled && (
             <section className="mt-7 flex flex-col gap-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-bold text-[var(--color-ink)]">
@@ -349,6 +358,12 @@ export function SettingsDialog({ open, onOpenChange, station, playState, current
               )}
             </section>
           )}
+
+          <div className="mt-7 pt-4 border-t border-[var(--color-line)]">
+            <p className="text-[11px] text-center text-[var(--color-ink-4)]">
+              Version {process.env.appVersion ?? '—'}
+            </p>
+          </div>
         </div>
       </div>
     </div>

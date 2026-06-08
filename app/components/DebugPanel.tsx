@@ -80,7 +80,6 @@ export function DebugPanel({ station, playState, currentTrack, active }: Props) 
   return (
     <div className="rounded-xl bg-[var(--color-bg)] border border-[var(--color-line)] p-3 text-[12px] font-mono leading-relaxed">
       <div className="flex flex-col gap-1">
-        <Row label="Version">{process.env.appVersion ?? '—'}</Row>
         <Row label="Recognizer">
           {health == null ? (
             <span className="text-[var(--color-ink-4)]">checking…</span>
