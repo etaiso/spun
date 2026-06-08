@@ -28,7 +28,7 @@ export function ShortcutsHelp({ open, onOpenChange, dockVisible }: Props) {
         aria-label="Keyboard shortcuts"
         title="Keyboard shortcuts (?)"
         className={[
-          'fixed right-6 z-40 w-14 h-14 rounded-full bg-white border border-[var(--color-line)] shadow-[0_6px_18px_rgba(0,0,0,0.15)] flex items-center justify-center text-[34px] leading-none text-[var(--color-ink-3)] hover:text-[var(--color-ink)] hover:border-[var(--color-brand-pink)] cursor-pointer transition-all',
+          'fixed right-6 z-40 w-10 h-10 rounded-full bg-white border border-[var(--color-line)] shadow-[0_6px_18px_rgba(0,0,0,0.15)] flex items-center justify-center text-[20px] leading-none text-[var(--color-ink-3)] hover:text-[var(--color-ink)] hover:border-[var(--color-brand-pink)] cursor-pointer transition-all',
           dockVisible ? 'bottom-24' : 'bottom-6',
         ].join(' ')}
       >

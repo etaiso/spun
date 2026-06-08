@@ -81,7 +81,7 @@ export function Recommended({ onSelect }: Props) {
       )}
       {pool !== null && !errored && shown.length === 0 && (
         <div className="text-sm text-[var(--color-ink-3)] px-1 py-2">
-          No popular stations in this region.
+          No popular stations in this country.
         </div>
       )}
       {shown.slice(0, 15).map(s => (

@@ -41,9 +41,9 @@ export function RegionPicker() {
           hidden too. */}
       <label className="flex items-center justify-between gap-3 cursor-pointer select-none">
         <span className="flex flex-col">
-          <span className="text-sm font-medium text-[var(--color-ink)]">Show only one region</span>
+          <span className="text-sm font-medium text-[var(--color-ink)]">Show only one country</span>
           <span className="text-xs text-[var(--color-ink-4)]">
-            Limit search and Popular to a single region. Favorites, Recently played and Explore are never limited.
+            Limit search and Popular to a single country. Favorites, Recently played and Explore are never limited.
           </span>
         </span>
         <button
@@ -68,7 +68,7 @@ export function RegionPicker() {
       {locked && (
         <div className="flex flex-col gap-2">
           <label htmlFor="region-select" className="text-[11px] tracking-[1.2px] uppercase font-bold text-[var(--color-ink-3)]">
-            Region
+            Country
           </label>
           <div className="relative">
             <select
