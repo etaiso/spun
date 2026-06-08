@@ -129,7 +129,8 @@ export function Player({ station, onPlayStateChange }: Props) {
       pausedByPreviewRef.current = false;
       const a = audioRef.current;
       if (a && a.paused) {
-        a.play().then(() => setPaused(false)).catch(() => cbRef.current('error'));
+        setPaused(false);
+        a.play().catch(() => cbRef.current('error'));
       }
     });
   }, []);
