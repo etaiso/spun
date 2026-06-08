@@ -20,9 +20,9 @@ export function NowPlayingCard({ station, nowPlaying }: Props) {
   const tracked = isTracked(station.id);
 
   return (
-    <div className="mb-6 rounded-2xl border border-[rgba(210,105,30,0.35)] bg-white p-3 shadow-[0_2px_10px_rgba(120,60,30,0.08)]">
-      <div className="flex items-center gap-1.5 mb-2.5 text-[10px] tracking-[1.4px] uppercase font-extrabold text-[var(--color-warm)]">
-        <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-warm)] pulse-soft" />
+    <div className="mb-6 rounded-2xl border border-[rgba(168,85,247,0.35)] bg-white p-3 shadow-[0_2px_10px_rgba(168,85,247,0.12)]">
+      <div className="flex items-center gap-1.5 mb-2.5 text-[10px] tracking-[1.4px] uppercase font-extrabold text-[var(--color-brand-purple)]">
+        <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-brand-purple)] pulse-soft" />
         Now playing
       </div>
       <div className="flex items-center gap-3">
@@ -30,7 +30,7 @@ export function NowPlayingCard({ station, nowPlaying }: Props) {
         <div className="flex-1 min-w-0">
           <div className="text-[15px] font-semibold tracking-tight truncate">{station.name}</div>
           {nowPlaying ? (
-            <div className="marquee text-xs text-[var(--color-warm)] font-semibold">
+            <div className="marquee text-xs text-[var(--color-brand-purple)] font-semibold">
               <span className="marquee-inner">
                 ♪ {nowPlaying}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;♪ {nowPlaying}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
               </span>
@@ -49,7 +49,7 @@ export function NowPlayingCard({ station, nowPlaying }: Props) {
             className={[
               'w-8 h-8 flex items-center justify-center',
               'cursor-pointer transition-transform hover:scale-125',
-              tracked ? 'text-[var(--color-warm)]' : 'text-[var(--color-ink-4)] hover:text-[var(--color-warm)]',
+              tracked ? 'text-[var(--color-brand-purple)]' : 'text-[var(--color-ink-4)] hover:text-[var(--color-brand-purple)]',
             ].join(' ')}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-[18px] h-[18px]">
@@ -65,7 +65,7 @@ export function NowPlayingCard({ station, nowPlaying }: Props) {
             className={[
               'w-8 h-8 flex items-center justify-center text-xl leading-none',
               'cursor-pointer transition-transform hover:scale-125',
-              fav ? 'text-[var(--color-warm)]' : 'text-[var(--color-ink-4)] hover:text-[var(--color-warm)]',
+              fav ? 'text-[var(--color-brand-purple)]' : 'text-[var(--color-ink-4)] hover:text-[var(--color-brand-purple)]',
             ].join(' ')}
           >
             {fav ? '★' : '☆'}

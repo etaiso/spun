@@ -236,7 +236,7 @@ export function NowPlaying({ station, playState, everPlayed, onTrack, onHistory 
   if (playState === 'connecting' && !everPlayed && currentRaw === null && history.length === 0) {
     return (
       <div className="flex flex-col gap-5">
-        <div className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-warm)]">
+        <div className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-brand-purple)]">
           Connecting to {station.name} <span className="dots"><span /><span /><span /></span>
         </div>
         <div className="flex gap-5 items-end">
@@ -350,7 +350,7 @@ export function NowPlaying({ station, playState, everPlayed, onTrack, onHistory 
           favicon={station.favicon}
           cover={trackCover ?? undefined}
           size={220}
-          className="shadow-[0_16px_48px_rgba(192,57,43,0.28)]"
+          className="shadow-[0_16px_48px_rgba(168,85,247,0.28)]"
         />
       }
       title={title}
@@ -403,7 +403,7 @@ function NowPlayingHeaderControls({
         title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
         className={[
           'w-7 h-7 flex items-center justify-center text-xl leading-none cursor-pointer transition-transform hover:scale-125',
-          isFavorite ? 'text-[var(--color-warm)]' : 'text-[var(--color-ink-4)] hover:text-[var(--color-warm)]',
+          isFavorite ? 'text-[var(--color-brand-purple)]' : 'text-[var(--color-ink-4)] hover:text-[var(--color-brand-purple)]',
         ].join(' ')}
       >
         {isFavorite ? '★' : '☆'}
@@ -413,7 +413,7 @@ function NowPlayingHeaderControls({
         disabled={refreshing}
         aria-label="Check for song update"
         title="Check for song update"
-        className="w-7 h-7 rounded-full border border-[var(--color-line)] flex items-center justify-center text-[13px] text-[var(--color-ink-3)] hover:text-[var(--color-ink)] hover:border-[var(--color-warm)] hover:bg-white transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+        className="w-7 h-7 rounded-full border border-[var(--color-line)] flex items-center justify-center text-[13px] text-[var(--color-ink-3)] hover:text-[var(--color-ink)] hover:border-[var(--color-brand-pink)] hover:bg-white transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
       >
         {refreshing ? <span className="spin-warm" /> : <span aria-hidden="true">↻</span>}
       </button>
@@ -460,7 +460,7 @@ function NowPlayingFrame({
   return (
     <div className="flex flex-col gap-6">
       <div className="relative z-10 flex items-center justify-between gap-4 flex-wrap">
-        <div className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-warm)]">
+        <div className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-brand-purple)]">
           Now playing on {stationName}
         </div>
         {headerExtras}
