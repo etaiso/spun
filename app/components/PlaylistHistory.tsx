@@ -1,11 +1,14 @@
 'use client';
 
 import { splitArtistTitle } from '@/app/lib/track';
-import type { HistoryEntry } from '@/app/lib/nowPlayingTypes';
+import { humanizeGap } from '@/app/lib/trackingHistory';
+import { isGap } from '@/app/lib/nowPlayingTypes';
+import type { HistoryItem } from '@/app/lib/nowPlayingTypes';
 
 // Session playlist log, rendered below the player controls. Carries a solid
 // background + soft feather so the pulse rings dissolve smoothly into it.
-export function PlaylistHistory({ history }: { history: HistoryEntry[] }) {
+// Tracked stations may include "no tracking" gap markers between runs.
+export function PlaylistHistory({ history }: { history: HistoryItem[] }) {
   if (history.length === 0) return null;
 
   return (
@@ -14,6 +17,18 @@ export function PlaylistHistory({ history }: { history: HistoryEntry[] }) {
         ▾ Playlist history
       </div>
       {history.map((h, i) => {
+        if (isGap(h)) {
+          return (
+            <div
+              key={i}
+              className="flex items-center gap-3 py-3 text-[10px] tracking-[1.4px] uppercase font-bold text-[var(--color-ink-4)]"
+            >
+              <span className="flex-1 h-px bg-[var(--color-line)]" aria-hidden="true" />
+              <span className="shrink-0">⋯ no tracking · {humanizeGap(h.fromAt, h.toAt)} ⋯</span>
+              <span className="flex-1 h-px bg-[var(--color-line)]" aria-hidden="true" />
+            </div>
+          );
+        }
         const { artist, title } = splitArtistTitle(h.title);
         return (
           <div
