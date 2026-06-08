@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { Station } from '@/app/lib/stations';
 import { useFavorites } from '@/app/lib/favorites';
-import { useRegion, useRegionFilter } from '@/app/lib/region';
+import { useActiveRegion, useRegionFilter } from '@/app/lib/region';
 import { useHiddenFilter } from '@/app/lib/hidden';
 import { useGenreAffinity } from '@/app/lib/taste';
 import { scorePopular } from '@/app/lib/popularRank';
@@ -31,7 +31,7 @@ export function Recommended({ onSelect }: Props) {
   const [pool, setPool] = useState<Station[] | null>(null);
   const [errored, setErrored] = useState(false);
   const { isFavorite, toggle } = useFavorites();
-  const { region } = useRegion();
+  const region = useActiveRegion();
   const filterByRegion = useRegionFilter();
   const filterHidden = useHiddenFilter();
   const { scores, top } = useGenreAffinity();
@@ -81,7 +81,7 @@ export function Recommended({ onSelect }: Props) {
       )}
       {pool !== null && !errored && shown.length === 0 && (
         <div className="text-sm text-[var(--color-ink-3)] px-1 py-2">
-          No popular stations in this region.
+          No popular stations in this country.
         </div>
       )}
       {shown.slice(0, 15).map(s => (

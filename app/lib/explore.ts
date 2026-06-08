@@ -1,0 +1,100 @@
+'use client';
+
+import { useEffect, useSyncExternalStore } from 'react';
+import type { Station } from './stations';
+import type { ExploreCountry, ExploreTag } from './explorePaths';
+
+// Client data layer for Explore. The country/tag lists are fetched once and
+// cached at module scope (they barely change and the server caches them for
+// hours too), surfaced through useSyncExternalStore like the favorites/region
+// stores. Station drill-ins are one-shot fetches (the caller manages state).
+
+type Resource<T> = { data: T[]; loading: boolean; error: boolean };
+
+// A self-fetching, fetch-once list endpoint exposed as a hook.
+function createListResource<T>(url: string) {
+  let state: Resource<T> = { data: [], loading: false, error: false };
+  let started = false;
+  const listeners = new Set<() => void>();
+  // Stable server/hydration snapshot (no fetching on the server).
+  const SERVER: Resource<T> = { data: [], loading: false, error: false };
+
+  const emit = () => { for (const cb of listeners) cb(); };
+
+  async function load() {
+    if (started) return;
+    started = true;
+    state = { ...state, loading: true, error: false };
+    emit();
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(String(res.status));
+      const json = (await res.json()) as unknown;
+      state = { data: Array.isArray(json) ? (json as T[]) : [], loading: false, error: false };
+    } catch {
+      started = false; // let a later mount retry
+      state = { data: [], loading: false, error: true };
+    }
+    emit();
+  }
+
+  function subscribe(cb: () => void) {
+    listeners.add(cb);
+    return () => { listeners.delete(cb); };
+  }
+
+  return function useResource(): Resource<T> {
+    const value = useSyncExternalStore(subscribe, () => state, () => SERVER);
+    useEffect(() => { void load(); }, []);
+    return value;
+  };
+}
+
+export const useCountries = createListResource<ExploreCountry>('/api/countries');
+export const useTags = createListResource<ExploreTag>('/api/tags');
+
+async function getStations(url: string, signal?: AbortSignal): Promise<Station[]> {
+  const res = await fetch(url, { signal });
+  if (!res.ok) throw new Error(String(res.status));
+  const json = (await res.json()) as unknown;
+  return Array.isArray(json) ? (json as Station[]) : [];
+}
+
+// Stations matching a country and/or one-or-more genre tags — all ANDed (e.g.
+// German stations tagged jazz AND blues). At least one facet should be set;
+// with none the API returns [].
+export function fetchStations(
+  { country, tags }: { country?: string | null; tags?: string[] },
+  signal?: AbortSignal,
+): Promise<Station[]> {
+  const params = new URLSearchParams();
+  if (country) params.set('country', country);
+  for (const t of tags ?? []) params.append('tag', t);
+  return getStations(`/api/stations?${params.toString()}`, signal);
+}
+
+// The ISO codes of countries that have at least one station for these genre
+// tag(s) — used to narrow the country picker. Empty tags → empty (no filter).
+export async function fetchCountryCodesForTags(tags: string[], signal?: AbortSignal): Promise<string[]> {
+  if (tags.length === 0) return [];
+  const params = new URLSearchParams();
+  for (const t of tags) params.append('tag', t);
+  const res = await fetch(`/api/country-codes?${params.toString()}`, { signal });
+  if (!res.ok) throw new Error(String(res.status));
+  const json = (await res.json()) as unknown;
+  return Array.isArray(json) ? (json as string[]) : [];
+}
+
+// Curated genres for the Explore landing chips — a clean, recognizable subset
+// of radio-browser's (thousands of) tags. Station counts are joined in from
+// useTags() by name, and the same string is the drill-in query, so each entry
+// must match radio-browser's exact tag spelling (verified against /json/tags)
+// — e.g. "hiphop"/"rnb", not "hip hop"/"r&b" (which fragment into low counts).
+export const GENRES = [
+  'pop', 'rock', 'jazz', 'classical', 'electronic', 'dance',
+  'hiphop', 'rnb', 'soul', 'funk', 'disco', 'metal',
+  'punk', 'alternative', 'indie', 'country', 'folk', 'blues',
+  'reggae', 'latin', 'house', 'techno', 'ambient', 'lounge',
+  'chillout', 'oldies', '70s', '80s', '90s', 'news',
+  'talk', 'sports',
+] as const;

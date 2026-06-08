@@ -174,3 +174,16 @@ export function useRegionFilter(): <T extends { countrycode: string }>(stations:
     [locked, region],
   );
 }
+
+/**
+ * The region that actually shapes discovery (search + Popular): the chosen
+ * region only while "show only" is on, else empty (fully global). This keeps
+ * region effects tied to the visible toggle — there's no hidden prioritization
+ * when it's off. (The stored home region still drives Explore's "your country
+ * first" pinning and the picker default; that's `useRegion`.)
+ */
+export function useActiveRegion(): string {
+  const region = useSyncExternalStore(subscribe, read, () => '');
+  const locked = useSyncExternalStore(subscribeLock, readLock, () => false);
+  return locked ? region : '';
+}

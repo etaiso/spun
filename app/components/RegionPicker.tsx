@@ -1,7 +1,8 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useRegion, useRegionLock } from '@/app/lib/region';
+import { useRegion, useRegionLock, userRegion } from '@/app/lib/region';
+import { flagEmoji } from '@/app/lib/flag';
 
 // A practical spread of countries for the picker. The user's detected region
 // is always included even if it's not in this list.
@@ -11,11 +12,6 @@ const CODES = [
   'RU', 'UA', 'TR', 'BR', 'MX', 'AR', 'CL', 'CO', 'JP', 'KR', 'CN', 'IN',
   'ID', 'TH', 'VN', 'PH', 'ZA', 'EG', 'MA', 'NG', 'KE', 'AE', 'SA',
 ];
-
-function flagEmoji(code: string): string {
-  if (code.length !== 2) return '🌐';
-  return code.toUpperCase().replace(/./g, c => String.fromCodePoint(127397 + c.charCodeAt(0)));
-}
 
 export function RegionPicker() {
   const { region, setRegion } = useRegion();
@@ -30,63 +26,65 @@ export function RegionPicker() {
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [region]);
 
-  return (
-    <div className="flex flex-col gap-2">
-      <label htmlFor="region-select" className="text-[11px] tracking-[1.2px] uppercase font-bold text-[var(--color-ink-3)]">
-        Search region
-      </label>
-      <div className="relative">
-        <select
-          id="region-select"
-          value={region}
-          onChange={(e) => setRegion(e.target.value)}
-          className="appearance-none cursor-pointer w-full rounded-full border border-[var(--color-line)] bg-white pl-3 pr-8 py-2 text-sm text-[var(--color-ink)] hover:border-[var(--color-brand-pink)] transition-colors"
-        >
-          <option value="">🌐 Global (no preference)</option>
-          {options.map(o => (
-            <option key={o.code} value={o.code}>{o.label}</option>
-          ))}
-        </select>
-        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-[var(--color-ink-3)]">▾</span>
-      </div>
-      <span className="text-xs text-[var(--color-ink-4)]">
-        Stations from your region rank higher in search.
-      </span>
+  // "Show only" needs a region; enabling it defaults to the detected home
+  // region (or the first option) when none is set yet.
+  function toggle() {
+    if (locked) { setLocked(false); return; }
+    if (!region) setRegion(userRegion() ?? options[0]?.code ?? '');
+    setLocked(true);
+  }
 
-      <label
-        className={[
-          'mt-2 flex items-center justify-between gap-3 select-none',
-          region ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed',
-        ].join(' ')}
-      >
+  return (
+    <div className="flex flex-col gap-3">
+      {/* Single coupled control: the region only matters while "show only" is
+          on. Off = fully global (no hidden prioritization), so the picker is
+          hidden too. */}
+      <label className="flex items-center justify-between gap-3 cursor-pointer select-none">
         <span className="flex flex-col">
-          <span className="text-sm font-medium text-[var(--color-ink)]">Region-only mode</span>
+          <span className="text-sm font-medium text-[var(--color-ink)]">Show only one country</span>
           <span className="text-xs text-[var(--color-ink-4)]">
-            {region
-              ? 'Show only stations from this region everywhere — search, favorites, popular and recent.'
-              : 'Pick a region above to enable this.'}
+            Limit search and Popular to a single country. Favorites, Recently played and Explore are never limited.
           </span>
         </span>
         <button
           type="button"
           role="switch"
-          aria-checked={locked && !!region}
-          disabled={!region}
-          onClick={() => setLocked(!locked)}
+          aria-checked={locked}
+          onClick={toggle}
           className={[
-            'shrink-0 relative h-5 w-9 rounded-full transition-colors',
-            locked && region ? 'bg-[var(--color-brand-purple)]' : 'bg-[var(--color-line)]',
-            region ? 'cursor-pointer' : 'cursor-not-allowed',
+            'shrink-0 relative h-5 w-9 rounded-full transition-colors cursor-pointer',
+            locked ? 'bg-[var(--color-brand-purple)]' : 'bg-[var(--color-line)]',
           ].join(' ')}
         >
           <span
             className={[
               'absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all',
-              locked && region ? 'left-[18px]' : 'left-0.5',
+              locked ? 'left-[18px]' : 'left-0.5',
             ].join(' ')}
           />
         </button>
       </label>
+
+      {locked && (
+        <div className="flex flex-col gap-2">
+          <label htmlFor="region-select" className="text-[11px] tracking-[1.2px] uppercase font-bold text-[var(--color-ink-3)]">
+            Country
+          </label>
+          <div className="relative">
+            <select
+              id="region-select"
+              value={region}
+              onChange={(e) => setRegion(e.target.value)}
+              className="appearance-none cursor-pointer w-full rounded-full border border-[var(--color-line)] bg-white pl-3 pr-8 py-2 text-sm text-[var(--color-ink)] hover:border-[var(--color-brand-pink)] transition-colors"
+            >
+              {options.map(o => (
+                <option key={o.code} value={o.code}>{o.label}</option>
+              ))}
+            </select>
+            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-[var(--color-ink-3)]">▾</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

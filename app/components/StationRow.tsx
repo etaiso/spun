@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { Station } from '@/app/lib/stations';
 import { useTracking } from '@/app/lib/tracking';
+import { showTitleIfTruncated } from '@/app/lib/dom';
 import { StationLogo } from './StationLogo';
 import { StationContextMenu } from './StationContextMenu';
 
@@ -47,7 +48,7 @@ export function StationRow({ station, isActive, isFavorite, onSelect, onToggleFa
       >
         <StationLogo name={station.name} favicon={station.favicon} />
         <div className="flex-1 min-w-0">
-          <div className="text-[15px] font-semibold tracking-tight truncate">{station.name}</div>
+          <div className="text-[15px] font-semibold tracking-tight truncate" onMouseEnter={showTitleIfTruncated}>{station.name}</div>
           <div className="text-xs text-[var(--color-ink-3)] truncate">
             {[station.country, station.bitrate > 0 ? `${station.bitrate} kbps` : null].filter(Boolean).join(' · ')}
           </div>

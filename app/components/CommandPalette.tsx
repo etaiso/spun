@@ -5,9 +5,10 @@ import type { Station } from '@/app/lib/stations';
 import { useFavorites } from '@/app/lib/favorites';
 import { useRecent } from '@/app/lib/recent';
 import { useTracking } from '@/app/lib/tracking';
-import { useRegion, useRegionFilter } from '@/app/lib/region';
+import { useActiveRegion, useRegionFilter } from '@/app/lib/region';
 import { useHiddenFilter } from '@/app/lib/hidden';
 import { rankStations } from '@/app/lib/rank';
+import { showTitleIfTruncated } from '@/app/lib/dom';
 import { StationLogo } from './StationLogo';
 import { StationContextMenu } from './StationContextMenu';
 
@@ -30,7 +31,7 @@ export function CommandPalette({ onClose, onSelect }: Props) {
   const { favorites, isFavorite, toggle } = useFavorites();
   const { recent } = useRecent();
   const { isTracked, track, untrack } = useTracking();
-  const { region } = useRegion();
+  const region = useActiveRegion();
   const filterByRegion = useRegionFilter();
   const filterHidden = useHiddenFilter();
 
@@ -87,9 +88,11 @@ export function CommandPalette({ onClose, onSelect }: Props) {
   }, [active]);
 
   // With an empty query, the palette shows recently-played as a jumping-off
-  // point; once you type, it shows ranked search results.
+  // point; once you type, it shows ranked search results. Recently-played isn't
+  // region-filtered (Region-only mode focuses discovery, not your history) — but
+  // the search candidate pool above still is.
   const showingRecent = query.trim() === '';
-  const displayed = showingRecent ? filterHidden(filterByRegion(recent)) : results;
+  const displayed = showingRecent ? filterHidden(recent) : results;
 
   function choose(s: Station | undefined) {
     if (!s) return;
@@ -170,7 +173,7 @@ export function CommandPalette({ onClose, onSelect }: Props) {
             >
               <StationLogo name={s.name} favicon={s.favicon} />
               <div className="flex-1 min-w-0">
-                <div className="text-[15px] font-semibold tracking-tight truncate">{s.name}</div>
+                <div className="text-[15px] font-semibold tracking-tight truncate" onMouseEnter={showTitleIfTruncated}>{s.name}</div>
                 <div className="text-xs text-[var(--color-ink-3)] truncate">
                   {[s.country, s.bitrate > 0 ? `${s.bitrate} kbps` : null].filter(Boolean).join(' · ')}
                 </div>

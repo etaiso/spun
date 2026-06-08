@@ -2,6 +2,7 @@
 
 import { useMemo, useSyncExternalStore } from 'react';
 import { useRegion, useRegionLock } from '@/app/lib/region';
+import { flagEmoji } from '@/app/lib/flag';
 
 type Props = {
   onOpenSearch: () => void;
@@ -9,12 +10,12 @@ type Props = {
   onOpenSaved: () => void;
   // Highlight the settings control while its modal is open.
   settingsActive: boolean;
+  // Open the Explore destination + reflect whether it's the active view.
+  onToggleExplore: () => void;
+  exploreActive: boolean;
+  // Click the logo to return to the now-playing home.
+  onGoHome: () => void;
 };
-
-function flagEmoji(code: string): string {
-  if (code.length !== 2) return '🌐';
-  return code.toUpperCase().replace(/./g, c => String.fromCodePoint(127397 + c.charCodeAt(0)));
-}
 
 // Platform detection that's hydration-safe: the server (and the first client
 // render, to match it) sees `false`, then React swaps to the real value. Using
@@ -29,7 +30,7 @@ function useIsMac(): boolean {
   );
 }
 
-export function TopBar({ onOpenSearch, onOpenSettings, onOpenSaved, settingsActive }: Props) {
+export function TopBar({ onOpenSearch, onOpenSettings, onOpenSaved, settingsActive, onToggleExplore, exploreActive, onGoHome }: Props) {
   const isMac = useIsMac();
 
   // Surface the active region alongside the settings cog (one merged control —
@@ -45,7 +46,12 @@ export function TopBar({ onOpenSearch, onOpenSettings, onOpenSaved, settingsActi
 
   return (
     <header className="flex items-center gap-4 px-6 h-16 border-b border-[var(--color-line)] bg-[var(--color-bg-2)] shrink-0">
-      <div className="flex items-center gap-1.5 text-[15px] font-extrabold tracking-tight text-[var(--color-ink)]">
+      <button
+        onClick={onGoHome}
+        aria-label="spun — back to now playing"
+        title="Back to now playing"
+        className="flex items-center gap-1.5 text-[15px] font-extrabold tracking-tight text-[var(--color-ink)] cursor-pointer rounded-lg hover:opacity-80 transition-opacity"
+      >
         {/* App logo: concentric pulse rings, matching the desktop app icon. */}
         <svg viewBox="0 0 24 24" aria-hidden="true" className="w-10 h-10">
           <defs>
@@ -73,10 +79,28 @@ export function TopBar({ onOpenSearch, onOpenSettings, onOpenSaved, settingsActi
           </defs>
           <text x="0" y="25" fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" fontSize="26" fontWeight="800" letterSpacing="-1.4" fill="url(#wordmarkGradient)">spun</text>
         </svg>
-      </div>
+      </button>
+      {/* Explore destination — browse the catalogue by country or genre. */}
+      <button
+        onClick={onToggleExplore}
+        aria-label="Explore stations"
+        aria-pressed={exploreActive}
+        title="Explore stations by country or genre"
+        className={[
+          'ml-auto flex items-center gap-2 h-10 px-4 rounded-full border transition-colors cursor-pointer shrink-0',
+          exploreActive
+            ? 'bg-brand text-white border-transparent shadow-[0_4px_14px_rgba(168,85,247,0.35)]'
+            : 'border-[var(--color-line)] bg-white text-[var(--color-ink-2)] hover:border-[var(--color-brand-pink)]',
+        ].join(' ')}
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-[18px] h-[18px]">
+          <circle cx="12" cy="12" r="10" /><path d="M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20M2 12h20" />
+        </svg>
+        <span className="text-sm font-semibold hidden sm:inline">Explore</span>
+      </button>
       <button
         onClick={onOpenSearch}
-        className="ml-auto md:ml-6 flex-1 max-w-md flex items-center gap-2.5 h-10 px-4 rounded-full border border-[var(--color-line)] bg-white text-[var(--color-ink-3)] hover:border-[var(--color-brand-pink)] transition-colors cursor-pointer text-left shadow-[0_1px_3px_rgba(0,0,0,0.03)]"
+        className="md:ml-2 flex-1 max-w-md flex items-center gap-2.5 h-10 px-4 rounded-full border border-[var(--color-line)] bg-white text-[var(--color-ink-3)] hover:border-[var(--color-brand-pink)] transition-colors cursor-pointer text-left shadow-[0_1px_3px_rgba(0,0,0,0.03)]"
         aria-label="Search stations"
       >
         <span aria-hidden="true">🔍</span>
@@ -109,8 +133,8 @@ export function TopBar({ onOpenSearch, onOpenSettings, onOpenSaved, settingsActi
           one button. Highlighted only while the modal is open. */}
       <button
         onClick={onOpenSettings}
-        aria-label={showRegion ? `Settings — region: ${regionName}` : 'Settings'}
-        title={showRegion ? `Region · ${regionName} — open settings` : 'Settings'}
+        aria-label={showRegion ? `Settings — showing only ${regionName}` : 'Settings'}
+        title={showRegion ? `Showing only ${regionName} · open settings` : 'Settings'}
         className={[
           'flex items-center h-10 rounded-full border bg-white transition-colors cursor-pointer shrink-0',
           showRegion ? 'gap-2 pl-3 pr-2.5' : 'w-10 justify-center',
@@ -123,7 +147,7 @@ export function TopBar({ onOpenSearch, onOpenSettings, onOpenSaved, settingsActi
           <>
             <span className="flex items-center gap-1.5">
               <span className="text-[15px] leading-none" aria-hidden="true">{flagEmoji(region)}</span>
-              <span className="text-[13px] font-semibold tracking-wide text-[var(--color-ink-2)]">{region}</span>
+              <span className="text-[13px] font-semibold text-[var(--color-ink-2)] whitespace-nowrap">{regionName}</span>
             </span>
             <span className="w-px self-stretch my-2 bg-[var(--color-line)]" aria-hidden="true" />
           </>

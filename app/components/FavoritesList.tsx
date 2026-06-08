@@ -2,7 +2,6 @@
 
 import type { Station } from '@/app/lib/stations';
 import { useFavorites } from '@/app/lib/favorites';
-import { useRegionFilter } from '@/app/lib/region';
 import { useHiddenFilter } from '@/app/lib/hidden';
 import { StationRow } from './StationRow';
 import { CollapsibleSection } from './CollapsibleSection';
@@ -11,11 +10,13 @@ type Props = {
   onSelect: (s: Station) => void;
 };
 
+// Favorites are explicit picks, so they're never region-filtered (Region-only
+// mode focuses *discovery* — search + Popular — not your saved stations). Only
+// hidden stations are dropped.
 export function FavoritesList({ onSelect }: Props) {
   const { favorites, toggle } = useFavorites();
-  const filterByRegion = useRegionFilter();
   const filterHidden = useHiddenFilter();
-  const shown = filterHidden(filterByRegion(favorites));
+  const shown = filterHidden(favorites);
 
   return (
     <CollapsibleSection title="★ Favorites" count={shown.length}>

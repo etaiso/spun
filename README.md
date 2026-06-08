@@ -18,6 +18,9 @@ falls back to **fingerprinting the live audio with Shazam** to identify it.
   catches the next track the moment it starts.
 - 🔎 **Command palette search** (`⌘K` / `Ctrl K`) with fuzzy matching and
   results ranked by your region, recently played, and favorites.
+- 🧭 **Explore** — browse the catalogue by **country** and **genre**, or combine
+  both (e.g. *jazz + blues in Germany*), with searchable pickers and multi-genre
+  filters. A docked mini-player keeps your station playing while you browse.
 - 🎙️ **Now playing** with the current song and **album cover art**, plus a
   **playlist history** restored when you reload or switch back to a station.
 - 📡 **Background tracking** — track multiple stations at once and watch what's
