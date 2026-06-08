@@ -6,12 +6,21 @@ import { resumeAudio, connectIfRunning, disconnectElement } from '@/app/lib/audi
 import { subscribePauseRadio, subscribeResumeRadio, stopPreview } from '@/app/lib/playbackBus';
 import { VOLUME_KEY, readStoredVolume } from '@/app/lib/volume';
 import { persistSet } from '@/app/lib/persist';
+import { StationLogo } from './StationLogo';
 
 export type PlayState = 'idle' | 'connecting' | 'playing' | 'error';
 
 type Props = {
   station: Station;
   onPlayStateChange: (s: PlayState) => void;
+  // When true, render a compact bar docked to the bottom of the page instead of
+  // the full inline controls — used while the Explore view is open so playback
+  // continues uninterrupted (the same audio element stays mounted either way).
+  dock?: boolean;
+  // The current song title, shown in the dock alongside the station name.
+  nowPlaying?: string | null;
+  // Clicking the dock's station info returns to the full now-playing view.
+  onExpand?: () => void;
 };
 
 const AUTOPLAY_KEY = 'radio:autoplay';
@@ -26,7 +35,7 @@ function readStoredAutoplay(): boolean {
   }
 }
 
-export function Player({ station, onPlayStateChange }: Props) {
+export function Player({ station, onPlayStateChange, dock = false, nowPlaying = null, onExpand }: Props) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   // True only while the live stream is paused because a preview asked it to —
   // so we resume exactly that, never audio the user paused themselves. A single
@@ -154,7 +163,9 @@ export function Player({ station, onPlayStateChange }: Props) {
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
-  }, []);
+    // Re-attach when swapping between the full controls and the dock, since the
+    // wrapper element (volWrapRef) is a different node in each layout.
+  }, [dock]);
 
   // On unmount (station switch), explicitly tear down the audio element so its
   // proxied connection is released immediately. Without this, rapid switching
@@ -296,90 +307,128 @@ export function Player({ station, onPlayStateChange }: Props) {
     }
   }
 
-  return (
-    <div className="relative z-10 flex items-center gap-5 pt-2 flex-wrap">
-      <audio
-        ref={audioRef}
-        // Inner key guards against streamUrl swaps within a single station
-        // selection (e.g. mirror failover); parent typically keys by id.
-        key={station.streamUrl}
-        // Proxied through our origin so Web Audio can analyse it for the
-        // canvas visualiser (cross-origin streams can't be analysed).
-        src={`/api/stream?url=${encodeURIComponent(station.streamUrl)}`}
-        // Native autoplay attempt (some browsers/settings honor the attribute
-        // more leniently than a script play()). The mount effect below also
-        // calls play() to catch a block and arm a gesture-resume fallback.
-        autoPlay={autoplay}
-        preload={autoplay ? 'auto' : 'none'}
-        onPlay={handlePlay}
-        onPlaying={handlePlay}
-        onPause={handlePause}
-        onWaiting={handleWaiting}
-        onError={handleError}
+  // The mute icon + volume slider, shared by the full controls and the dock.
+  const volumeControl = (
+    <div ref={volWrapRef} className="flex items-center gap-3 max-w-[280px] text-[var(--color-ink-3)]" title="Scroll to change volume">
+      <button
+        onClick={() => setMuted(m => !m)}
+        className="shrink-0 hover:text-[var(--color-ink)] transition-colors cursor-pointer"
+        aria-label={muted ? 'Unmute' : 'Mute'}
+        title={muted ? 'Unmute' : 'Mute'}
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+          <path d="M11 5 6 9H2v6h4l5 4V5z" />
+          {muted ? (
+            <>
+              <line x1="22" y1="9" x2="16" y2="15" />
+              <line x1="16" y1="9" x2="22" y2="15" />
+            </>
+          ) : (
+            <>
+              <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+            </>
+          )}
+        </svg>
+      </button>
+      <input
+        type="range"
+        min={0}
+        max={1}
+        step={0.01}
+        value={volume}
+        onChange={(e) => setVolume(parseFloat(e.target.value))}
+        className="flex-1 w-40 accent-[var(--color-brand-pink)] cursor-pointer"
+        aria-label="Volume"
       />
-      <button
-        onClick={togglePlay}
-        data-autoplay-ignore
-        className="w-14 h-14 rounded-full bg-[var(--color-ink)] text-white text-xl flex items-center justify-center shadow-[0_8px_20px_rgba(0,0,0,0.2)] cursor-pointer"
-        aria-label={paused ? 'Play' : 'Pause'}
-      >
-        {paused ? '▶' : '⏸'}
-      </button>
-      <div ref={volWrapRef} className="flex items-center gap-3 max-w-[280px] text-[var(--color-ink-3)]" title="Scroll to change volume">
-        <button
-          onClick={() => setMuted(m => !m)}
-          className="shrink-0 hover:text-[var(--color-ink)] transition-colors cursor-pointer"
-          aria-label={muted ? 'Unmute' : 'Mute'}
-          title={muted ? 'Unmute' : 'Mute'}
-        >
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="w-5 h-5"
-          >
-            <path d="M11 5 6 9H2v6h4l5 4V5z" />
-            {muted ? (
-              <>
-                <line x1="22" y1="9" x2="16" y2="15" />
-                <line x1="16" y1="9" x2="22" y2="15" />
-              </>
-            ) : (
-              <>
-                <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-                <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
-              </>
-            )}
-          </svg>
-        </button>
-        <input
-          type="range"
-          min={0}
-          max={1}
-          step={0.01}
-          value={volume}
-          onChange={(e) => setVolume(parseFloat(e.target.value))}
-          className="flex-1 w-40 accent-[var(--color-brand-pink)] cursor-pointer"
-          aria-label="Volume"
-        />
-      </div>
-      <div className="flex-1" />
-      <button
-        onClick={() => setAutoplay(a => !a)}
-        aria-pressed={autoplay}
-        title="Start audio automatically when you pick a station"
-        className={[
-          'text-[11px] tracking-[1px] uppercase font-bold px-3 py-1.5 rounded-full border transition-colors cursor-pointer',
-          autoplay
-            ? 'bg-[var(--color-brand-purple)] text-white border-[var(--color-brand-purple)] shadow-[0_2px_6px_rgba(168,85,247,0.3)]'
-            : 'text-[var(--color-ink-3)] border-[var(--color-line)] hover:border-[var(--color-brand-pink)] hover:text-[var(--color-ink)]',
-        ].join(' ')}
-      >
-        Auto-play {autoplay ? 'on' : 'off'}
-      </button>
     </div>
+  );
+
+  // The <audio> element is rendered ONCE here, outside the dock/full branch, so
+  // switching layouts (e.g. opening Explore) never remounts it — playback and
+  // the streaming connection survive the swap uninterrupted.
+  const audioEl = (
+    <audio
+      ref={audioRef}
+      // Inner key guards against streamUrl swaps within a single station
+      // selection (e.g. mirror failover); parent typically keys by id.
+      key={station.streamUrl}
+      // Proxied through our origin so Web Audio can analyse it for the
+      // canvas visualiser (cross-origin streams can't be analysed).
+      src={`/api/stream?url=${encodeURIComponent(station.streamUrl)}`}
+      // Native autoplay attempt (some browsers/settings honor the attribute
+      // more leniently than a script play()). The mount effect below also
+      // calls play() to catch a block and arm a gesture-resume fallback.
+      autoPlay={autoplay}
+      preload={autoplay ? 'auto' : 'none'}
+      onPlay={handlePlay}
+      onPlaying={handlePlay}
+      onPause={handlePause}
+      onWaiting={handleWaiting}
+      onError={handleError}
+    />
+  );
+
+  // Compact dock: fixed to the bottom of the content area (right of the
+  // sidebar) so the active station keeps playing while the user browses Explore.
+  if (dock) {
+    return (
+      <>
+        {audioEl}
+        <div className="fixed bottom-0 left-0 lg:left-[360px] right-0 z-30 h-[72px] flex items-center gap-4 px-5 border-t border-[var(--color-line)] bg-[var(--color-bg-2)] shadow-[0_-4px_24px_rgba(60,30,10,0.08)]">
+          <button
+            onClick={togglePlay}
+            data-autoplay-ignore
+            className="shrink-0 w-12 h-12 rounded-full bg-[var(--color-ink)] text-white text-lg flex items-center justify-center shadow-[0_6px_16px_rgba(0,0,0,0.2)] cursor-pointer"
+            aria-label={paused ? 'Play' : 'Pause'}
+          >
+            {paused ? '▶' : '⏸'}
+          </button>
+          <button
+            onClick={onExpand}
+            className="group flex items-center gap-3 min-w-0 flex-1 text-left cursor-pointer"
+            title="Back to now playing"
+          >
+            <StationLogo name={station.name} favicon={station.favicon} size={44} />
+            <div className="min-w-0">
+              <div className="text-[14px] font-bold tracking-tight truncate group-hover:text-[var(--color-brand-purple)] transition-colors">{station.name}</div>
+              <div className="text-xs text-[var(--color-ink-3)] truncate">{nowPlaying ?? 'Live'}</div>
+            </div>
+          </button>
+          <div className="hidden sm:block">{volumeControl}</div>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      {audioEl}
+      <div className="relative z-10 flex items-center gap-5 pt-2 flex-wrap">
+        <button
+          onClick={togglePlay}
+          data-autoplay-ignore
+          className="w-14 h-14 rounded-full bg-[var(--color-ink)] text-white text-xl flex items-center justify-center shadow-[0_8px_20px_rgba(0,0,0,0.2)] cursor-pointer"
+          aria-label={paused ? 'Play' : 'Pause'}
+        >
+          {paused ? '▶' : '⏸'}
+        </button>
+        {volumeControl}
+        <div className="flex-1" />
+        <button
+          onClick={() => setAutoplay(a => !a)}
+          aria-pressed={autoplay}
+          title="Start audio automatically when you pick a station"
+          className={[
+            'text-[11px] tracking-[1px] uppercase font-bold px-3 py-1.5 rounded-full border transition-colors cursor-pointer',
+            autoplay
+              ? 'bg-[var(--color-brand-purple)] text-white border-[var(--color-brand-purple)] shadow-[0_2px_6px_rgba(168,85,247,0.3)]'
+              : 'text-[var(--color-ink-3)] border-[var(--color-line)] hover:border-[var(--color-brand-pink)] hover:text-[var(--color-ink)]',
+          ].join(' ')}
+        >
+          Auto-play {autoplay ? 'on' : 'off'}
+        </button>
+      </div>
+    </>
   );
 }

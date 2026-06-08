@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { Station } from './lib/stations';
 import { useRecent } from './lib/recent';
 import { usePlayCounts } from './lib/playCounts';
@@ -192,52 +192,67 @@ export default function Home() {
       <div className="flex flex-1 min-h-0">
         <Sidebar selected={currentStation} onSelect={handleSelect} nowPlaying={currentTrack} />
         <main className="flex-1 bg-[var(--color-bg)] overflow-y-auto overflow-x-hidden">
-          {view === 'explore' ? (
-          <ExploreView onSelect={(s) => { handleSelect(s); setView('home'); }} />
-          ) : (
-          <div className="p-10 min-h-full">
-          {/* Full-width stage so the Tracking monitor hugs the right edge.
-              When stations are tracked it splits into the player column + the
-              aside (stacks below on narrow screens); the player content is
-              capped + centered within its own column for readability. */}
-          <div className="w-full flex flex-col lg:flex-row gap-8 min-h-full">
-            <div className="flex-1 min-w-0 flex flex-col justify-center">
-              <div className="w-full max-w-4xl mx-auto flex flex-col gap-6">
-                {currentStation ? (
-                  // Single key on the Fragment so both children remount together
-                  // when the station changes. Short `<>` can't carry a key, and
-                  // the same key on both children is a React duplicate-key error.
-                  <Fragment key={currentStation.id}>
-                    <NowPlaying station={currentStation} playState={playState} everPlayed={everPlayed} onTrack={setCurrentTrack} onHistory={setPlaylistHistory} />
-                    <Player station={currentStation} onPlayStateChange={handlePlayState} />
-                    <PlaylistHistory history={playlistHistory} stationName={currentStation.name} />
-                  </Fragment>
-                ) : (
-                  <div className="flex items-center justify-center text-center">
-                    <div>
-                      <div className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-brand-purple)] mb-3">
-                        Spun
-                      </div>
-                      <div className="text-[32px] font-bold tracking-tight">Pick a station to begin</div>
-                      <div className="text-base text-[var(--color-ink-3)] mt-3 max-w-md mx-auto">
-                        Press <kbd className="px-1.5 py-0.5 rounded border border-[var(--color-line)] bg-white text-[12px] font-semibold">⌘K</kbd> to search, or browse the popular list in the sidebar. Star what you love to pin it to the top.
-                      </div>
+          {/* Now-playing stage. It stays mounted while Explore is open — the
+              cover, history and tracking panel hide, and the stage wrappers
+              collapse — so the Player (and its live audio + now-playing SSE)
+              keep running uninterrupted. The Player itself re-renders as a
+              fixed bottom dock via `dock`. Wrappers are keyed by station so a
+              station change still remounts them; a view change does not. */}
+          {currentStation && (
+            <div className={view === 'explore' ? '' : 'p-10 min-h-full'}>
+              <div className={view === 'explore' ? '' : 'w-full flex flex-col lg:flex-row gap-8 min-h-full'}>
+                <div className={view === 'explore' ? '' : 'flex-1 min-w-0 flex flex-col justify-center'}>
+                  <div className={view === 'explore' ? '' : 'w-full max-w-4xl mx-auto flex flex-col gap-6'}>
+                    <div className={view === 'explore' ? 'hidden' : ''}>
+                      <NowPlaying key={currentStation.id} station={currentStation} playState={playState} everPlayed={everPlayed} onTrack={setCurrentTrack} onHistory={setPlaylistHistory} />
+                    </div>
+                    <Player
+                      key={currentStation.id}
+                      station={currentStation}
+                      onPlayStateChange={handlePlayState}
+                      dock={view === 'explore'}
+                      nowPlaying={currentTrack}
+                      onExpand={() => setView('home')}
+                    />
+                    <div className={view === 'explore' ? 'hidden' : ''}>
+                      <PlaylistHistory key={currentStation.id} history={playlistHistory} stationName={currentStation.name} />
                     </div>
                   </div>
+                </div>
+                {tracked.length > 0 && view !== 'explore' && (
+                  <aside className="shrink-0 self-stretch lg:w-[320px] lg:border-l lg:border-[var(--color-line)] lg:pl-8 pt-2">
+                    <TrackingPanel
+                      onSelect={handleSelect}
+                      activeStationId={currentStation?.id ?? null}
+                      activeTrack={currentTrack}
+                    />
+                  </aside>
                 )}
               </div>
             </div>
-            {tracked.length > 0 && (
-              <aside className="shrink-0 self-stretch lg:w-[320px] lg:border-l lg:border-[var(--color-line)] lg:pl-8 pt-2">
-                <TrackingPanel
-                  onSelect={handleSelect}
-                  activeStationId={currentStation?.id ?? null}
-                  activeTrack={currentTrack}
-                />
-              </aside>
-            )}
-          </div>
-          </div>
+          )}
+
+          {/* Explore destination. Bottom padding clears the fixed player dock
+              when something is playing. Selecting a station keeps you in
+              Explore — the dock just updates to the new station. */}
+          {view === 'explore' && (
+            <div className={currentStation ? 'pb-24' : ''}>
+              <ExploreView onSelect={handleSelect} />
+            </div>
+          )}
+
+          {!currentStation && view !== 'explore' && (
+            <div className="p-10 min-h-full flex items-center justify-center text-center">
+              <div>
+                <div className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-brand-purple)] mb-3">
+                  Spun
+                </div>
+                <div className="text-[32px] font-bold tracking-tight">Pick a station to begin</div>
+                <div className="text-base text-[var(--color-ink-3)] mt-3 max-w-md mx-auto">
+                  Press <kbd className="px-1.5 py-0.5 rounded border border-[var(--color-line)] bg-white text-[12px] font-semibold">⌘K</kbd> to search, or browse the popular list in the sidebar. Star what you love to pin it to the top.
+                </div>
+              </div>
+            </div>
           )}
         </main>
       </div>
