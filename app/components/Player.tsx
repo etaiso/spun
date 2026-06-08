@@ -29,7 +29,10 @@ function readStoredAutoplay(): boolean {
 export function Player({ station, onPlayStateChange }: Props) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   // True only while the live stream is paused because a preview asked it to —
-  // so we resume exactly that, never audio the user paused themselves.
+  // so we resume exactly that, never audio the user paused themselves. A single
+  // boolean suffices because at most one preview is ever on screen at a time
+  // (the Saved-Songs preview lives in a modal; the playlist-history preview in
+  // the main view — they can't both be active).
   const pausedByPreviewRef = useRef(false);
   const volWrapRef = useRef<HTMLDivElement | null>(null);
   // Lazy init: Player is only rendered after a user gesture (selectedStation
