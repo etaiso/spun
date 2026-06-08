@@ -47,6 +47,9 @@ Open <http://localhost:3000>.
 This is fully functional on its own: stations that broadcast song titles show
 them, and stations that don't show "No song info right now."
 
+Append `?debug=true` to the URL to reveal a diagnostics panel in Settings (web
+only — it's never shown in the desktop app).
+
 ### 2. The Shazam recognizer (optional)
 
 To identify songs on stations that don't broadcast a title, run the recognizer

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { Station } from '@/app/lib/stations';
-import { useHidden } from '@/app/lib/hidden';
+import { useHidden, useHideConfirm } from '@/app/lib/hidden';
 import { useTracking } from '@/app/lib/tracking';
 
 type Props = {
@@ -18,8 +18,11 @@ type Props = {
 // rows and the command palette.
 export function StationContextMenu({ station, position, onClose }: Props) {
   const { hide } = useHidden();
+  const { skipConfirm, setSkipConfirm } = useHideConfirm();
   const { isTracked, track, untrack } = useTracking();
   const [confirmOpen, setConfirmOpen] = useState(false);
+  // "Don't ask again" checkbox state for the confirm dialog.
+  const [dontAskAgain, setDontAskAgain] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
 
@@ -73,7 +76,16 @@ export function StationContextMenu({ station, position, onClose }: Props) {
             It will stop appearing in search, favorites, popular and recently played. To bring it back,
             go to <span className="font-semibold text-[var(--color-ink-2)]">Settings → Hidden stations</span>.
           </p>
-          <div className="flex justify-end gap-2.5 mt-5">
+          <label className="flex items-center gap-2 mt-4 text-sm text-[var(--color-ink-3)] cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={dontAskAgain}
+              onChange={(e) => setDontAskAgain(e.target.checked)}
+              className="h-4 w-4 rounded border-[var(--color-line)] accent-[var(--color-brand-purple)] cursor-pointer"
+            />
+            Don’t ask again
+          </label>
+          <div className="flex justify-end gap-2.5 mt-4">
             <button
               onClick={onClose}
               className="px-3.5 py-1.5 rounded-full text-sm font-semibold text-[var(--color-ink-2)] border border-[var(--color-line)] hover:bg-[var(--color-bg)] cursor-pointer transition-colors"
@@ -81,7 +93,7 @@ export function StationContextMenu({ station, position, onClose }: Props) {
               Cancel
             </button>
             <button
-              onClick={() => { hide(station); onClose(); }}
+              onClick={() => { if (dontAskAgain) setSkipConfirm(true); hide(station); onClose(); }}
               className="px-3.5 py-1.5 rounded-full text-sm font-semibold text-white bg-[var(--color-danger)] hover:opacity-90 cursor-pointer transition-opacity"
             >
               Hide station
@@ -124,7 +136,7 @@ export function StationContextMenu({ station, position, onClose }: Props) {
         </button>
         <button
           role="menuitem"
-          onClick={() => setConfirmOpen(true)}
+          onClick={() => { if (skipConfirm) { hide(station); onClose(); } else setConfirmOpen(true); }}
           className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm text-[var(--color-ink)] hover:bg-[var(--color-bg)] cursor-pointer"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 shrink-0 text-[var(--color-ink-3)]">

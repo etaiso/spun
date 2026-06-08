@@ -64,6 +64,47 @@ export function useHidden() {
   return { hidden, isHidden, hide, unhide };
 }
 
+// Whether to skip the "Hide station?" confirmation. Off by default (we always
+// confirm). Flipped on when the user ticks "Don't ask again" in the dialog, and
+// revertable from Settings → Hidden stations. Same store shape as the toggles in
+// app/lib/closeToTray.ts; the StorageEvent listener also picks up the value when
+// hydrateFromServer() replays the server state on boot.
+const SKIP_CONFIRM_KEY = 'radio:hideSkipConfirm';
+
+function loadSkipConfirm(): boolean {
+  if (typeof window === 'undefined') return false;
+  try { return window.localStorage.getItem(SKIP_CONFIRM_KEY) === '1'; } catch { return false; }
+}
+
+let skipSnapshot: boolean | null = null;
+function readSkip(): boolean {
+  if (skipSnapshot === null) skipSnapshot = loadSkipConfirm();
+  return skipSnapshot;
+}
+
+const skipListeners = new Set<() => void>();
+function subscribeSkip(cb: () => void): () => void {
+  skipListeners.add(cb);
+  const onStorage = (e: StorageEvent) => {
+    if (e.key === SKIP_CONFIRM_KEY) { skipSnapshot = loadSkipConfirm(); cb(); }
+  };
+  window.addEventListener('storage', onStorage);
+  return () => { skipListeners.delete(cb); window.removeEventListener('storage', onStorage); };
+}
+
+function writeSkip(next: boolean) {
+  skipSnapshot = next;
+  persistSet(SKIP_CONFIRM_KEY, next ? '1' : '0');
+  for (const cb of skipListeners) cb();
+}
+
+/** The "skip the hide confirmation" preference + a setter. */
+export function useHideConfirm() {
+  const skipConfirm = useSyncExternalStore(subscribeSkip, readSkip, () => false);
+  const setSkipConfirm = useCallback((v: boolean) => writeSkip(v), []);
+  return { skipConfirm, setSkipConfirm };
+}
+
 /**
  * Returns a filter that drops hidden stations from any list — apply it
  * everywhere stations are shown so hidden ones never reappear.
