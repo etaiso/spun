@@ -52,6 +52,18 @@ describe('addSong / removeSong', () => {
     list = removeSong(list, 'A');
     expect(list.map(s => s.id)).toEqual(['B']);
   });
+
+  it('de-dupes the same song saved from different sources (Shazam key vs artist|title)', () => {
+    // Now-playing card saves with a Shazam key id; playlist history saves the
+    // same track with a normalized artist|title id. They must not both persist.
+    const fromCard = buildSavedSong({ ...base, key: 'shz-99' });
+    const fromHistory = buildSavedSong({ ...base, key: '' }); // id = 'tracy chapman|fast car'
+    expect(fromCard.id).not.toBe(fromHistory.id);
+    let list: SavedSong[] = [];
+    list = addSong(list, fromCard);
+    list = addSong(list, fromHistory); // same artist/title → deduped
+    expect(list.map(s => s.id)).toEqual(['shz-99']);
+  });
 });
 
 describe('searchSavedSongs', () => {

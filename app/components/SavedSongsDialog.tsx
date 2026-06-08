@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useSavedSongs, searchSavedSongs } from '@/app/lib/savedSongs';
+import { useSavedSongs, searchSavedSongs, type SavedSong } from '@/app/lib/savedSongs';
 import { rangeFilter, groupByDate, formatPlayed, type DateRange } from '@/app/lib/savedDates';
 import { lookupITunesSong } from '@/app/lib/itunes';
 import { usePreviewPlayer } from '@/app/lib/usePreviewPlayer';
@@ -35,23 +35,34 @@ export function SavedSongsDialog({ open, onOpenChange }: Props) {
   const [now, setNow] = useState(() => Date.now());
   const [exportOpen, setExportOpen] = useState(false);
   const exportRef = useRef<HTMLDivElement | null>(null);
-  // Ids we've already tried to backfill a preview for this session (incl. ones
+  // Ids we've already tried to backfill from iTunes this session (incl. ones
   // iTunes had no match for) so we don't re-query them on every open.
-  const previewTried = useRef<Set<string>>(new Set());
+  const backfillTried = useRef<Set<string>>(new Set());
 
-  // Backfill missing previews from iTunes when the dialog opens. Songs saved
-  // before previews were captured (or metadata tracks) have no previewUrl; the
-  // same iTunes lookup that yielded their Apple Music link also has a ~30s
-  // clip, so fetch it and persist so the ▶ appears (and sticks next time).
+  // Backfill missing fields from iTunes when the dialog opens. Metadata-only
+  // saves (and songs saved from playlist history) lack a preview, real cover,
+  // and a direct Apple Music link — their appleMusicUrl is a generic search
+  // fallback. One iTunes lookup yields all three; fetch and persist so they
+  // stick next time. A search-URL apple link counts as "missing".
+  const isAppleSearchUrl = (u: string) => !u || u.includes('music.apple.com/search');
   useEffect(() => {
     if (!open) return;
     const ctrl = new AbortController();
     for (const s of saved) {
-      if (s.previewUrl || previewTried.current.has(s.id)) continue;
-      previewTried.current.add(s.id);
+      if (backfillTried.current.has(s.id)) continue;
+      const needsPreview = !s.previewUrl;
+      const needsApple = isAppleSearchUrl(s.appleMusicUrl);
+      const needsCover = !s.cover;
+      if (!needsPreview && !needsApple && !needsCover) continue;
+      backfillTried.current.add(s.id);
       const term = ([s.artist, s.title].filter(Boolean).join(' ').trim()) || s.raw;
       lookupITunesSong(term, ctrl.signal).then(m => {
-        if (!ctrl.signal.aborted && m?.previewUrl) update(s.id, { previewUrl: m.previewUrl });
+        if (ctrl.signal.aborted || !m) return;
+        const patch: Partial<SavedSong> = {};
+        if (needsPreview && m.previewUrl) patch.previewUrl = m.previewUrl;
+        if (needsApple && m.appleUrl) patch.appleMusicUrl = m.appleUrl;
+        if (needsCover && m.cover) patch.cover = m.cover;
+        if (Object.keys(patch).length) update(s.id, patch);
       });
     }
     return () => ctrl.abort();

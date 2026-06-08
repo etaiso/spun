@@ -15,9 +15,6 @@ function termFor(raw: string): string {
   return ([artist, title].filter(Boolean).join(' ').trim()) || raw;
 }
 
-const savedId = (artist: string, title: string) =>
-  `${artist.trim().toLowerCase()}|${title.trim().toLowerCase()}`;
-
 type PreviewState = 'idle' | 'resolving' | 'playing' | 'none';
 
 // Session playlist log, rendered below the player controls. Carries a solid
@@ -27,7 +24,7 @@ type PreviewState = 'idle' | 'resolving' | 'playing' | 'none';
 // the live radio) and can be saved (brand heart) — metadata-only saves whose
 // cover / preview / Apple Music link the SavedSongsDialog backfills from iTunes.
 export function PlaylistHistory({ history, stationName }: { history: HistoryItem[]; stationName: string }) {
-  const { isSaved, save, remove } = useSavedSongs();
+  const { savedSong, save, remove } = useSavedSongs();
   const { previewId, audioRef, onEnded, toggle, stop } = usePreviewPlayer({ resumeRadioOnStop: true });
   // iTunes term -> previewUrl, or null for a confirmed no-match. Resolved lazily
   // on click and kept for the session (history rows stay lean — nothing persisted).
@@ -76,8 +73,8 @@ export function PlaylistHistory({ history, stationName }: { history: HistoryItem
           : resolvingKey === key ? 'resolving'
           : resolved[term] === null ? 'none'
           : 'idle';
-        const id = savedId(artist, title);
-        const saved = isSaved(id);
+        const existing = savedSong(artist, title);
+        const saved = !!existing;
         return (
           <div
             key={key}
@@ -91,13 +88,13 @@ export function PlaylistHistory({ history, stationName }: { history: HistoryItem
               <PreviewButton state={state} onClick={() => onPreview(key, h.title)} />
               <button
                 onClick={() => {
-                  if (saved) { remove(id); return; }
+                  if (existing) { remove(existing.id); return; }
                   save({ raw: h.title, artist, title, stationName, playedAt: h.at ?? Date.now() });
                 }}
                 aria-label={saved ? `Remove ${title} from saved` : `Save ${title}`}
                 title={saved ? 'Saved — click to remove' : 'Save this song'}
                 className={[
-                  'w-7 h-7 flex items-center justify-center text-base leading-none cursor-pointer transition-transform hover:scale-125',
+                  'w-8 h-8 flex items-center justify-center text-xl leading-none cursor-pointer transition-transform hover:scale-125',
                   saved ? 'text-[var(--color-brand-pink)]' : 'text-[var(--color-ink-4)] hover:text-[var(--color-brand-pink)]',
                 ].join(' ')}
               >
