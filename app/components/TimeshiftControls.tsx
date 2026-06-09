@@ -20,14 +20,23 @@ function fmtBehind(sec: number): string {
 // [−30] [LIVE] [+30] cluster. The scrubber tints the played-behind portion,
 // marks song boundaries (ticks) and real audio gaps (discontinuities), and
 // seeks on click/drag.
+const STEP_SEC = 30;
+
 export function TimeshiftControls(props: TimeshiftControlsProps) {
+  const { bufferStartMs, liveEdgeMs, playheadMs, atLiveEdge } = props.state;
+  const head = playheadMs ?? liveEdgeMs;
+  // −30 needs a full step of rewindable history behind the playhead; on first
+  // load (or once rewound to the start) there isn't, so disable it rather than
+  // letting it clamp to a no-op. +30 is meaningless at the live edge.
+  const canRewind = head !== null && bufferStartMs !== null && head - bufferStartMs >= STEP_SEC * 1000;
+  const canForward = !atLiveEdge;
   return (
     <div className="flex flex-col gap-1.5 w-full">
       <Timeline state={props.state} onSeekTo={props.onSeekTo} ticks={props.ticks} height={4} />
       <div className="flex items-center justify-center gap-3">
-        <StepButton delta={-30} onSeekBy={props.onSeekBy} />
+        <StepButton delta={-30} onSeekBy={props.onSeekBy} disabled={!canRewind} />
         <LivePill state={props.state} onGoLive={props.onGoLive} />
-        <StepButton delta={30} onSeekBy={props.onSeekBy} />
+        <StepButton delta={30} onSeekBy={props.onSeekBy} disabled={!canForward} />
       </div>
     </div>
   );
@@ -52,7 +61,9 @@ function Timeline({ state, onSeekTo, ticks, height }: {
     onSeekTo(bufferStartMs + f * span);
   };
 
-  if (bufferStartMs === null || liveEdgeMs === null || span < 10_000) return null;
+  // Show as soon as there's any buffer (even seconds) so the scrubber is present
+  // from first load while it fills — frac() clamps to the live edge until then.
+  if (bufferStartMs === null || liveEdgeMs === null) return null;
   return (
     <div
       ref={barRef}
@@ -97,13 +108,19 @@ function Timeline({ state, onSeekTo, ticks, height }: {
   );
 }
 
-function StepButton({ delta, onSeekBy }: { delta: number; onSeekBy: (d: number) => void }) {
+function StepButton({ delta, onSeekBy, disabled }: { delta: number; onSeekBy: (d: number) => void; disabled?: boolean }) {
   return (
     <button
       onClick={() => onSeekBy(delta)}
+      disabled={disabled}
       aria-label={delta < 0 ? 'Back 30 seconds' : 'Forward 30 seconds'}
       title={delta < 0 ? 'Back 30s (J)' : 'Forward 30s (L)'}
-      className="w-9 h-9 rounded-full border border-[var(--color-line)] text-[11px] font-bold text-[var(--color-ink-3)] hover:border-[var(--color-brand-pink)] hover:text-[var(--color-ink)] transition-colors cursor-pointer"
+      className={[
+        'w-9 h-9 rounded-full border border-[var(--color-line)] text-[11px] font-bold transition-colors',
+        disabled
+          ? 'text-[var(--color-ink-4)] opacity-40 cursor-default'
+          : 'text-[var(--color-ink-3)] hover:border-[var(--color-brand-pink)] hover:text-[var(--color-ink)] cursor-pointer',
+      ].join(' ')}
     >
       {delta < 0 ? '−30' : '+30'}
     </button>
