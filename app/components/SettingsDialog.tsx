@@ -185,7 +185,6 @@ export function SettingsDialog({ open, onOpenChange, station, playState, current
           </div>
 
           <section className="flex flex-col gap-3">
-            <h3 className="text-sm font-bold text-[var(--color-ink)]">Localization</h3>
             <RegionPicker />
           </section>
 
