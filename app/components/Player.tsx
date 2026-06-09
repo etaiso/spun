@@ -8,6 +8,10 @@ import { VOLUME_KEY, readStoredVolume } from '@/app/lib/volume';
 import { persistSet } from '@/app/lib/persist';
 import { showTitleIfTruncated } from '@/app/lib/dom';
 import { StationLogo } from './StationLogo';
+import { TimeshiftEngine, type TimeshiftState } from '@/app/lib/timeshift/engine';
+import { timeshiftEnabled } from '@/app/lib/timeshiftSetting';
+import { subscribeSeekRequests, publishTimeshiftState } from '@/app/lib/timeshift/bus';
+import { TimeshiftControls } from './TimeshiftControls';
 
 export type PlayState = 'idle' | 'connecting' | 'playing' | 'error';
 
@@ -22,6 +26,9 @@ type Props = {
   nowPlaying?: string | null;
   // Clicking the dock's station info returns to the full now-playing view.
   onExpand?: () => void;
+  // Song tick marks for the timeshift scrubber — passed down from the page in a
+  // later task; default [].
+  ticks?: { atMs: number; title: string }[];
 };
 
 const AUTOPLAY_KEY = 'radio:autoplay';
@@ -36,7 +43,7 @@ function readStoredAutoplay(): boolean {
   }
 }
 
-export function Player({ station, onPlayStateChange, dock = false, nowPlaying = null, onExpand }: Props) {
+export function Player({ station, onPlayStateChange, dock = false, nowPlaying = null, onExpand, ticks = [] }: Props) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   // True only while the live stream is paused because a preview asked it to —
   // so we resume exactly that, never audio the user paused themselves. A single
@@ -55,6 +62,19 @@ export function Player({ station, onPlayStateChange, dock = false, nowPlaying = 
   // change remounts the component, so it picks up the latest setting then.
   // Initial paused state mirrors !autoplay so the button icon is correct.
   const [paused, setPaused] = useState<boolean>(!autoplay);
+
+  // 'pending' while the engine handshakes; 'on' = MSE timeshift path; 'off' =
+  // plain <audio src=/api/stream> exactly as before this feature. Reading
+  // localStorage/MediaSource in the initializer is safe here for the same
+  // reason as `volume`/`autoplay` above: Player only mounts after a user
+  // gesture, so it never SSR-renders — no hydration mismatch.
+  const [tsMode, setTsMode] = useState<'pending' | 'on' | 'off'>(() =>
+    timeshiftEnabled() && typeof MediaSource !== 'undefined' ? 'pending' : 'off');
+  const [tsState, setTsState] = useState<TimeshiftState | null>(null);
+  const engineRef = useRef<TimeshiftEngine | null>(null);
+  // The autoplay effect re-runs when tsMode settles, but its body must fire at
+  // most once for the lifetime of this Player instance.
+  const ranRef = useRef(false);
 
   useEffect(() => {
     persistSet(VOLUME_KEY, String(volume));
@@ -81,6 +101,40 @@ export function Player({ station, onPlayStateChange, dock = false, nowPlaying = 
     a.muted = muted;
   }, [muted]);
 
+  // Bring up the timeshift engine once on mount when the setting is on. The
+  // engine takes over the audio element's `src` (an MSE object URL) and feeds
+  // a sliding SourceBuffer window. start() resolves false on the format gate
+  // (silent fallback) and onFallback fires on any later failure — both revert
+  // us to the plain path, which remounts the element via the `key` below.
+  useEffect(() => {
+    if (tsMode !== 'pending') return;
+    const a = audioRef.current;
+    if (!a) { setTsMode('off'); return; }
+    const engine = new TimeshiftEngine(a, {
+      streamUrl: station.streamUrl,
+      stationId: station.id,
+      onState: (s) => { setTsState(s); publishTimeshiftState(s); },
+      onFallback: () => { engineRef.current = null; setTsState(null); publishTimeshiftState(null); setTsMode('off'); },
+    });
+    engineRef.current = engine;
+    let cancelled = false;
+    engine.start().then(ok => {
+      if (cancelled) return;
+      setTsMode(ok ? 'on' : 'off');
+      if (!ok) { engineRef.current = null; }
+    });
+    return () => {
+      cancelled = true;
+      engine.stop();
+      engineRef.current = null;
+      publishTimeshiftState(null);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Jump-to-song seeks requested from PlaylistHistory go through the engine.
+  useEffect(() => subscribeSeekRequests((ms) => engineRef.current?.seekToWallClock(ms)), []);
+
   // On mount, start playback when autoplay is enabled. Browsers block
   // audio-with-sound before any user interaction (e.g. after a reload), so we
   // call play() ourselves to catch the rejection: instead of a stuck
@@ -88,6 +142,9 @@ export function Player({ station, onPlayStateChange, dock = false, nowPlaying = 
   // pointer interaction to start it — the closest to autoplay the platform
   // allows without a gesture.
   useEffect(() => {
+    if (tsMode === 'pending') return;       // engine still handshaking — wait
+    if (ranRef.current) return;
+    ranRef.current = true;
     if (!autoplay) { cbRef.current('idle'); return; }
     const a = audioRef.current;
     if (!a) return;
@@ -122,7 +179,7 @@ export function Player({ station, onPlayStateChange, dock = false, nowPlaying = 
 
     return () => { cancelled = true; disarm?.(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [tsMode]);
 
   // Pause the live stream when a preview starts; remember we did, so we can
   // resume it when the preview ends.
@@ -234,6 +291,17 @@ export function Player({ station, onPlayStateChange, dock = false, nowPlaying = 
           e.preventDefault();
           setVolume(v => Math.max(0, +(v - 0.05).toFixed(2)));
           break;
+        case 'j':
+        case 'J':
+          e.preventDefault();
+          engineRef.current?.seekBy(-30);
+          break;
+        case 'l':
+        case 'L':
+          e.preventDefault();
+          if (e.shiftKey) engineRef.current?.goLive();
+          else engineRef.current?.seekBy(30);
+          break;
       }
     }
     window.addEventListener('keydown', onKey);
@@ -263,11 +331,15 @@ export function Player({ station, onPlayStateChange, dock = false, nowPlaying = 
     try {
       ms.setActionHandler('play', play);
       ms.setActionHandler('pause', pause);
+      ms.setActionHandler('seekbackward', (d) => engineRef.current?.seekBy(-(d.seekOffset || 30)));
+      ms.setActionHandler('seekforward', (d) => engineRef.current?.seekBy(d.seekOffset || 30));
     } catch { /* unsupported — ignore */ }
     return () => {
       try {
         ms.setActionHandler('play', null);
         ms.setActionHandler('pause', null);
+        ms.setActionHandler('seekbackward', null);
+        ms.setActionHandler('seekforward', null);
       } catch { /* ignore */ }
     };
   }, []);
@@ -352,21 +424,28 @@ export function Player({ station, onPlayStateChange, dock = false, nowPlaying = 
     <audio
       ref={audioRef}
       // Inner key guards against streamUrl swaps within a single station
-      // selection (e.g. mirror failover); parent typically keys by id.
-      key={station.streamUrl}
+      // selection (e.g. mirror failover); parent typically keys by id. The
+      // tsMode suffix forces a fresh element on fallback (ts → plain), so the
+      // engine's MSE object URL is dropped and the plain src below takes hold.
+      key={`${station.streamUrl}:${tsMode === 'off' ? 'plain' : 'ts'}`}
       // Proxied through our origin so Web Audio can analyse it for the
-      // canvas visualiser (cross-origin streams can't be analysed).
-      src={`/api/stream?url=${encodeURIComponent(station.streamUrl)}`}
+      // canvas visualiser (cross-origin streams can't be analysed). In
+      // timeshift mode the engine owns `src` via an MSE object URL.
+      src={tsMode === 'off' ? `/api/stream?url=${encodeURIComponent(station.streamUrl)}` : undefined}
       // Native autoplay attempt (some browsers/settings honor the attribute
       // more leniently than a script play()). The mount effect below also
       // calls play() to catch a block and arm a gesture-resume fallback.
-      autoPlay={autoplay}
+      // Engine drives playback in timeshift mode.
+      autoPlay={tsMode === 'off' ? autoplay : undefined}
       preload={autoplay ? 'auto' : 'none'}
       onPlay={handlePlay}
       onPlaying={handlePlay}
       onPause={handlePause}
       onWaiting={handleWaiting}
-      onError={handleError}
+      // In timeshift mode the engine routes errors through onFallback; the
+      // element's own error (e.g. a spurious one during MSE teardown) is ignored.
+      onError={tsMode === 'on' ? undefined : handleError}
+      onTimeUpdate={() => engineRef.current?.onTimeUpdate()}
     />
   );
 
@@ -430,6 +509,17 @@ export function Player({ station, onPlayStateChange, dock = false, nowPlaying = 
           Auto-play {autoplay ? 'on' : 'off'}
         </button>
       </div>
+      {tsMode === 'on' && tsState && (
+        <div className="relative z-10 mt-3">
+          <TimeshiftControls
+            state={tsState}
+            onSeekBy={(d) => engineRef.current?.seekBy(d)}
+            onGoLive={() => engineRef.current?.goLive()}
+            onSeekTo={(ms) => engineRef.current?.seekToWallClock(ms)}
+            ticks={ticks ?? []}
+          />
+        </div>
+      )}
     </>
   );
 }
