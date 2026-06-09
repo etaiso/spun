@@ -111,7 +111,7 @@ function StepButton({ delta, onSeekBy }: { delta: number; onSeekBy: (d: number) 
 }
 
 function LivePill({ state, onGoLive }: { state: TimeshiftState; onGoLive: () => void }) {
-  const atEdge = state.behindSec < 3;
+  const atEdge = state.atLiveEdge;
   return (
     <button
       onClick={onGoLive}

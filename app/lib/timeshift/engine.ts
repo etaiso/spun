@@ -14,10 +14,18 @@ import { resolveSeek, type Range } from './resolveSeek';
 const AHEAD_MAX_SEC = 45;      // stop appending this far ahead of the playhead
 const BEHIND_KEEP_SEC = 180;   // evict SourceBuffer data older than this
 const STATE_TICK_MS = 500;
+// "At live" is hysteretic, not a bare threshold: upstream delivers in ~6 s
+// bursts, so behind-live naturally sawtooths 0–~6 s at the edge. Without
+// hysteresis the LIVE pill would flicker between "● Live" and "−00:0x". Enter
+// the live state below ENTER, only leave it above EXIT — the band is wider than
+// one burst so the sawtooth can't toggle it.
+const LIVE_ENTER_SEC = 5;
+const LIVE_EXIT_SEC = 12;
 
 export type TimeshiftState = {
   active: true;
   behindSec: number;            // 0 at the live edge
+  atLiveEdge: boolean;          // hysteretic "at live" flag — drives the LIVE pill
   playheadMs: number | null;    // wall clock at the playhead
   liveEdgeMs: number | null;
   bufferStartMs: number | null; // oldest seekable (disk-aware)
@@ -66,6 +74,7 @@ export class TimeshiftEngine {
   // (which lands ~where the estimate already is, so no visible jump).
   private liveWallClock = 0;
   private livePerf = 0;
+  private liveSticky = true; // hysteretic "at live edge" — see LIVE_ENTER/EXIT
   private contentType = '';
   private mime = '';
   private diskStartMs: number | null = null;
@@ -251,7 +260,10 @@ export class TimeshiftEngine {
 
   goLive(): void {
     const end = this.ring.endMs();
-    if (end !== null) this.seekToWallClock(end);
+    if (end !== null) {
+      this.liveSticky = true; // snap the pill to "Live" immediately on click
+      this.seekToWallClock(end);
+    }
   }
 
   seekToWallClock(targetMs: number): void {
@@ -317,10 +329,15 @@ export class TimeshiftEngine {
     const ahead = sb && sb.buffered.length > 0
       ? Math.max(0, sb.buffered.end(sb.buffered.length - 1) - this.audio.currentTime)
       : 0;
+    const behindSec = playheadMs !== null && liveEdgeMs !== null
+      ? Math.max(0, (liveEdgeMs - playheadMs) / 1000) : 0;
+    // Hysteresis so the LIVE pill doesn't flicker on the burst sawtooth.
+    if (this.liveSticky) { if (behindSec > LIVE_EXIT_SEC) this.liveSticky = false; }
+    else { if (behindSec < LIVE_ENTER_SEC) this.liveSticky = true; }
     return {
       active: true,
-      behindSec: playheadMs !== null && liveEdgeMs !== null
-        ? Math.max(0, (liveEdgeMs - playheadMs) / 1000) : 0,
+      behindSec,
+      atLiveEdge: this.liveSticky,
       playheadMs,
       liveEdgeMs,
       bufferStartMs: this.diskStartMs ?? this.ring.startMs(),
