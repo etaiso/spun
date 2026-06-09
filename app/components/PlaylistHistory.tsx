@@ -23,7 +23,14 @@ type PreviewState = 'idle' | 'resolving' | 'playing' | 'none';
 // row can play a ~30s iTunes preview (resolved on demand, pauses + auto-resumes
 // the live radio) and can be saved (brand heart) — metadata-only saves whose
 // cover / preview / Apple Music link the SavedSongsDialog backfills from iTunes.
-export function PlaylistHistory({ history, stationName }: { history: HistoryItem[]; stationName: string }) {
+export function PlaylistHistory({ history, stationName, jumpRange = null, onJumpTo }: {
+  history: HistoryItem[];
+  stationName: string;
+  // When timeshift is live, the wall-clock range currently seekable from the
+  // buffer. In-buffer song rows get a "replay from buffer" jump button.
+  jumpRange?: { startMs: number; endMs: number } | null;
+  onJumpTo?: (wallClockMs: number) => void;
+}) {
   const { savedSong, save, remove } = useSavedSongs();
   const { previewId, audioRef, onEnded, toggle, stop } = usePreviewPlayer({ resumeRadioOnStop: true });
   // iTunes term -> previewUrl, or null for a confirmed no-match. Resolved lazily
@@ -85,6 +92,17 @@ export function PlaylistHistory({ history, stationName }: { history: HistoryItem
               {artist ? <><b className="text-[var(--color-ink)] font-bold">{artist}</b> — {title}</> : title}
             </div>
             <div className="flex items-center gap-1.5 shrink-0">
+              {onJumpTo && jumpRange && h.startedAt !== undefined &&
+               h.startedAt >= jumpRange.startMs && h.startedAt <= jumpRange.endMs && (
+                <button
+                  onClick={() => onJumpTo(h.startedAt! - 3000)}
+                  aria-label={`Replay ${title} from the buffer`}
+                  title="Replay from the live buffer"
+                  className="self-center w-7 h-7 flex items-center justify-center rounded-full text-[11px] cursor-pointer transition-colors border text-[var(--color-brand-purple)] border-[var(--color-line)] opacity-70 group-hover:opacity-100 hover:border-[var(--color-brand-purple)]"
+                >
+                  ↩
+                </button>
+              )}
               <PreviewButton state={state} onClick={() => onPreview(key, h.title)} />
               <button
                 onClick={() => {
