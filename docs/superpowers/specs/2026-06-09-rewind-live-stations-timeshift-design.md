@@ -254,6 +254,43 @@ today's behavior. (Opt-out rather than opt-in because the feature changes
 neither sound quality nor live latency; the costs are RAM/disk and a new
 code path, both reverted by the toggle.)
 
+## Debug panel
+
+The existing `app/components/DebugPanel.tsx` (shown inside the Settings
+dialog, polls only while `active`) gains a timeshift section, following its
+`Row label/value` convention and per-interval sampling. Rendered only when
+the feature is enabled and a tee/ring exists; otherwise the rows are hidden.
+
+Sampled from the renderer engine + a lightweight `/api/timeshift-stats`
+(or the already-open SSE) on the same ~250 ms / 5 s cadence the panel
+already uses:
+
+- **Timeshift** — `on · MSE` / `off (gate: <reason>)` / `fallback`. Tells
+  you at a glance whether the active station is on the MSE path or fell back
+  to plain `<audio>`, and why (e.g. `gate: audio/ogg`).
+- **Buffer** — RAM ring fill: `mm:ss / 60:00 · NN MB` (and `% of 150 MB`
+  cap). Confirms the ring is filling and bounds are respected.
+- **Playhead** — `live` or `−mm:ss behind · <source>` where source is
+  `window` (SourceBuffer) / `ram` / `disk`, i.e. which seek tier served the
+  current position. Makes seek-latency tiers visible during testing.
+- **SourceBuffer** — buffered window `start–end (≈NN s, NN MB)` vs the
+  ~12 MB Chromium cap, plus last `append`/`remove` op. Surfaces eviction
+  behaviour and the cap headroom.
+- **Tee** — `subscribers: N · bytes/s · codec sync: ok/realigning`.
+  Confirms the unified upstream connection is flowing and frame-aligning.
+- **Disk rings** — per tracked station: `<name>: mm:ss · NN MB · NN segs`,
+  plus `rings: N/5 · total NN MB` and a `cleanup: ok` / last-error line.
+  Confirms the 5-station cap, rolling GC, and total disk footprint.
+- **Discontinuities** — count + age of the most recent gap marker
+  (reconnect / sleep), so resilience handling is observable.
+- **startedAt** — for the current track: `source: icy|shazam(off −Ns) ·
+  jumpable: yes/no`. Verifies jump-to-song timestamp derivation without
+  guessing.
+
+These are read-only diagnostics — no new controls — and exist to make the
+RAM/disk bounds, seek tiers, fallback path, and timestamp derivation
+verifiable during development and bug reports.
+
 ## Edge cases & resilience
 
 - **Upstream reconnects:** insert a timestamped discontinuity marker in the
@@ -281,7 +318,9 @@ Follows the project's pure-reducer pattern (`app/lib/trackingHistory.ts`):
   real stream snippets.
 - **Integration:** end-to-end against live stations via the preview tools —
   seek latency, back-to-live, jump-to-song accuracy, fallback on an
-  Ogg/Opus station, toggle off/on.
+  Ogg/Opus station, toggle off/on. The debug-panel timeshift rows (see
+  above) are the primary read-out for these checks — buffer fill, playhead
+  source tier, SourceBuffer eviction, disk-ring footprint.
 
 ## Out of scope
 
