@@ -7,7 +7,14 @@ export type RamRingOpts = { maxMs: number; maxBytes: number; gapMs?: number };
 
 export const RING_MAX_MS = 3_600_000;
 export const RING_MAX_BYTES = 150 * 1024 * 1024;
-export const DISCONTINUITY_GAP_MS = 5_000;
+// A discontinuity is a *real* hole in the audio (upstream dropped and the tee
+// reconnected, losing whatever aired during the outage). It is detected as a
+// jump in chunk arrival wall-clock — but that signal is noisy: most Icecast
+// servers deliver audio in periodic bursts (commonly every ~6 s), so naive
+// small thresholds flag every burst boundary as a fake gap. The threshold must
+// sit well above normal burst cadence; genuine reconnect outages are much
+// longer (tens of seconds) and still register.
+export const DISCONTINUITY_GAP_MS = 30_000;
 
 export class RamRing {
   private chunks: RingChunk[] = [];

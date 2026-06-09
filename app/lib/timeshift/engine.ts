@@ -51,6 +51,12 @@ export class TimeshiftEngine {
   private fetchAbort: AbortController | null = null;
   private appendCursor = 0;          // ring index of the next chunk to append
   private appendedWallClocks: number[] = []; // wallClock per in-flight append
+  // True only until the first chunk after a (re)build is appended. Gates the
+  // codec frame-sync trim, which must happen exactly ONCE per build — trimming
+  // every chunk would discard the leading bytes that complete the previous
+  // chunk's trailing partial frame, corrupting the stream (decodes to a
+  // SourceBuffer error on playback even though it buffers fine while paused).
+  private needAlign = true;
   private contentType = '';
   private mime = '';
   private diskStartMs: number | null = null;
@@ -127,6 +133,7 @@ export class TimeshiftEngine {
       this.timeMap.reset();
       this.appendCursor = fromIndex;
       this.appendedWallClocks = [];
+      this.needAlign = true;
       this.objectUrl = URL.createObjectURL(ms);
       const wasPaused = this.audio.paused;
       this.audio.src = this.objectUrl;
@@ -161,11 +168,13 @@ export class TimeshiftEngine {
     let chunk = this.ring.chunkAt(this.appendCursor);
     if (!chunk) return;
     let bytes = chunk.bytes;
-    if (this.appendedWallClocks.length === 0) {
-      // First append after a (re)build — align to a codec frame boundary.
-      // Skip past any chunks with no sync offset (iteratively, to avoid deep
-      // recursion on a run of sync-less chunks) until one aligns or the ring
-      // is exhausted.
+    if (this.needAlign) {
+      // First append after a (re)build — align to a codec frame boundary so the
+      // SourceBuffer parser starts on a clean frame. Skip past any chunks with
+      // no sync offset (iteratively, to avoid deep recursion on a run of
+      // sync-less chunks) until one aligns or the ring is exhausted. Once a
+      // chunk is appended we must NOT trim again — later chunks carry the bytes
+      // that complete each frame split across the chunk boundary.
       let off = findSyncOffset(this.contentType, bytes);
       while (off < 0) {
         this.appendCursor++;
@@ -179,6 +188,7 @@ export class TimeshiftEngine {
     try {
       this.evictBehind();
       sb.appendBuffer(bytes as BufferSource);
+      this.needAlign = false;
       this.appendedWallClocks.push(chunk.wallClock);
       this.appendCursor++;
     } catch (e) {
