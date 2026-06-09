@@ -58,14 +58,46 @@ discovers it via the `RECOGNIZER_URL` env var (default `http://127.0.0.1:8755`)
 and works fine without it; you just lose Shazam results on stations that lack
 broadcast metadata. See [`recognizer/README.md`](../recognizer/README.md).
 
+## Timeshift (rewind live radio)
+
+```
+Radio station ──► StationTee (one upstream per station)
+                     ├─► titles ──► /api/now-playing SSE (ts=1|disk)
+                     ├─► DiskRing (tracked stations, ≤5) ── seg-*.bin files
+                     └─► /api/timeshift ── framed bytes ──► browser engine
+                                                              ├─► RamRing (1 hr / 150 MB)
+                                                              └─► MSE SourceBuffer (sliding window)
+```
+
+- A server-side `StationTee` owns the single upstream connection per station and
+  fans audio out to the now-playing SSE (titles), an optional per-station disk
+  ring, and any number of `/api/timeshift` playback feeds. One connection means
+  song timestamps align with the audio buffer to sub-second.
+- Every chunk travels framed as `[f64 LE wallClockMs][u32 LE len][payload]`
+  (`app/lib/timeshift/framing.ts`) — the in-band wall clock is what makes seeks
+  and jump-to-song exact, on the wire and on disk.
+- The browser plays through MSE (`SourceBuffer`, `mode: 'sequence'`); the
+  authoritative client store is a 1-hour RAM ring, with the SourceBuffer holding
+  only a small window around the playhead. Seeks resolve fastest-tier-first:
+  window → RAM ring → disk ring. Unsupported formats (Ogg/HLS) silently fall
+  back to the plain `<audio src=/api/stream>` path, as does any engine error.
+- Disk rings are session-only: segment files (60 s each, GC'd to ≤60 / ≤150 MB
+  per station) live under `data/timeshift/` in dev or `<userData>/timeshift/`
+  in the desktop app, wiped on boot and on quit. Untracking a station deletes
+  its ring immediately.
+- The "Rewind live radio" setting (default on) gates the whole feature; off
+  reverts to the exact pre-timeshift code paths.
+
 ## API routes
 
 | Route | Purpose |
 |-------|---------|
 | `GET /api/search?q=&region=` | radio-browser search proxy; region + global candidate pool, 60s cache |
 | `GET /api/popular?region=` | Top stations (region-first), 5-min cache |
-| `GET /api/now-playing?url=` | SSE stream of track changes (ICY metadata + Shazam fallback) |
+| `GET /api/now-playing?url=&ts=&sid=` | SSE stream of track changes (ICY metadata + Shazam fallback); `ts=1\|disk` rides the station tee |
 | `GET /api/stream?url=` | Same-origin audio proxy (enables Web Audio analysis) |
+| `GET /api/timeshift?url=&sid=&from=` | Framed timeshift audio (disk history burst + live follow); `DELETE ?sid=` drops a ring |
+| `GET /api/timeshift-stats` | Tee + disk-ring diagnostics for the debug panel |
 | `GET /api/state` · `PUT /api/state` | Read all / upsert persisted app state (SQLite) |
 
 ## Persistence
