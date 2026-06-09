@@ -57,6 +57,15 @@ export class TimeshiftEngine {
   // chunk's trailing partial frame, corrupting the stream (decodes to a
   // SourceBuffer error on playback even though it buffers fine while paused).
   private needAlign = true;
+  // Smoothed live-edge clock. Upstream (Icecast) delivers audio in bursts — a
+  // ~6 s chunk lands at one instant, so ring.endMs() (newest arrival wall-clock)
+  // lurches forward in 6 s steps and sits flat between bursts. Using it directly
+  // makes "behind live" and the scrubber jump back and forth. Instead we track
+  // the newest chunk's wall-clock plus the perf-clock moment it arrived, then
+  // advance the live edge by real elapsed time — re-anchoring on each new burst
+  // (which lands ~where the estimate already is, so no visible jump).
+  private liveWallClock = 0;
+  private livePerf = 0;
   private contentType = '';
   private mime = '';
   private diskStartMs: number | null = null;
@@ -101,7 +110,10 @@ export class TimeshiftEngine {
     this.mime = mime;
     const bufStart = res.headers.get('x-buffer-start');
     this.diskStartMs = bufStart ? Number(bufStart) : null;
-    if (from !== 'live') this.ring.clear(); // disk seek replays through to live
+    if (from !== 'live') {
+      this.ring.clear(); // disk seek replays through to live
+      this.liveWallClock = 0; // re-derived from the replayed frames below
+    }
     void this.pump(res.body, this.fetchAbort.signal);
     return true;
   }
@@ -114,6 +126,11 @@ export class TimeshiftEngine {
         const { value, done } = await reader.read();
         if (done) break;
         for (const f of dec.push(value)) this.ring.push(f.wallClock, f.payload);
+        const end = this.ring.endMs();
+        if (end !== null && end > this.liveWallClock) {
+          this.liveWallClock = end;
+          this.livePerf = performance.now();
+        }
         this.tryAppend();
       }
     } catch (e) {
@@ -282,9 +299,20 @@ export class TimeshiftEngine {
     return this.timeMap.wallClockAt(this.audio.currentTime);
   }
 
+  /** Live edge for DISPLAY (behind-live readout, scrubber right edge): the
+   *  newest chunk's wall-clock advanced by real elapsed time, so bursty upstream
+   *  delivery doesn't make the UI lurch. Never regresses below actual newest
+   *  data. Seeks/goLive still use ring.endMs() (real data), not this estimate. */
+  private smoothLiveEdgeMs(): number | null {
+    const newest = this.ring.endMs();
+    if (newest === null) return null;
+    const est = this.liveWallClock + (performance.now() - this.livePerf);
+    return Math.max(est, newest);
+  }
+
   getState(): TimeshiftState {
     const playheadMs = this.playheadWallClock();
-    const liveEdgeMs = this.ring.endMs();
+    const liveEdgeMs = this.smoothLiveEdgeMs();
     const sb = this.sb;
     const ahead = sb && sb.buffered.length > 0
       ? Math.max(0, sb.buffered.end(sb.buffered.length - 1) - this.audio.currentTime)
