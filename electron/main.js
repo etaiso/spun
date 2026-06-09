@@ -280,6 +280,7 @@ async function startNextServer(recognizerPort) {
       PORT: String(port),
       HOSTNAME: '127.0.0.1',
       APP_DB_PATH: path.join(app.getPath('userData'), 'app_state.db'),
+      APP_TIMESHIFT_DIR: path.join(app.getPath('userData'), 'timeshift'),
       RECOGNIZER_URL: `http://127.0.0.1:${recognizerPort}`,
     },
   });
@@ -421,4 +422,12 @@ app.on('before-quit', () => {
       require('node:child_process').execFileSync('/usr/bin/pkill', ['-f', RECOGNIZER_PROC_MATCH]);
     } catch { /* nothing to kill */ }
   }
+});
+
+// Timeshift buffers are session-only: wipe on quit. (Boot also wipes — see
+// app/lib/server/timeshiftDir.ts — covering crashes where this never runs.)
+app.on('will-quit', () => {
+  try {
+    fs.rmSync(path.join(app.getPath('userData'), 'timeshift'), { recursive: true, force: true });
+  } catch { /* best-effort */ }
 });
