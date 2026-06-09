@@ -29,4 +29,36 @@ describe('findSyncOffset', () => {
   it('passes unknown content types through at offset 0', () => {
     expect(findSyncOffset('application/octet-stream', new Uint8Array([1, 2]))).toBe(0);
   });
+
+  // Frame-length chain validation (rejects false 0xFFEx syncs).
+  // 0xFB 0x90 = MPEG1 Layer III, 128 kbps, 44.1 kHz → 417-byte frame.
+  const FRAME_LEN = 417;
+  const mkFrame = () => {
+    const f = new Uint8Array(FRAME_LEN);
+    f[0] = 0xff; f[1] = 0xfb; f[2] = 0x90; f[3] = 0x00;
+    return f;
+  };
+
+  it('accepts a real two-frame chain at offset 0', () => {
+    const buf = new Uint8Array(FRAME_LEN * 2);
+    buf.set(mkFrame(), 0);
+    buf.set(mkFrame(), FRAME_LEN);
+    expect(findSyncOffset('audio/mpeg', buf)).toBe(0);
+  });
+
+  it('skips a false sync whose next frame does not sync, finds the real chain', () => {
+    // A lone header at 0 (followed by zeros, so no frame at +417), then a real
+    // two-frame chain starting at 421.
+    const start = FRAME_LEN + 4;
+    const buf = new Uint8Array(start + FRAME_LEN * 2);
+    buf[0] = 0xff; buf[1] = 0xfb; buf[2] = 0x90; buf[3] = 0x00; // false sync
+    buf.set(mkFrame(), start);
+    buf.set(mkFrame(), start + FRAME_LEN);
+    expect(findSyncOffset('audio/mpeg', buf)).toBe(start);
+  });
+
+  it('rejects reserved bitrate/samplerate header bytes', () => {
+    // 0xFF 0xFB 0x0C: bitrate index 0 (free) → not a valid frame.
+    expect(findSyncOffset('audio/mpeg', new Uint8Array([0xff, 0xfb, 0x0c, 0x00]))).toBe(-1);
+  });
 });
