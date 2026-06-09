@@ -75,6 +75,12 @@ export class TimeshiftEngine {
   private liveWallClock = 0;
   private livePerf = 0;
   private liveSticky = true; // hysteretic "at live edge" — see LIVE_ENTER/EXIT
+  // Rebuilds (ram/disk seeks) must not overlap: a second buildMediaSource while
+  // the first is mid-flight corrupts the append stream (CHUNK_DEMUXER append
+  // failed). While building, a new seek is coalesced into pendingSeekMs and
+  // applied once the current rebuild settles (latest target wins).
+  private building = false;
+  private pendingSeekMs: number | null = null;
   private contentType = '';
   private mime = '';
   private diskStartMs: number | null = null;
@@ -93,7 +99,9 @@ export class TimeshiftEngine {
       const ok = await this.openStream('live');
       if (!ok) return false;
       if (this.stopped) return false; // torn down during the async openStream (Strict Mode remount)
+      this.building = true;
       await this.buildMediaSource(/* fromIndex */ 0);
+      this.afterBuild();
       this.stateTimer = setInterval(() => this.publishState(), STATE_TICK_MS);
       return true;
     } catch (e) {
@@ -174,8 +182,11 @@ export class TimeshiftEngine {
           const sb = ms.addSourceBuffer(this.mime);
           sb.mode = 'sequence';
           this.sb = sb;
-          sb.addEventListener('updateend', () => this.onUpdateEnd());
-          sb.addEventListener('error', () => this.fail('sourcebuffer error'));
+          // Pass `sb` so the handlers can ignore stale events: a seek rebuilds
+          // the MediaSource, detaching this SourceBuffer, but a pending append's
+          // updateend/error can still fire afterward.
+          sb.addEventListener('updateend', () => this.onUpdateEnd(sb));
+          sb.addEventListener('error', () => { if (!this.stopped && sb === this.sb) this.fail('sourcebuffer error'); });
           this.tryAppend();
           if (!wasPaused) this.audio.play().catch(() => { /* gesture-gated */ });
           resolve();
@@ -233,11 +244,13 @@ export class TimeshiftEngine {
     }
   }
 
-  private onUpdateEnd(): void {
-    const sb = this.sb;
-    if (!sb) return;
+  private onUpdateEnd(sb: SourceBuffer): void {
+    // Ignore events from a SourceBuffer that's been superseded (seek rebuild) or
+    // torn down — reading .buffered on a removed SourceBuffer throws.
+    if (this.stopped || sb !== this.sb) return;
     const wc = this.appendedWallClocks.shift();
-    const buffered = sb.buffered;
+    let buffered: TimeRanges;
+    try { buffered = sb.buffered; } catch { return; }
     if (wc !== undefined && buffered.length > 0) {
       this.timeMap.addAnchor(buffered.end(buffered.length - 1), wc);
     }
@@ -273,6 +286,9 @@ export class TimeshiftEngine {
   }
 
   seekToWallClock(targetMs: number): void {
+    // A rebuild is in flight — remember the latest target and apply it when the
+    // current rebuild finishes, rather than starting an overlapping one.
+    if (this.building) { this.pendingSeekMs = targetMs; return; }
     try {
       const win = this.windowRange();
       const ram: Range = this.ring.startMs() !== null
@@ -286,17 +302,34 @@ export class TimeshiftEngine {
         if (bt !== null) this.audio.currentTime = bt;
       } else if (plan.tier === 'ram') {
         const idx = this.ring.indexAt(plan.targetMs);
-        if (idx >= 0) void this.buildMediaSource(idx).catch(e => this.fail(String(e)));
+        if (idx >= 0) {
+          this.building = true;
+          void this.buildMediaSource(idx)
+            .then(() => this.afterBuild())
+            .catch(e => { this.building = false; this.fail(String(e)); });
+        }
       } else {
         // disk: re-open the stream from the target; ring is cleared and
         // rebuilt from the replayed history through to live.
+        this.building = true;
         void this.openStream(plan.targetMs)
           .then(() => this.buildMediaSource(0))
-          .catch(e => this.fail(String(e)));
+          .then(() => this.afterBuild())
+          .catch(e => { this.building = false; this.fail(String(e)); });
       }
       this.publishState();
     } catch (e) {
       this.fail(`seek: ${String(e)}`);
+    }
+  }
+
+  /** Clear the build lock and apply any seek that arrived while rebuilding. */
+  private afterBuild(): void {
+    this.building = false;
+    if (this.pendingSeekMs !== null && !this.stopped) {
+      const t = this.pendingSeekMs;
+      this.pendingSeekMs = null;
+      this.seekToWallClock(t);
     }
   }
 
