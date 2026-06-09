@@ -72,6 +72,14 @@ export function Player({ station, onPlayStateChange, dock = false, nowPlaying = 
     timeshiftEnabled() && typeof MediaSource !== 'undefined' ? 'pending' : 'off');
   const [tsState, setTsState] = useState<TimeshiftState | null>(null);
   const engineRef = useRef<TimeshiftEngine | null>(null);
+  // Timeshift can fail transiently (e.g. a SourceBuffer error from a dev
+  // Strict-Mode double-mount race, or a momentary upstream/MSE hiccup). Rather
+  // than fall back to plain audio for the whole session on the first stumble,
+  // retry the engine a couple of times — a clean rebuild clears the errored
+  // media element. tsAttempt re-triggers the lifecycle effect.
+  const [tsAttempt, setTsAttempt] = useState(0);
+  const tsRetriesRef = useRef(0);
+  const TS_MAX_RETRIES = 2;
   // The autoplay effect re-runs when tsMode settles, but its body must fire at
   // most once for the lifetime of this Player instance.
   const ranRef = useRef(false);
@@ -108,29 +116,53 @@ export function Player({ station, onPlayStateChange, dock = false, nowPlaying = 
   // us to the plain path, which remounts the element via the `key` below.
   useEffect(() => {
     if (tsMode !== 'pending') return;
-    const a = audioRef.current;
-    if (!a) { setTsMode('off'); return; }
-    const engine = new TimeshiftEngine(a, {
-      streamUrl: station.streamUrl,
-      stationId: station.id,
-      onState: (s) => { setTsState(s); publishTimeshiftState(s); },
-      onFallback: () => { engineRef.current = null; setTsState(null); publishTimeshiftState(null); setTsMode('off'); },
-    });
-    engineRef.current = engine;
     let cancelled = false;
-    engine.start().then(ok => {
+    let engine: TimeshiftEngine | null = null;
+    // Defer engine creation past this tick. In React Strict Mode (dev) the
+    // effect runs mount→cleanup→mount synchronously; deferring + cancelling in
+    // cleanup means only the surviving mount ever builds an engine, so two
+    // engines never fight over the one <audio> element (which previously caused
+    // intermittent SourceBuffer errors → fallback).
+    const timer = setTimeout(() => {
       if (cancelled) return;
-      setTsMode(ok ? 'on' : 'off');
-      if (!ok) { engineRef.current = null; }
-    });
+      const a = audioRef.current;
+      if (!a) { setTsMode('off'); return; }
+      engine = new TimeshiftEngine(a, {
+        streamUrl: station.streamUrl,
+        stationId: station.id,
+        onState: (s) => { setTsState(s); publishTimeshiftState(s); },
+        onFallback: () => {
+          if (cancelled) return;
+          engineRef.current = null;
+          setTsState(null);
+          publishTimeshiftState(null);
+          if (tsRetriesRef.current < TS_MAX_RETRIES) {
+            tsRetriesRef.current++;
+            setTsAttempt(n => n + 1); // rebuild a fresh engine; tsMode stays 'pending'
+          } else {
+            setTsMode('off'); // give up — plain audio for this session
+          }
+        },
+      });
+      engineRef.current = engine;
+      engine.start().then(ok => {
+        if (cancelled) return;
+        if (ok) { tsRetriesRef.current = 0; setTsMode('on'); return; }
+        // start() returned false = format gate (unsupported codec / no MSE).
+        // That's not transient — go straight to plain, no retry.
+        engineRef.current = null;
+        setTsMode('off');
+      });
+    }, 0);
     return () => {
       cancelled = true;
-      engine.stop();
+      clearTimeout(timer);
+      engine?.stop();
       engineRef.current = null;
       publishTimeshiftState(null);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [tsAttempt]);
 
   // Jump-to-song seeks requested from PlaylistHistory go through the engine.
   useEffect(() => subscribeSeekRequests((ms) => engineRef.current?.seekToWallClock(ms)), []);

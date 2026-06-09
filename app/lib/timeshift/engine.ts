@@ -92,6 +92,7 @@ export class TimeshiftEngine {
     try {
       const ok = await this.openStream('live');
       if (!ok) return false;
+      if (this.stopped) return false; // torn down during the async openStream (Strict Mode remount)
       await this.buildMediaSource(/* fromIndex */ 0);
       this.stateTimer = setInterval(() => this.publishState(), STATE_TICK_MS);
       return true;
@@ -152,6 +153,10 @@ export class TimeshiftEngine {
    *  remove/re-append — simpler and immune to 'sequence' timestamp drift). */
   private buildMediaSource(fromIndex: number): Promise<void> {
     return new Promise((resolve, reject) => {
+      // A stopped engine must never touch the shared <audio> element. In React
+      // Strict Mode (dev) the Player mounts twice, so a torn-down engine's
+      // in-flight start() could otherwise clobber the live engine's src.
+      if (this.stopped) { resolve(); return; }
       if (this.objectUrl) URL.revokeObjectURL(this.objectUrl);
       const ms = new MediaSource();
       this.mediaSource = ms;
@@ -164,6 +169,7 @@ export class TimeshiftEngine {
       const wasPaused = this.audio.paused;
       this.audio.src = this.objectUrl;
       ms.addEventListener('sourceopen', () => {
+        if (this.stopped) { resolve(); return; }
         try {
           const sb = ms.addSourceBuffer(this.mime);
           sb.mode = 'sequence';
@@ -364,7 +370,14 @@ export class TimeshiftEngine {
     this.stopped = true;
     if (this.stateTimer) clearInterval(this.stateTimer);
     this.fetchAbort?.abort();
-    if (this.objectUrl) { URL.revokeObjectURL(this.objectUrl); this.objectUrl = null; }
+    if (this.objectUrl) {
+      // Don't revoke a blob that's still the element's src — doing so errors the
+      // media element. If another engine has already taken over the element
+      // (src differs), it's safe to revoke; otherwise leave it for GC once the
+      // next src is set.
+      if (this.audio.src !== this.objectUrl) URL.revokeObjectURL(this.objectUrl);
+      this.objectUrl = null;
+    }
     this.ring.clear();
   }
 }
