@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useSyncExternalStore } from 'react';
 import { persistSet } from './persist';
+import { flagEmoji } from './flag';
 
 /**
  * Best-guess ISO 3166 alpha-2 region for the current user, derived from their
@@ -186,4 +187,32 @@ export function useActiveRegion(): string {
   const region = useSyncExternalStore(subscribe, read, () => '');
   const locked = useSyncExternalStore(subscribeLock, readLock, () => false);
   return locked ? region : '';
+}
+
+// ── Country picker options ─────────────────────────────────────────────────
+export type CountryOption = { value: string; label: string };
+
+/**
+ * Build the settings picker's country options from the live country list,
+ * always including `region` (even if it's not in the list) so the user's own
+ * country is always selectable. Each label is "<flag> <name>"; sorted by name.
+ */
+export function buildCountryOptions(
+  countries: { code: string; name: string }[],
+  region: string,
+): CountryOption[] {
+  let names: Intl.DisplayNames | null = null;
+  try { names = new Intl.DisplayNames(['en'], { type: 'region' }); } catch { names = null; }
+
+  const byCode = new Map<string, string>();
+  for (const c of countries) {
+    if (c.code) byCode.set(c.code, c.name);
+  }
+  if (region && !byCode.has(region)) {
+    byCode.set(region, names?.of(region) ?? region);
+  }
+
+  return Array.from(byCode, ([code, name]) => ({ code, name }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map(({ code, name }) => ({ value: code, label: `${flagEmoji(code)} ${name}` }));
 }

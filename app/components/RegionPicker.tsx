@@ -1,36 +1,35 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useRegion, useRegionLock, userRegion } from '@/app/lib/region';
+import { useRegion, useRegionLock, userRegion, buildCountryOptions } from '@/app/lib/region';
+import { useCountries } from '@/app/lib/explore';
 import { flagEmoji } from '@/app/lib/flag';
-
-// A practical spread of countries for the picker. The user's detected region
-// is always included even if it's not in this list.
-const CODES = [
-  'IL', 'US', 'GB', 'CA', 'AU', 'IE', 'DE', 'FR', 'NL', 'BE', 'CH', 'AT',
-  'ES', 'IT', 'PT', 'GR', 'SE', 'NO', 'DK', 'FI', 'PL', 'CZ', 'HU', 'RO',
-  'RU', 'UA', 'TR', 'BR', 'MX', 'AR', 'CL', 'CO', 'JP', 'KR', 'CN', 'IN',
-  'ID', 'TH', 'VN', 'PH', 'ZA', 'EG', 'MA', 'NG', 'KE', 'AE', 'SA',
-];
+import { Combobox } from './Combobox';
 
 export function RegionPicker() {
   const { region, setRegion } = useRegion();
   const { locked, setLocked } = useRegionLock();
+  // The live ~200-country list (countries that actually have stations), shared
+  // with Explore and cached app-wide. The current region is always folded in by
+  // buildCountryOptions even if it isn't in the list, so the picker is never
+  // empty while locked.
+  const { data: countries } = useCountries();
 
-  const options = useMemo(() => {
-    const codes = Array.from(new Set([region, ...CODES].filter(Boolean)));
-    let names: Intl.DisplayNames | null = null;
-    try { names = new Intl.DisplayNames(['en'], { type: 'region' }); } catch { names = null; }
-    return codes
-      .map(code => ({ code, label: `${flagEmoji(code)} ${names?.of(code) ?? code}` }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-  }, [region]);
+  const options = useMemo(() => buildCountryOptions(countries, region), [countries, region]);
+
+  // The trigger shows the selected country (flag + name). Fall back to the raw
+  // code with a flag while the live list is still loading, then to a prompt.
+  const trigger = useMemo(() => {
+    const current = options.find(o => o.value === region);
+    if (current) return current.label;
+    return region ? `${flagEmoji(region)} ${region}` : 'Select a country';
+  }, [options, region]);
 
   // "Show only" needs a region; enabling it defaults to the detected home
   // region (or the first option) when none is set yet.
   function toggle() {
     if (locked) { setLocked(false); return; }
-    if (!region) setRegion(userRegion() ?? options[0]?.code ?? '');
+    if (!region) setRegion(userRegion() ?? options[0]?.value ?? '');
     setLocked(true);
   }
 
@@ -41,7 +40,7 @@ export function RegionPicker() {
           hidden too. */}
       <label className="flex items-center justify-between gap-3 cursor-pointer select-none">
         <span className="flex flex-col">
-          <span className="text-sm font-medium text-[var(--color-ink)]">Show only one country</span>
+          <span className="text-sm font-medium text-[var(--color-ink)]">Filter by country</span>
           <span className="text-xs text-[var(--color-ink-4)]">
             Limit search and Popular to a single country. Favorites, Recently played and Explore are never limited.
           </span>
@@ -67,22 +66,17 @@ export function RegionPicker() {
 
       {locked && (
         <div className="flex flex-col gap-2">
-          <label htmlFor="region-select" className="text-[11px] tracking-[1.2px] uppercase font-bold text-[var(--color-ink-3)]">
+          <span className="text-[11px] tracking-[1.2px] uppercase font-bold text-[var(--color-ink-3)]">
             Country
-          </label>
-          <div className="relative">
-            <select
-              id="region-select"
-              value={region}
-              onChange={(e) => setRegion(e.target.value)}
-              className="appearance-none cursor-pointer w-full rounded-full border border-[var(--color-line)] bg-white pl-3 pr-8 py-2 text-sm text-[var(--color-ink)] hover:border-[var(--color-brand-pink)] transition-colors"
-            >
-              {options.map(o => (
-                <option key={o.code} value={o.code}>{o.label}</option>
-              ))}
-            </select>
-            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-[var(--color-ink-3)]">▾</span>
-          </div>
+          </span>
+          <Combobox
+            ariaLabel="Country"
+            searchPlaceholder="Search countries…"
+            trigger={trigger}
+            value={region}
+            options={options}
+            onSelect={(v) => setRegion(v)}
+          />
         </div>
       )}
     </div>
