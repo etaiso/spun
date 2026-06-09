@@ -8,6 +8,7 @@ import { HiddenStationsDialog } from './HiddenStationsDialog';
 import { DebugPanel } from './DebugPanel';
 import { UpdateModal } from './UpdateModal';
 import { useRingsEnabled } from '@/app/lib/visualizer';
+import { useTimeshiftEnabled } from '@/app/lib/timeshiftSetting';
 import { useHidden, useHideConfirm } from '@/app/lib/hidden';
 import { persistSet } from '@/app/lib/persist';
 import { useCloseToTray, canCloseToTray } from '@/app/lib/closeToTray';
@@ -51,6 +52,9 @@ function updateStatusLine(s: UpdateStatus, selfInstall: boolean): string | null 
 export function SettingsDialog({ open, onOpenChange, station, playState, currentTrack }: Props) {
   // Audio-reactive rings toggle (persisted, on by default).
   const { enabled: ringsOn, toggle: toggleRings } = useRingsEnabled();
+
+  // Rewind live radio toggle (persisted, on by default).
+  const { enabled: timeshiftOn, toggle: toggleTimeshift } = useTimeshiftEnabled();
 
   // Hidden stations live in their own modal (opened below) so a long list
   // doesn't bloat Settings; here we only show the count + a way in.
@@ -155,6 +159,12 @@ export function SettingsDialog({ open, onOpenChange, station, playState, current
     });
   };
 
+  const handleTimeshiftToggle = () => {
+    const turningOff = timeshiftOn; // current value → new value is !timeshiftOn
+    toggleTimeshift();
+    if (turningOff) void fetch('/api/timeshift?sid=*', { method: 'DELETE' });
+  };
+
   return (
     <>
     <div
@@ -210,6 +220,37 @@ export function SettingsDialog({ open, onOpenChange, station, playState, current
                   className={[
                     'absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all',
                     ringsOn ? 'left-[18px]' : 'left-0.5',
+                  ].join(' ')}
+                />
+              </button>
+            </div>
+          </section>
+
+          <section className="mt-7 flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-[var(--color-ink)]">Rewind live radio</h3>
+                <p className="text-xs text-[var(--color-ink-3)] mt-0.5">
+                  {timeshiftOn
+                    ? 'Buffer the last hour so you can rewind and replay songs.'
+                    : 'Off — playback is live-only and nothing is buffered.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={timeshiftOn}
+                aria-label="Rewind live radio"
+                onClick={handleTimeshiftToggle}
+                className={[
+                  'relative h-5 w-9 rounded-full transition-colors cursor-pointer shrink-0',
+                  timeshiftOn ? 'bg-[var(--color-brand-purple)]' : 'bg-[var(--color-line)]',
+                ].join(' ')}
+              >
+                <span
+                  className={[
+                    'absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all',
+                    timeshiftOn ? 'left-[18px]' : 'left-0.5',
                   ].join(' ')}
                 />
               </button>
