@@ -34,12 +34,22 @@ export function scrubRelease(
   return { next: { phase: 'settling', ms: s.ms, sinceMs: nowMs }, commitMs: s.ms };
 }
 
+// Pointer-cancel. During `dragging` this aborts without committing; during
+// `settling` the seek is already committed — returning to idle just resumes
+// tracking the engine immediately, which is harmless.
 export function scrubCancel(): ScrubState {
   return IDLE;
 }
 
 /** Engine tick while settling. Returns the SAME object when nothing changes
- *  so a React setState with the result can bail out. */
+ *  so a React setState with the result can bail out.
+ *
+ *  The landed check is symmetric (Math.abs) on purpose: until the seek
+ *  completes, the engine still reports the PRE-seek playhead, which can sit
+ *  far on either side of the target (ahead after a backward drag from live,
+ *  behind after a forward drag). Overshoot past the target is bounded by the
+ *  engine's live-snap band (LIVE_ENTER_SEC = 5 s < tolerance), and the
+ *  timeout is the backstop for anything pathological. */
 export function scrubSettle(
   s: ScrubState, playheadMs: number | null, nowMs: number,
 ): ScrubState {

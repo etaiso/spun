@@ -57,6 +57,11 @@ describe('scrub state machine', () => {
     expect(scrubSettle(next, null, SETTLE_TIMEOUT_MS)).toBe(IDLE);
   });
 
+  it('keeps holding one tick before the timeout deadline (playhead unknown)', () => {
+    const { next } = scrubRelease(scrubStart(T0), 0);
+    expect(scrubSettle(next, null, SETTLE_TIMEOUT_MS - 1)).toBe(next);
+  });
+
   it('settle is a no-op outside the settling phase', () => {
     expect(scrubSettle(IDLE, T0, 0)).toBe(IDLE);
     const dragging = scrubStart(T0);
