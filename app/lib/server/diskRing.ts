@@ -81,6 +81,13 @@ export class DiskRing {
     return this.segments.length ? this.segments[0].startMs : null;
   }
 
+  /** Epoch ms of the newest persisted frame, or null when empty. Lets the tee
+   *  trim a back-stamped reconnect burst to only what the ring doesn't
+   *  already hold. */
+  endMs(): number | null {
+    return this.segments.length ? this.segments[this.segments.length - 1].endMs : null;
+  }
+
   stats(): { segments: number; bytes: number; startMs: number | null } {
     return {
       segments: this.segments.length,

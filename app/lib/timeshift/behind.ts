@@ -1,11 +1,15 @@
 // Steady behind-live readout, derived from playback physics instead of raw
 // chunk stamps.
 //
-// The raw value (smoothed live edge − timeMap playhead wall-clock) inherits
-// the arrival jitter of the server's per-chunk Date.now() stamps (±0.5 s every
-// burst), and creeps badly across an Icecast burst-on-connect zone, where a
-// minute of past audio is stamped into a few seconds. Rounding that raw value
-// makes the −MM:SS readout wobble constantly.
+// Historically the raw value (smoothed live edge − timeMap playhead
+// wall-clock) inherited the arrival jitter of the server's per-chunk
+// Date.now() stamps (±0.5 s every burst) and crept badly across Icecast
+// burst-on-connect zones, where a minute of past audio was stamped into a few
+// seconds. Media-time stamping (lib/server/mediaClock.ts) fixed that at the
+// source; the smoother stays because the readout still moves for lesser
+// reasons — append/decode granularity, a fresh tee's provisional settling
+// stamps, measured-bitrate drift — and rounding a wobbly raw value makes the
+// −MM:SS readout flicker.
 //
 // Physics: playing at 1× keeps you a CONSTANT distance behind live; pausing or
 // stalling grows it 1:1 with wall time; a seek shifts it by exactly the jump

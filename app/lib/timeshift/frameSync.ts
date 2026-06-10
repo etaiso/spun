@@ -17,25 +17,48 @@ const MP3_SAMPLERATES: Record<number, number[]> = {
   0: [11025, 12000, 8000, 0],
 };
 
-/** Length in bytes of the MPEG-audio Layer III frame whose header starts at
- *  bytes[i], or 0 if those bytes aren't a valid Layer III header. */
-function mp3FrameLength(bytes: Uint8Array, i: number): number {
-  if (i + 2 >= bytes.length) return 0;
+export type Mp3FrameInfo = {
+  lengthBytes: number;
+  bitrateBps: number;
+  sampleRate: number;
+  samplesPerFrame: number;
+  durationMs: number;
+};
+
+/** Parsed header of the MPEG-audio Layer III frame starting at bytes[i], or
+ *  null if those bytes aren't a valid Layer III header. The bitrate field is
+ *  what lets the server derive a media clock for CBR streams (duration of N
+ *  bytes = N·8/bitrate). */
+export function mp3FrameInfoAt(bytes: Uint8Array, i: number): Mp3FrameInfo | null {
+  if (i + 2 >= bytes.length) return null;
   const b0 = bytes[i], b1 = bytes[i + 1], b2 = bytes[i + 2];
-  if (b0 !== 0xff || (b1 & 0xe0) !== 0xe0) return 0; // 11-bit frame sync
+  if (b0 !== 0xff || (b1 & 0xe0) !== 0xe0) return null; // 11-bit frame sync
   const version = (b1 >> 3) & 0x03; // 3=MPEG1, 2=MPEG2, 0=MPEG2.5, 1=reserved
   const layer = (b1 >> 1) & 0x03;   // 1=Layer III
-  if (version === 1 || layer !== 1) return 0;
+  if (version === 1 || layer !== 1) return null;
   const bitrateIdx = (b2 >> 4) & 0x0f;
   const srIdx = (b2 >> 2) & 0x03;
-  if (bitrateIdx === 0 || bitrateIdx === 15 || srIdx === 3) return 0; // free/bad/reserved
+  if (bitrateIdx === 0 || bitrateIdx === 15 || srIdx === 3) return null; // free/bad/reserved
   const bitrate = (version === 3 ? MP3_BITRATES_V1 : MP3_BITRATES_V2)[bitrateIdx] * 1000;
   const sampleRate = MP3_SAMPLERATES[version][srIdx];
-  if (!bitrate || !sampleRate) return 0;
+  if (!bitrate || !sampleRate) return null;
   const padding = (b2 >> 1) & 0x01;
   const samplesPerFrame = version === 3 ? 1152 : 576; // Layer III
   const len = Math.floor((samplesPerFrame / 8) * bitrate / sampleRate) + padding;
-  return len > 4 ? len : 0;
+  if (len <= 4) return null;
+  return {
+    lengthBytes: len,
+    bitrateBps: bitrate,
+    sampleRate,
+    samplesPerFrame,
+    durationMs: (samplesPerFrame / sampleRate) * 1000,
+  };
+}
+
+/** Length in bytes of the MPEG-audio Layer III frame whose header starts at
+ *  bytes[i], or 0 if those bytes aren't a valid Layer III header. */
+function mp3FrameLength(bytes: Uint8Array, i: number): number {
+  return mp3FrameInfoAt(bytes, i)?.lengthBytes ?? 0;
 }
 
 /** First valid MP3 frame offset. A candidate is accepted only when the next

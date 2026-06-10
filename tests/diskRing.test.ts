@@ -35,6 +35,16 @@ describe('DiskRing', () => {
     ring.destroy();
   });
 
+  it('reports endMs of the newest persisted frame', () => {
+    const ring = new DiskRing(dir, { segmentMs: 1000, maxSegments: 60, maxBytes: 1 << 20 });
+    expect(ring.endMs()).toBeNull();
+    ring.append(5000, new Uint8Array([1]));
+    expect(ring.endMs()).toBe(5000);
+    ring.append(6500, new Uint8Array([2])); // rotates into a new segment
+    expect(ring.endMs()).toBe(6500);
+    ring.destroy();
+  });
+
   it('GCs oldest segments past maxSegments', () => {
     const ring = new DiskRing(dir, { segmentMs: 1000, maxSegments: 2, maxBytes: 1 << 20 });
     ring.append(1000, new Uint8Array([1]));

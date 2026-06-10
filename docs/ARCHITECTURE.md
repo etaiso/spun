@@ -75,7 +75,11 @@ Radio station ──► StationTee (one upstream per station)
   song timestamps align with the audio buffer to sub-second.
 - Every chunk travels framed as `[f64 LE wallClockMs][u32 LE len][payload]`
   (`app/lib/timeshift/framing.ts`) — the in-band wall clock is what makes seeks
-  and jump-to-song exact, on the wire and on disk.
+  and jump-to-song exact, on the wire and on disk. The stamp is *media time*
+  (broadcast wall-clock of the chunk's newest sample, derived from the stream
+  bitrate by `app/lib/server/mediaClock.ts`), not arrival time — Icecast's
+  bursty delivery would otherwise compress ~60 s of burst-on-connect audio
+  into seconds of stamp span.
 - The browser plays through MSE (`SourceBuffer`, `mode: 'sequence'`); the
   authoritative client store is a 1-hour RAM ring, with the SourceBuffer holding
   only a small window around the playhead. Seeks resolve fastest-tier-first:
