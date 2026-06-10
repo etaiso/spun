@@ -9,7 +9,7 @@ import { FrameDecoder } from './framing';
 import { findSyncOffset } from './frameSync';
 import { RamRing } from './ramRing';
 import { TimeMap } from './timeMap';
-import { resolveSeek, type Range } from './resolveSeek';
+import { resolveSeek, resolveNearLiveSeek, type Range } from './resolveSeek';
 import { LiveEdgeEstimator } from './liveEdge';
 import { BehindSmoother } from './behind';
 
@@ -287,6 +287,29 @@ export class TimeshiftEngine {
     // current rebuild finishes, rather than starting an overlapping one.
     if (this.building) { this.pendingSeekMs = targetMs; return; }
     try {
+      // Near-live targets resolve as audio distance from the buffered end —
+      // wall-clock anchors are degenerate there (see resolveNearLiveSeek).
+      const sb = this.sb;
+      const edge = this.smoothLiveEdgeMs();
+      const newest = this.ring.endMs();
+      if (sb && sb.buffered.length > 0 && edge !== null && newest !== null) {
+        const near = resolveNearLiveSeek(
+          targetMs, edge, newest,
+          sb.buffered.start(0), sb.buffered.end(sb.buffered.length - 1),
+          this.appendCursor >= this.ring.length(),
+          LIVE_ENTER_SEC,
+        );
+        if (near !== null) {
+          // A deliberate seek overrides the hysteresis: snap the pill to LIVE
+          // inside the enter band, and drop it when seeking behind — without
+          // this, a click at −8 s keeps the stale sticky flag until EXIT (12 s).
+          this.liveSticky = near.snapLive;
+          this.audio.currentTime = near.bufferTime;
+          this.lastSeekTier = 'window';
+          this.publishState();
+          return;
+        }
+      }
       const win = this.windowRange();
       const ram: Range = this.ring.startMs() !== null
         ? { startMs: this.ring.startMs()!, endMs: this.ring.endMs()! } : null;
