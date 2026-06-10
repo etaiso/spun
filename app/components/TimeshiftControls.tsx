@@ -176,7 +176,7 @@ function BehindReadout({ state }: { state: TimeshiftState }) {
     <span
       aria-hidden="true"
       className={[
-        'text-[11px] font-semibold tabular-nums text-[var(--color-ink-3)] whitespace-nowrap pointer-events-none transition-opacity duration-300',
+        'text-[13px] font-semibold tabular-nums text-[var(--color-ink-3)] whitespace-nowrap pointer-events-none transition-opacity duration-300',
         state.atLiveEdge ? 'opacity-0' : 'opacity-100',
       ].join(' ')}
     >
