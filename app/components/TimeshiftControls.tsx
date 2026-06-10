@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, type PointerEvent as ReactPointerEvent } from 'react';
 import type { TimeshiftState } from '@/app/lib/timeshift/engine';
+import { fmtBehind } from '@/app/lib/timeshift/format';
 
 export type TimeshiftControlsProps = {
   state: TimeshiftState;
@@ -10,11 +11,6 @@ export type TimeshiftControlsProps = {
   onSeekTo: (wallClockMs: number) => void;
   ticks: { atMs: number; title: string }[];
 };
-
-function fmtBehind(sec: number): string {
-  const m = Math.floor(sec / 60), s = Math.round(sec % 60);
-  return `−${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-}
 
 // Layout: a full-width scrubber on its own row above a centered
 // [−30] [LIVE] [+30] cluster. The scrubber tints the played-behind portion,
