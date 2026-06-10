@@ -20,7 +20,7 @@ const STATE_TICK_MS = 500;
 // hysteresis the LIVE pill would flicker between "● Live" and "−00:0x". Enter
 // the live state below ENTER, only leave it above EXIT — the band is wider than
 // one burst so the sawtooth can't toggle it.
-const LIVE_ENTER_SEC = 5;
+export const LIVE_ENTER_SEC = 5; // exported: the scrubber tooltip shows "Live" inside this band
 const LIVE_EXIT_SEC = 12;
 
 export type TimeshiftState = {
