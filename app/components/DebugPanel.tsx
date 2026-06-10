@@ -9,6 +9,9 @@ import { useRecent } from '@/app/lib/recent';
 import { useGenreAffinity } from '@/app/lib/taste';
 import { usePlayCounts } from '@/app/lib/playCounts';
 import { getContextState, getEnergy } from '@/app/lib/audioBus';
+import { getTimeshiftState } from '@/app/lib/timeshift/bus';
+import { timeshiftEnabled } from '@/app/lib/timeshiftSetting';
+import type { TimeshiftState } from '@/app/lib/timeshift/engine';
 
 type Props = {
   station: Station | null;
@@ -20,6 +23,17 @@ type Props = {
 };
 
 type Health = { up: boolean; url: string; ms: number } | null;
+
+type TsStats = {
+  tees: { url: string; subscribers: number; bytesPerSec: number; contentType: string | null }[];
+  rings: { stationId: string; segments: number; bytes: number; startMs: number | null }[];
+} | null;
+
+const mb = (n: number) => `${(n / (1024 * 1024)).toFixed(1)} MB`;
+const mmss = (ms: number) => {
+  const s = Math.max(0, Math.round(ms / 1000));
+  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+};
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -33,6 +47,10 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 export function DebugPanel({ station, playState, currentTrack, active }: Props) {
   const [health, setHealth] = useState<Health>(null);
   const [audio, setAudio] = useState({ state: 'none', energy: 0 });
+  const [ts, setTs] = useState<TimeshiftState | null>(null);
+  const [tsStats, setTsStats] = useState<TsStats>(null);
+  // Sampled clock for the "gap N ago" readout — Date.now() in render is impure.
+  const [now, setNow] = useState(0);
   const { region } = useRegion();
   const { favorites } = useFavorites();
   const { recent } = useRecent();
@@ -77,6 +95,29 @@ export function DebugPanel({ station, playState, currentTrack, active }: Props) 
     return () => clearInterval(id);
   }, [active]);
 
+  // Sample engine state on the panel's fast cadence.
+  useEffect(() => {
+    if (!active) return;
+    const id = setInterval(() => { setTs(getTimeshiftState()); setNow(Date.now()); }, 250);
+    return () => clearInterval(id);
+  }, [active]);
+
+  // Server stats on the slow cadence.
+  useEffect(() => {
+    if (!active || !timeshiftEnabled()) return;
+    let alive = true;
+    const poll = async () => {
+      try {
+        const r = await fetch('/api/timeshift-stats', { cache: 'no-store' });
+        const d = (await r.json()) as TsStats;
+        if (alive) setTsStats(d);
+      } catch { if (alive) setTsStats(null); }
+    };
+    poll();
+    const id = setInterval(poll, 5000);
+    return () => { alive = false; clearInterval(id); };
+  }, [active]);
+
   return (
     <div className="rounded-xl bg-[var(--color-bg)] border border-[var(--color-line)] p-3 text-[12px] font-mono leading-relaxed">
       <div className="flex flex-col gap-1">
@@ -110,6 +151,39 @@ export function DebugPanel({ station, playState, currentTrack, active }: Props) 
             {audio.energy.toFixed(2)}
           </span>
         </Row>
+        <Row label="Timeshift">
+          {!timeshiftEnabled() ? 'off (setting)'
+            : ts ? <span className="text-green-600 font-semibold">on · MSE · {ts.contentType || '?'}</span>
+            : 'off (gate/fallback)'}
+        </Row>
+        {ts && (
+          <>
+            <Row label="Buffer">
+              {ts.ramStartMs !== null && ts.liveEdgeMs !== null
+                ? `${mmss(ts.liveEdgeMs - ts.ramStartMs)} / 60:00 · ${mb(ts.ramBytes)}`
+                : '—'}
+            </Row>
+            <Row label="Playhead">
+              {ts.behindSec < 3 ? 'live' : `−${mmss(ts.behindSec * 1000)} behind`}
+              <span className="text-[var(--color-ink-4)]"> · tier {ts.lastSeekTier ?? '—'} · ahead {ts.sourceBufferAhead.toFixed(1)}s</span>
+            </Row>
+            <Row label="Gaps">
+              {ts.discontinuities.length === 0 ? 'none'
+                : `${ts.discontinuities.length} · last ${mmss(now - ts.discontinuities[ts.discontinuities.length - 1].toMs)} ago`}
+            </Row>
+          </>
+        )}
+        {tsStats && tsStats.tees.length > 0 && (
+          <Row label="Tees">
+            {tsStats.tees.map(t => `${t.subscribers} sub · ${(t.bytesPerSec / 1024).toFixed(0)} KB/s`).join(' | ')}
+          </Row>
+        )}
+        {tsStats && tsStats.rings.length > 0 && (
+          <Row label="Disk rings">
+            {tsStats.rings.length}/5 · {mb(tsStats.rings.reduce((n, r) => n + r.bytes, 0))} ·{' '}
+            {tsStats.rings.map(r => `${r.segments} segs`).join(', ')}
+          </Row>
+        )}
         <Row label="Favorites">{favorites.length}</Row>
         <Row label="Recent">{recent.length}</Row>
         <div className="mt-1 pt-1 border-t border-[var(--color-line)]" />

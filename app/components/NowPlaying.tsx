@@ -15,6 +15,7 @@ import type { PlayState } from './Player';
 import { useTracking } from '@/app/lib/tracking';
 import { loadTrackingHistory, recordTrack, noteConnect, heartbeat, HEARTBEAT_MS } from '@/app/lib/trackingHistory';
 import { useSavedSongs } from '@/app/lib/savedSongs';
+import { timeshiftEnabled } from '@/app/lib/timeshiftSetting';
 
 type MetaState = 'waiting' | 'playing' | 'no-metadata' | 'no-song' | 'recognizing';
 
@@ -80,6 +81,12 @@ export function NowPlaying({ station, playState, everPlayed, onTrack, onHistory 
   // null until the first live `track` event (a restored session has no known
   // start time) → callers fall back to Date.now().
   const currentStartRef = useRef<number | null>(null);
+
+  // Air time (epoch ms) of the track that is about to roll off — i.e. the
+  // start of the song currently on screen, captured so that when the NEXT
+  // title arrives we can stamp the finished song's `startedAt` for the
+  // timeshift jump-to-song affordance. Mirrors prevTitleRef's lifecycle.
+  const prevStartedAtRef = useRef<number | null>(null);
 
   // Keep the onTrack callback in a ref so the SSE effect doesn't depend on it.
   const onTrackRef = useRef(onTrack);
@@ -148,7 +155,14 @@ export function NowPlaying({ station, playState, everPlayed, onTrack, onHistory 
   // fresh one — the server starts a new ICY parse).
   useEffect(() => {
     onTrackRef.current?.(null); // reset the sidebar marquee for the new station
-    const es = new EventSource(`/api/now-playing?url=${encodeURIComponent(station.streamUrl)}`);
+    // Timeshift tee params: tracked active stations get the disk ring ('disk'),
+    // untracked active stations get a tee only ('1'). Off → no params (plain
+    // ICY/Shazam path, unchanged behavior).
+    const ts = timeshiftEnabled() ? (trackedRef.current ? 'disk' : '1') : null;
+    const es = new EventSource(
+      `/api/now-playing?url=${encodeURIComponent(station.streamUrl)}` +
+      (ts ? `&ts=${ts}&sid=${encodeURIComponent(station.id)}` : ''),
+    );
 
     // When this station is tracked, the active player is its only watcher — so
     // keep its tracking history alive here too (gap on reconnect, heartbeat
@@ -161,7 +175,7 @@ export function NowPlaying({ station, playState, everPlayed, onTrack, onHistory 
     es.onmessage = (ev) => {
       try {
         const msg = JSON.parse(ev.data) as
-          | { type: 'track'; title: string; source?: TrackSource; cover?: string; shazamUrl?: string; appleMusicUrl?: string; previewUrl?: string; key?: string }
+          | { type: 'track'; title: string; source?: TrackSource; cover?: string; shazamUrl?: string; appleMusicUrl?: string; previewUrl?: string; key?: string; startedAt?: number }
           | { type: 'no-metadata' }
           | { type: 'no-song' }
           | { type: 'recognizing' }
@@ -195,17 +209,21 @@ export function NowPlaying({ station, playState, everPlayed, onTrack, onHistory 
           if (prev !== null && !isNonTrack(prev, station.name)) {
             if (trackedRef.current) {
               // Durable, gap-aware store (stamps its own `at`); reflect it back.
-              recordTrack(station.id, prev);
+              // Thread the finished song's air-start for timeshift jump-to-song.
+              recordTrack(station.id, prev, prevStartedAtRef.current ?? undefined);
               setHistory(loadTrackingHistory(station.id));
             } else {
               // Session entry: stamp the outgoing track's air time so it can be
-              // saved from the history with an accurate playedAt.
+              // saved from the history with an accurate playedAt, and its
+              // air-start so it's jumpable from the live buffer.
               const prevAt = currentStartRef.current ?? Date.now();
-              setHistory(h => [{ time: nowHHMM(), title: prev, at: prevAt }, ...h].slice(0, 50));
+              const prevStart = prevStartedAtRef.current ?? undefined;
+              setHistory(h => [{ time: nowHHMM(), title: prev, at: prevAt, startedAt: prevStart }, ...h].slice(0, 50));
             }
           }
           prevTitleRef.current = msg.title;
-          currentStartRef.current = Date.now();
+          prevStartedAtRef.current = msg.startedAt ?? Date.now();
+          currentStartRef.current = msg.startedAt ?? Date.now();
           setCurrentRaw(msg.title);
           // Report a real song up for the sidebar marquee (skip station IDs).
           onTrackRef.current?.(isNonTrack(msg.title, station.name) ? null : msg.title);
@@ -237,6 +255,7 @@ export function NowPlaying({ station, playState, everPlayed, onTrack, onHistory 
     // result, so the reload looks like a no-op). History is left intact.
     prevTitleRef.current = null;
     currentStartRef.current = null;
+    prevStartedAtRef.current = null;
     setCurrentRaw(null);
     setCurrentCover(null);
     setMetaState('waiting');

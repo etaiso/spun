@@ -3,6 +3,7 @@ import { parseIcy } from '@/app/lib/icy';
 import { isJunkMetadata } from '@/app/lib/nonTrack';
 import { computeNextDelayMs, FINGERPRINT_INTERVAL_MS } from '@/app/lib/recognitionSchedule';
 import type { FingerprintOutcome } from '@/app/lib/recognitionSchedule';
+import { acquireTee, releaseTee, attachRing, type StationTee } from '@/app/lib/server/stationTee';
 
 const UA = 'Spun/0.1';
 
@@ -89,30 +90,66 @@ export async function GET(req: NextRequest) {
     return new Response('unsupported protocol', { status: 400 });
   }
 
-  const upstreamController = new AbortController();
-  req.signal.addEventListener('abort', () => upstreamController.abort(), { once: true });
-
-  let upstream: Response;
-  try {
-    upstream = await fetch(streamUrl, {
-      headers: { 'Icy-MetaData': '1', 'User-Agent': UA },
-      signal: upstreamController.signal,
-    });
-  } catch (e) {
-    return new Response(`upstream fetch failed: ${String(e)}`, { status: 502 });
-  }
-  if (!upstream.ok) {
-    upstreamController.abort();
-    return new Response(`upstream returned ${upstream.status}`, { status: 502 });
-  }
-
-  const metaIntHeader = upstream.headers.get('icy-metaint');
-  const metaInt = metaIntHeader ? parseInt(metaIntHeader, 10) : NaN;
-  const hasMeta = Boolean(metaInt) && Boolean(upstream.body);
+  // Timeshift routing. With no `ts` param the route behaves exactly as before
+  // (its own upstream fetch + parseIcy). With `ts` set it rides a shared
+  // StationTee so song timestamps align with the /api/timeshift audio buffer.
+  //   ts === '1'    → tee (RAM tail only)
+  //   ts === 'disk' → tee + disk ring (requires sid)
+  const ts = req.nextUrl.searchParams.get('ts'); // null | '1' | 'disk'
+  const sid = req.nextUrl.searchParams.get('sid') || '';
 
   const encoder = new TextEncoder();
   const streamUrlStr = streamUrl.toString();
 
+  // --- title source + teardown differ per branch; everything else is shared.
+  let hasMeta: boolean;
+  // Legacy branch state:
+  const upstreamController = new AbortController();
+  let upstream: Response | null = null;
+  // Tee branch state:
+  let tee: StationTee | null = null;
+  let released = false; // guards releaseTee to exactly one call per request
+
+  if (ts === null) {
+    // === Legacy path (unchanged): own upstream fetch ===
+    req.signal.addEventListener('abort', () => upstreamController.abort(), { once: true });
+    try {
+      upstream = await fetch(streamUrl, {
+        headers: { 'Icy-MetaData': '1', 'User-Agent': UA },
+        signal: upstreamController.signal,
+      });
+    } catch (e) {
+      return new Response(`upstream fetch failed: ${String(e)}`, { status: 502 });
+    }
+    if (!upstream.ok) {
+      upstreamController.abort();
+      return new Response(`upstream returned ${upstream.status}`, { status: 502 });
+    }
+    const metaIntHeader = upstream.headers.get('icy-metaint');
+    const metaInt = metaIntHeader ? parseInt(metaIntHeader, 10) : NaN;
+    hasMeta = Boolean(metaInt) && Boolean(upstream.body);
+
+    return buildResponse(metaInt);
+  }
+
+  // === Tee path: shared upstream connection per station ===
+  tee = acquireTee(streamUrlStr);
+  let teeInfo;
+  try {
+    teeInfo = await tee.ready();
+  } catch (e) {
+    releaseTee(streamUrlStr, tee);
+    return new Response(`upstream failed: ${String(e)}`, { status: 502 });
+  }
+  if (ts === 'disk' && sid) attachRing(sid, tee);
+  hasMeta = teeInfo.hasMeta;
+
+  return buildResponse(NaN);
+
+  // ----------------------------------------------------------------------
+  // Shared body. The only per-branch differences are the title source (direct
+  // parseIcy loop vs tee subscription) and the teardown of the upstream.
+  function buildResponse(metaInt: number): Response {
   const body = new ReadableStream<Uint8Array>({
     async start(controller) {
       let closed = false;
@@ -150,8 +187,10 @@ export async function GET(req: NextRequest) {
         if (match) {
           if (match.raw !== lastTitle) {
             lastTitle = match.raw;
+            const startedAt =
+              match.offsetSec !== null ? Date.now() - match.offsetSec * 1000 : Date.now();
             send({
-              type: 'track', title: match.raw, source: 'shazam',
+              type: 'track', title: match.raw, source: 'shazam', startedAt,
               cover: match.cover ?? undefined,
               shazamUrl: match.shazamUrl || undefined,
               appleMusicUrl: match.appleMusicUrl || undefined,
@@ -187,9 +226,51 @@ export async function GET(req: NextRequest) {
       // first attempt is silent to avoid a recognizing flash before the title.
       const fpInitial = setTimeout(() => { void runFingerprintLoop(hasMeta); }, 0);
 
+      // Tee-branch unsubscribes (no-ops in the legacy branch).
+      let unsubTitles: (() => void) | null = null;
+      let unsubAudio: (() => void) | null = null;
+
       try {
-        if (hasMeta) {
-          for await (const event of parseIcy(upstream.body!, metaInt)) {
+        if (tee) {
+          // === Tee branch: title source is the shared StationTee. ===
+          // Real titles win over fingerprinting and dedup against the last
+          // emitted title; junk/empty titles nudge the fingerprint fallback.
+          // demuxIcy does NOT dedup consecutive repeats (parseIcy does), so we
+          // replicate that here with lastRawTitle.
+          if (hasMeta) {
+            let lastRawTitle: string | null = null;
+            unsubTitles = tee.subscribeTitles((title) => {
+              if (closed) return;
+              if (title === lastRawTitle) return; // parseIcy deduped consecutive repeats
+              lastRawTitle = title;
+              if (title === '' || isJunkMetadata(title)) {
+                tryFingerprint();
+                return;
+              }
+              haveMetaTitle = true;
+              (fpAbort as AbortController | null)?.abort();
+              if (title !== lastTitle) {
+                lastTitle = title;
+                send({ type: 'track', title, source: 'metadata', startedAt: Date.now() });
+              }
+            });
+          }
+          // Close the SSE when the tee dies (upstream drop) so the client's
+          // EventSource reconnects and re-acquires a fresh tee. A no-op audio
+          // subscriber is the only hook the tee gives us for death (titleSubs
+          // aren't notified on die()). Stations with no ICY metadata keep their
+          // upstream OPEN here — the tee needs audio for the buffer; that's the
+          // intentional cost of buffering metadata-less stations.
+          // The resolver is created first so the subscribe assignment stays in
+          // linear flow (assigning unsubAudio inside the executor callback would
+          // hide it from control-flow narrowing in the finally block).
+          let resolveDeath!: () => void;
+          const death = new Promise<void>((resolve) => { resolveDeath = resolve; });
+          req.signal.addEventListener('abort', () => resolveDeath(), { once: true });
+          unsubAudio = tee.subscribeAudio({ onChunk: () => {}, onEnd: () => resolveDeath() });
+          await death;
+        } else if (hasMeta) {
+          for await (const event of parseIcy(upstream!.body!, metaInt)) {
             if (event.title === '' || isJunkMetadata(event.title)) {
               // Station isn't naming the song (empty, or just CDN/station
               // branding like "Powered By … CDN") — let the fingerprint
@@ -202,7 +283,7 @@ export async function GET(req: NextRequest) {
             (fpAbort as AbortController | null)?.abort();
             if (event.title !== lastTitle) {
               lastTitle = event.title;
-              send({ type: 'track', title: event.title, source: 'metadata' });
+              send({ type: 'track', title: event.title, source: 'metadata', startedAt: Date.now() });
             }
           }
         } else {
@@ -222,11 +303,21 @@ export async function GET(req: NextRequest) {
         if (fpTimer) clearTimeout(fpTimer);
         clearTimeout(fpInitial);
         try { controller.close(); } catch {}
-        upstreamController.abort();
+        if (tee) {
+          unsubTitles?.();
+          unsubAudio?.();
+          if (!released) { released = true; releaseTee(streamUrlStr, tee); }
+        } else {
+          upstreamController.abort();
+        }
       }
     },
     cancel() {
-      upstreamController.abort();
+      if (tee) {
+        if (!released) { released = true; releaseTee(streamUrlStr, tee); }
+      } else {
+        upstreamController.abort();
+      }
     },
   });
 
@@ -237,4 +328,5 @@ export async function GET(req: NextRequest) {
       Connection: 'keep-alive',
     },
   });
+  }
 }

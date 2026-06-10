@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseIcy } from '../app/lib/icy';
+import { parseIcy, demuxIcy } from '../app/lib/icy';
 
 // Helpers to build ICY-format buffers for tests.
 function buildMetadataBlock(payload: string): Uint8Array {
@@ -130,5 +130,39 @@ describe('parseIcy — edge cases', () => {
 
     const events = await collect(parseIcy(stream, metaInt));
     expect(events).toEqual([]);
+  });
+});
+
+describe('demuxIcy', () => {
+  it('yields audio bytes and titles in stream order', async () => {
+    const metaInt = 4;
+    const audio = new Uint8Array([10, 11, 12, 13]);
+    const meta = buildMetadataBlock("StreamTitle='A - B';");
+    const audio2 = new Uint8Array([20, 21, 22, 23]);
+    const zeroMeta = new Uint8Array([0]); // empty metadata block
+    const stream = streamFromChunks([audio, meta, audio2, zeroMeta]);
+
+    const events = await collect(demuxIcy(stream, metaInt));
+    const audioBytes = events
+      .filter((e): e is { kind: 'audio'; bytes: Uint8Array } => e.kind === 'audio')
+      .flatMap(e => Array.from(e.bytes));
+    const titles = events.filter(e => e.kind === 'title');
+    expect(audioBytes).toEqual([10, 11, 12, 13, 20, 21, 22, 23]);
+    expect(titles).toEqual([{ kind: 'title', title: 'A - B' }]);
+  });
+
+  it('emits partial audio as it arrives (no waiting for the full metaInt block)', async () => {
+    const metaInt = 8;
+    const stream = streamFromChunks([new Uint8Array([1, 2, 3])]); // stream ends mid-block
+    const events = await collect(demuxIcy(stream, metaInt));
+    expect(events).toEqual([{ kind: 'audio', bytes: new Uint8Array([1, 2, 3]) }]);
+  });
+
+  it('repeats duplicate titles (dedup is parseIcy concern)', async () => {
+    const metaInt = 2;
+    const m = buildMetadataBlock("StreamTitle='X';");
+    const stream = streamFromChunks([new Uint8Array(2), m, new Uint8Array(2), m]);
+    const titles = (await collect(demuxIcy(stream, metaInt))).filter(e => e.kind === 'title');
+    expect(titles).toHaveLength(2);
   });
 });

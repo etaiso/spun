@@ -4,9 +4,12 @@
 export type TrackSource = 'metadata' | 'shazam';
 
 // A logged song. `at` (epoch ms) is set for tracking-history entries — it drives
-// gap math and humanized durations. `time` (HH:MM) is for display. `at` is
-// optional so pre-existing session entries (which lack it) remain valid.
-export type HistoryEntry = { time: string; title: string; at?: number };
+// gap math and humanized durations; it's the moment the NEXT song was announced,
+// i.e. ≈ when this one ENDED. `startedAt` (epoch ms) is when it began airing
+// (ICY announce time, or Shazam detection minus the match offset) — used by the
+// timeshift jump-to-song affordance. `time` (HH:MM) is for display. Both epoch
+// fields are optional so pre-existing entries remain valid.
+export type HistoryEntry = { time: string; title: string; at?: number; startedAt?: number };
 
 // A "tracking paused" marker between an older run and a newer one.
 // fromAt = last activity before the pause; toAt = when tracking resumed.
