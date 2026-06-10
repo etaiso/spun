@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { LIVE_ENTER_SEC, type TimeshiftState } from '@/app/lib/timeshift/engine';
+import { IDLE, displayMs, scrubCancel, scrubMove, scrubRelease, scrubSettle, scrubStart, type ScrubState } from '@/app/lib/timeshift/scrub';
 import { fmtBehind, fmtWallClock } from '@/app/lib/timeshift/format';
 
 export type TimeshiftControlsProps = {
@@ -37,14 +38,35 @@ function Timeline({ state, onSeekTo, ticks, height }: {
   const barRef = useRef<HTMLDivElement | null>(null);
   const tipRef = useRef<HTMLDivElement | null>(null);
   const [hover, setHover] = useState<{ x: number; ms: number } | null>(null);
+  // Scrub state lives in BOTH a ref and useState: pointer events stream
+  // faster than renders, and pointerup must commit the exact position of the
+  // last pointermove — a useState read from the event closure can be one
+  // move stale. The ref is authoritative; the state mirror drives rendering.
+  const [scrub, setScrubState] = useState<ScrubState>(IDLE);
+  const scrubRef = useRef<ScrubState>(scrub);
+  const setScrub = useCallback((next: ScrubState) => {
+    if (next === scrubRef.current) return; // scrubSettle returns same ref on no-op
+    scrubRef.current = next;
+    setScrubState(next);
+  }, []);
+
   const { bufferStartMs, liveEdgeMs, playheadMs, atLiveEdge } = state;
   const span = (liveEdgeMs ?? 0) - (bufferStartMs ?? 0);
   const frac = useCallback((ms: number) =>
     span > 0 ? Math.min(1, Math.max(0, (ms - (bufferStartMs ?? 0)) / span)) : 1,
     [bufferStartMs, span]);
+
+  // Release the post-seek display hold once the engine playhead catches up.
+  useEffect(() => {
+    setScrub(scrubSettle(scrubRef.current, playheadMs, Date.now()));
+  }, [playheadMs, setScrub]);
+
+  const dispMs = displayMs(scrub);
   // The playhead trails the advancing live edge by decode latency, which would
   // leave a permanent unfilled tail — at LIVE the bar is simply full.
-  const fillFrac = atLiveEdge ? 1 : frac(playheadMs ?? liveEdgeMs ?? 0);
+  const fillFrac = dispMs !== null
+    ? frac(dispMs)
+    : atLiveEdge ? 1 : frac(playheadMs ?? liveEdgeMs ?? 0);
 
   const pointOnBar = (e: ReactPointerEvent): { x: number; ms: number } | null => {
     const el = barRef.current;
@@ -55,14 +77,41 @@ function Timeline({ state, onSeekTo, ticks, height }: {
     return { x, ms: bufferStartMs + (x / r.width) * span };
   };
 
-  const seekFromPointer = (e: ReactPointerEvent) => {
+  const onDown = (e: ReactPointerEvent) => {
     const p = pointOnBar(e);
-    if (p) onSeekTo(p.ms);
+    if (!p) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setScrub(scrubStart(p.ms));
+    setHover(p); // tooltip follows the drag for every pointer type
   };
 
   const onMove = (e: ReactPointerEvent) => {
-    if (e.pointerType !== 'mouse') return; // hover tooltip is a mouse affordance
-    setHover(pointOnBar(e));
+    const p = pointOnBar(e);
+    if (!p) return;
+    if (scrubRef.current.phase === 'dragging') {
+      setScrub(scrubMove(scrubRef.current, p.ms));
+      setHover(p);
+    } else if (e.pointerType === 'mouse') {
+      setHover(p); // hover preview is a mouse affordance
+    }
+  };
+
+  const onUp = (e: ReactPointerEvent) => {
+    const { next, commitMs } = scrubRelease(scrubRef.current, Date.now());
+    setScrub(next);
+    if (commitMs !== null) onSeekTo(commitMs);
+    if (e.pointerType !== 'mouse') setHover(null);
+  };
+
+  const onCancel = () => {
+    setScrub(scrubCancel());
+    setHover(null);
+  };
+
+  const onLeave = () => {
+    // Pointer capture still delivers boundary events — keep the tooltip alive
+    // mid-drag when the pointer strays off the bar.
+    if (scrubRef.current.phase !== 'dragging') setHover(null);
   };
 
   // Clamp the tooltip inside the bar once its rendered width is known.
@@ -78,6 +127,8 @@ function Timeline({ state, onSeekTo, ticks, height }: {
   // from first load while it fills — frac() clamps to the live edge until then.
   if (bufferStartMs === null || liveEdgeMs === null) return null;
   const hoverBehindSec = hover ? Math.max(0, (liveEdgeMs - hover.ms) / 1000) : 0;
+  const dispBehindSec = Math.max(0, (liveEdgeMs - (dispMs ?? playheadMs ?? liveEdgeMs)) / 1000);
+  const shownLive = dispMs === null ? atLiveEdge : dispBehindSec < LIVE_ENTER_SEC;
   return (
     <div
       ref={barRef}
@@ -85,15 +136,18 @@ function Timeline({ state, onSeekTo, ticks, height }: {
       aria-label="Rewind position"
       aria-valuemin={0} aria-valuemax={100}
       aria-valuenow={Math.round(fillFrac * 100)}
-      onPointerDown={seekFromPointer}
+      aria-valuetext={shownLive ? 'Live' : `${fmtBehind(dispBehindSec)} behind live`}
+      onPointerDown={onDown}
       onPointerMove={onMove}
-      onPointerLeave={() => setHover(null)}
+      onPointerUp={onUp}
+      onPointerCancel={onCancel}
+      onPointerLeave={onLeave}
       className="relative w-full cursor-pointer group/tl"
       style={{ height: height + 8, paddingTop: 4, paddingBottom: 4 }}
     >
       {/* base track: the whole seekable buffer, always reads filled */}
       <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 rounded-full bg-[var(--color-brand-purple)]/20" style={{ height }}>
-        {/* strong fill up to the playhead (100% at LIVE) */}
+        {/* strong fill up to the displayed position (100% at LIVE) */}
         <div
           className="absolute left-0 top-0 h-full rounded-full bg-[var(--color-brand-purple)]/55"
           style={{ width: `${fillFrac * 100}%` }}
