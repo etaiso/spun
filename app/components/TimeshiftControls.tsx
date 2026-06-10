@@ -57,9 +57,12 @@ function Timeline({ state, onSeekTo, ticks, height }: {
     [bufferStartMs, span]);
 
   // Release the post-seek display hold once the engine playhead catches up.
+  // Depends on the state OBJECT (fresh every engine tick), not the playhead
+  // value: while paused the playhead is static, but the settle timeout must
+  // still be evaluated each tick or a failed seek could freeze the display.
   useEffect(() => {
-    setScrub(scrubSettle(scrubRef.current, playheadMs, Date.now()));
-  }, [playheadMs, setScrub]);
+    setScrub(scrubSettle(scrubRef.current, state.playheadMs, Date.now()));
+  }, [state, setScrub]);
 
   const dispMs = displayMs(scrub);
   // The playhead trails the advancing live edge by decode latency, which would
@@ -78,6 +81,9 @@ function Timeline({ state, onSeekTo, ticks, height }: {
   };
 
   const onDown = (e: ReactPointerEvent) => {
+    // Primary pointer + left button only — a second touch or a right-click
+    // must not restart the drag mid-flight.
+    if (!e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) return;
     const p = pointOnBar(e);
     if (!p) return;
     e.currentTarget.setPointerCapture(e.pointerId);
