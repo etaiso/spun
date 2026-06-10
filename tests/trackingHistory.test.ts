@@ -115,3 +115,24 @@ describe('humanizeGap', () => {
     expect(humanizeGap(0, 10_000)).toBe('~1 min');
   });
 });
+
+describe('applyTrack — startedAt', () => {
+  it('stores startedAt on the logged entry when provided', () => {
+    let s = emptyStation();
+    s = applyConnect(s, 1_000_000);
+    s = applyTrack(s, 'Song A', 1_200_000, 1_050_000);
+    const entry = s.items[0];
+    expect(isGap(entry)).toBe(false);
+    if (!isGap(entry)) {
+      expect(entry.startedAt).toBe(1_050_000);
+      expect(entry.at).toBe(1_200_000);
+    }
+  });
+
+  it('leaves startedAt undefined when not provided (old callers)', () => {
+    let s = emptyStation();
+    s = applyTrack(s, 'Song B', 2_000_000);
+    const entry = s.items[0];
+    if (!isGap(entry)) expect(entry.startedAt).toBeUndefined();
+  });
+});

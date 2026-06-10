@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Station } from './lib/stations';
 import { useRecent } from './lib/recent';
 import { usePlayCounts } from './lib/playCounts';
@@ -20,7 +20,10 @@ import { ShortcutsHelp } from './components/ShortcutsHelp';
 import { SettingsDialog } from './components/SettingsDialog';
 import { SavedSongsDialog } from './components/SavedSongsDialog';
 import type { PlayState } from './components/Player';
-import type { HistoryItem } from './lib/nowPlayingTypes';
+import type { HistoryItem, HistoryEntry } from './lib/nowPlayingTypes';
+import { isGap } from './lib/nowPlayingTypes';
+import { subscribeTimeshiftState, requestSeekToWallClock } from './lib/timeshift/bus';
+import type { TimeshiftState } from './lib/timeshift/engine';
 
 export default function Home() {
   const [selected, setSelected] = useState<Station | null>(null);
@@ -30,6 +33,21 @@ export default function Home() {
   // Playlist history, lifted out of NowPlaying so it renders below the player
   // controls — the controls stay anchored near the cover as history grows.
   const [playlistHistory, setPlaylistHistory] = useState<HistoryItem[]>([]);
+  // Latest timeshift engine state (null when timeshift is off / inactive),
+  // published by the Player-owned engine via the bus. Drives the timeline song
+  // ticks and the jump-from-buffer affordance in PlaylistHistory.
+  const [tsState, setTsState] = useState<TimeshiftState | null>(null);
+  useEffect(() => subscribeTimeshiftState(setTsState), []);
+
+  // Song ticks for the scrubber: history entries with a known air-start that
+  // falls inside the currently-buffered wall-clock range.
+  const ticks = useMemo(() => {
+    if (!tsState?.bufferStartMs || !tsState.liveEdgeMs) return [];
+    return playlistHistory
+      .filter((h): h is HistoryEntry => !isGap(h) && h.startedAt !== undefined)
+      .filter(h => h.startedAt! >= tsState.bufferStartMs! && h.startedAt! <= tsState.liveEdgeMs!)
+      .map(h => ({ atMs: h.startedAt!, title: h.title }));
+  }, [playlistHistory, tsState]);
   const [showHelp, setShowHelp] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -220,9 +238,17 @@ export default function Home() {
                       dock={view === 'explore'}
                       nowPlaying={currentTrack}
                       onExpand={() => setView('home')}
+                      ticks={ticks}
                     />
                     <div className={view === 'explore' ? 'hidden' : ''}>
-                      <PlaylistHistory key={currentStation.id} history={playlistHistory} stationName={currentStation.name} />
+                      <PlaylistHistory
+                        key={currentStation.id}
+                        history={playlistHistory}
+                        stationName={currentStation.name}
+                        jumpRange={tsState && tsState.bufferStartMs !== null && tsState.liveEdgeMs !== null
+                          ? { startMs: tsState.bufferStartMs, endMs: tsState.liveEdgeMs } : null}
+                        onJumpTo={requestSeekToWallClock}
+                      />
                     </div>
                   </div>
                 </div>

@@ -7,6 +7,7 @@ import { isNonTrack } from '@/app/lib/nonTrack';
 import { loadSession, saveSession } from '@/app/lib/session';
 import { noteConnect, heartbeat, recordTrack, HEARTBEAT_MS } from '@/app/lib/trackingHistory';
 import type { TrackSource } from '@/app/lib/nowPlayingTypes';
+import { timeshiftEnabled } from '@/app/lib/timeshiftSetting';
 import { StationLogo } from './StationLogo';
 
 type Props = {
@@ -27,6 +28,13 @@ export function TrackingPanel({ onSelect, activeStationId, activeTrack }: Props)
   const { tracked, untrack } = useTracking();
   if (tracked.length === 0) return null;
 
+  // Untrack also deletes the server-side disk ring for this station, so a
+  // re-track starts fresh (no stale buffered history). Best-effort.
+  const onUntrack = (id: string) => {
+    untrack(id);
+    void fetch(`/api/timeshift?sid=${encodeURIComponent(id)}`, { method: 'DELETE' });
+  };
+
   return (
     <div>
       <div className="text-[11px] tracking-[1.6px] uppercase font-extrabold text-[var(--color-brand-purple)] mb-3 flex items-center gap-1.5">
@@ -39,7 +47,7 @@ export function TrackingPanel({ onSelect, activeStationId, activeTrack }: Props)
         <span className="text-[var(--color-ink-4)] font-bold">{tracked.length}</span>
       </div>
       <div className="flex flex-col gap-1">
-        {tracked.map(s => {
+        {tracked.map((s, i) => {
           const active = s.id === activeStationId;
           return (
             <TrackedStationRow
@@ -49,9 +57,12 @@ export function TrackingPanel({ onSelect, activeStationId, activeTrack }: Props)
               key={`${s.id}:${active}`}
               station={s}
               active={active}
+              // tracked[] is newest-first; the 5 most-recently-tracked get the
+              // disk ring (others tee-only) — passed down for the SSE ts param.
+              index={i}
               activeTrack={active ? activeTrack : null}
               onSelect={() => onSelect(s)}
-              onUntrack={() => untrack(s.id)}
+              onUntrack={() => onUntrack(s.id)}
             />
           );
         })}
@@ -78,12 +89,14 @@ function nowHHMM() {
 function TrackedStationRow({
   station,
   active,
+  index,
   activeTrack,
   onSelect,
   onUntrack,
 }: {
   station: Station;
   active: boolean;
+  index: number;
   activeTrack: string | null;
   onSelect: () => void;
   onUntrack: () => void;
@@ -105,11 +118,22 @@ function TrackedStationRow({
     })(),
   );
 
+  // Air-start (epoch ms) of the song currently on screen, captured so the
+  // finished song's `startedAt` is threaded into recordTrack when the next
+  // title arrives (drives timeshift jump-to-song). Mirrors prevTitleRef.
+  const prevStartedAtRef = useRef<number | null>(null);
+
   useEffect(() => {
     // The active station is recognised by NowPlaying; don't open a second SSE.
     if (active) return;
 
-    const es = new EventSource(`/api/now-playing?url=${encodeURIComponent(station.streamUrl)}`);
+    // Timeshift tee params: the 5 most-recently-tracked stations get the disk
+    // ring ('disk'); the rest get a tee only ('1'). Off → plain path.
+    const ts = timeshiftEnabled() ? (index < 5 ? 'disk' : '1') : null;
+    const es = new EventSource(
+      `/api/now-playing?url=${encodeURIComponent(station.streamUrl)}` +
+      (ts ? `&ts=${ts}&sid=${encodeURIComponent(station.id)}` : ''),
+    );
 
     // Fires on first connect AND on EventSource auto-reconnect, so a network
     // drop longer than GAP_MS surfaces as a "no tracking" gap.
@@ -124,7 +148,7 @@ function TrackedStationRow({
     es.onmessage = (ev) => {
       try {
         const msg = JSON.parse(ev.data) as
-          | { type: 'track'; title: string; source?: TrackSource; cover?: string }
+          | { type: 'track'; title: string; source?: TrackSource; cover?: string; startedAt?: number }
           | { type: 'no-metadata' }
           | { type: 'no-song' }
           | { type: 'recognizing' }
@@ -133,12 +157,14 @@ function TrackedStationRow({
           if (isNonTrack(msg.title, station.name)) {
             setStatus({ kind: 'idle' });
           } else {
-            // Log the song that just finished when a NEW real title arrives.
+            // Log the song that just finished when a NEW real title arrives,
+            // threading its air-start for timeshift jump-to-song.
             const prev = prevTitleRef.current;
             if (prev !== null && prev !== msg.title && !isNonTrack(prev, station.name)) {
-              recordTrack(station.id, prev);
+              recordTrack(station.id, prev, prevStartedAtRef.current ?? undefined);
             }
             prevTitleRef.current = msg.title;
+            prevStartedAtRef.current = msg.startedAt ?? Date.now();
             setStatus({ kind: 'track', title: msg.title });
             // Seed the session cache so selecting this station shows the song
             // immediately (NowPlaying restores from the same store on mount).
@@ -157,7 +183,7 @@ function TrackedStationRow({
       } catch { /* ignore malformed frames */ }
     };
     return () => { es.close(); clearInterval(hb); };
-  }, [active, station.streamUrl, station.name, station.id]);
+  }, [active, index, station.streamUrl, station.name, station.id]);
 
   const subtitle = active
     ? (activeTrack || 'Playing now')

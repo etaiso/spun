@@ -60,8 +60,9 @@ export function humanizeGap(fromAt: number, toAt: number): string {
 }
 
 /** Record a finished song. Dedupes consecutive re-broadcasts, consumes an armed
- *  gap (placing it beneath the resumed song), and caps the list. */
-export function applyTrack(s: StationHistory, finishedTitle: string, at: number): StationHistory {
+ *  gap (placing it beneath the resumed song), and caps the list. `startedAt` is
+ *  the song's air-start time when known (drives timeshift jump-to-song). */
+export function applyTrack(s: StationHistory, finishedTitle: string, at: number, startedAt?: number): StationHistory {
   const latestSong = s.items.find((it): it is HistoryEntry => !isGap(it));
   if (latestSong && latestSong.title === finishedTitle) {
     // Same song re-announced — don't log it again, but keep any armed gap for
@@ -75,7 +76,7 @@ export function applyTrack(s: StationHistory, finishedTitle: string, at: number)
   if (s.gapFromAt !== undefined) {
     items = [{ gap: true, fromAt: s.gapFromAt, toAt: at }, ...items];
   }
-  items = [{ time: hhmm(at), title: finishedTitle, at }, ...items].slice(0, CAP);
+  items = [{ time: hhmm(at), title: finishedTitle, at, startedAt }, ...items].slice(0, CAP);
   return { items, lastActiveAt: at }; // gapFromAt dropped (consumed)
 }
 
@@ -123,7 +124,8 @@ export function heartbeat(stationId: string): void {
   mutate(stationId, s => applyHeartbeat(s, Date.now()));
 }
 
-/** Call when a new real track replaces `finishedTitle` (which just ended). */
-export function recordTrack(stationId: string, finishedTitle: string): void {
-  mutate(stationId, s => applyTrack(s, finishedTitle, Date.now()));
+/** Call when a new real track replaces `finishedTitle` (which just ended).
+ *  `startedAt` = when the finished song began airing, when known. */
+export function recordTrack(stationId: string, finishedTitle: string, startedAt?: number): void {
+  mutate(stationId, s => applyTrack(s, finishedTitle, Date.now(), startedAt));
 }
