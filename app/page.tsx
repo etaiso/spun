@@ -114,8 +114,8 @@ export default function Home() {
   }, [addRecent, bumpPlay, currentStation]);
 
   // Page-level shortcuts. ⌘K / Ctrl+K opens the command palette (handled
-  // before the modifier bail). ←/→ cycle favorites, ? toggles help, S toggles
-  // saved songs, Esc closes. Audio shortcuts (Space/M/↑/↓) live in Player.
+  // before the modifier bail). ? toggles help, S toggles saved songs, Esc
+  // closes. Audio shortcuts (Space/M/↑/↓/←/→) live in Player.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
@@ -139,25 +139,15 @@ export default function Home() {
       } else if (e.key === 'Escape') {
         setShowHelp(false);
         setView('home');
-      } else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-        if (favorites.length === 0) return;
-        e.preventDefault();
-        const i = favorites.findIndex(f => f.id === currentStation?.id);
-        const len = favorites.length;
-        const next =
-          e.key === 'ArrowRight'
-            ? favorites[i < 0 ? 0 : (i + 1) % len]
-            : favorites[i < 0 ? len - 1 : (i - 1 + len) % len];
-        handleSelect(next);
       }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [favorites, handleSelect, currentStation, paletteOpen]);
+  }, [paletteOpen]);
 
   // Hardware media keys (the ⏮/⏭ buttons on media keyboards) and OS media
-  // controls. next/prev cycle favorites — mirroring the in-app ←/→ behavior —
-  // via the Media Session API (works in browsers and the Electron desktop app).
+  // controls. next/prev cycle favorites via the Media Session API (works in
+  // browsers and the Electron desktop app).
   // Only wired while there are favorites, so the OS hides the buttons otherwise.
   useEffect(() => {
     if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
