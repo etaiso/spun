@@ -11,6 +11,7 @@ import { RamRing } from './ramRing';
 import { TimeMap } from './timeMap';
 import { resolveSeek, type Range } from './resolveSeek';
 import { LiveEdgeEstimator } from './liveEdge';
+import { BehindSmoother } from './behind';
 
 const AHEAD_MAX_SEC = 45;      // stop appending this far ahead of the playhead
 const BEHIND_KEEP_SEC = 180;   // evict SourceBuffer data older than this
@@ -69,6 +70,9 @@ export class TimeshiftEngine {
   // Smoothed, monotone live-edge clock — see LiveEdgeEstimator for why naive
   // re-anchoring makes the behind-live readout sawtooth.
   private liveEdge = new LiveEdgeEstimator();
+  // Physics-derived behind-live readout — see BehindSmoother for why the raw
+  // stamp-based value jitters and creeps.
+  private behind = new BehindSmoother();
   private liveSticky = true; // hysteretic "at live edge" — see LIVE_ENTER/EXIT
   // Rebuilds (ram/disk seeks) must not overlap: a second buildMediaSource while
   // the first is mid-flight corrupts the append stream (CHUNK_DEMUXER append
@@ -162,6 +166,7 @@ export class TimeshiftEngine {
       this.mediaSource = ms;
       this.sb = null;
       this.timeMap.reset();
+      this.behind.reset(); // ct restarts near zero with the new SourceBuffer
       this.appendCursor = fromIndex;
       this.appendedWallClocks = [];
       this.needAlign = true;
@@ -360,8 +365,11 @@ export class TimeshiftEngine {
     const ahead = sb && sb.buffered.length > 0
       ? Math.max(0, sb.buffered.end(sb.buffered.length - 1) - this.audio.currentTime)
       : 0;
-    const behindSec = playheadMs !== null && liveEdgeMs !== null
+    const rawBehind = playheadMs !== null && liveEdgeMs !== null
       ? Math.max(0, (liveEdgeMs - playheadMs) / 1000) : 0;
+    const behindSec = playheadMs !== null && liveEdgeMs !== null
+      ? this.behind.update(rawBehind, this.audio.currentTime, performance.now())
+      : rawBehind;
     // Hysteresis so the LIVE pill doesn't flicker on the burst sawtooth.
     if (this.liveSticky) { if (behindSec > LIVE_EXIT_SEC) this.liveSticky = false; }
     else { if (behindSec < LIVE_ENTER_SEC) this.liveSticky = true; }

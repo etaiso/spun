@@ -104,6 +104,27 @@ pill and the tooltip; hours segment only when ≥ 1 h.
   content/clamping, steady offset over ≥ 60 s of observation, both tooltip
   variants presented for selection.
 
+## Addendum (verification discovery): physics-derived behindSec
+
+Preview verification showed the monotone live edge alone does not stop the
+readout wobble: the **playhead** side jitters too. The server stamps chunks
+with `Date.now()` at receive (`stationTee.ts`), so timeMap anchors inherit
+±0.5 s arrival jitter — and after a tee (re)connect, Icecast's
+burst-on-connect delivers ~60 s of past audio that gets stamped into a few
+seconds, making the raw behind-live value creep upward for the first minute
+of playback (measured: 70.6 s of audio carrying 13.5 s of stamp span).
+
+Added `app/lib/timeshift/behind.ts` (`BehindSmoother`, unit-tested): the
+displayed `behindSec` advances by `Δwall − Δct` — exactly constant while
+playing at 1×, +1 s/s while paused/stalled, instant on `currentTime` jumps
+(window-tier seeks) — plus a slow exponential correction (τ = 15 s) toward
+the raw stamp-derived value so persistent truth still wins, smoothly. Reset
+on MediaSource rebuilds. Verified in preview: zero flicker; seeks land
+instantly; burst-zone correction glides monotonically instead of sawtoothing.
+
+**Follow-up (separate change):** stamp chunks by media time in the server tee
+(root cause) — also improves song-tick/seek alignment inside burst zones.
+
 ## Out of scope
 
 - Drag-scrubbing with live tooltip follow (bar currently seeks on
