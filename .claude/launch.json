@@ -4,7 +4,7 @@
     {
       "name": "radio",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": ["run", "dev:preview"],
       "port": 3000,
       "autoPort": true
     },
