@@ -21,7 +21,7 @@ export type TimeshiftControlsProps = {
 export function TimeshiftControls(props: TimeshiftControlsProps) {
   return (
     <div className="flex flex-col gap-1.5 w-full">
-      <Timeline state={props.state} onSeekTo={props.onSeekTo} ticks={props.ticks} height={4} />
+      <Timeline state={props.state} onSeekTo={props.onSeekTo} ticks={props.ticks} height={6} />
       <div className="flex items-center">
         <LiveButton state={props.state} onGoLive={props.onGoLive} />
         <div className="flex-1" />
@@ -148,8 +148,8 @@ function Timeline({ state, onSeekTo, ticks, height }: {
       onPointerUp={onUp}
       onPointerCancel={onCancel}
       onPointerLeave={onLeave}
-      className="relative w-full cursor-pointer group/tl"
-      style={{ height: height + 8, paddingTop: 4, paddingBottom: 4 }}
+      className="relative w-full cursor-pointer"
+      style={{ height: 24 }}
     >
       {/* base track: the whole seekable buffer, always reads filled */}
       <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 rounded-full bg-[var(--color-brand-purple)]/20" style={{ height }}>
@@ -182,10 +182,10 @@ function Timeline({ state, onSeekTo, ticks, height }: {
             style={{ left: hover.x }}
           />
         )}
-        {/* playhead */}
+        {/* scrub handle — always visible, fixed size (spec: no hover growth) */}
         <div
-          className="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-[var(--color-ink)] shadow opacity-0 group-hover/tl:opacity-100 transition-opacity"
-          style={{ left: `calc(${fillFrac * 100}% - 5px)` }}
+          className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-[var(--color-brand-purple)] shadow"
+          style={{ left: `${fillFrac * 100}%` }}
         />
       </div>
       {/* hover tooltip: broadcast wall-clock · behind-live */}
