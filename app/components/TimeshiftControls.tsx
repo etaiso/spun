@@ -6,33 +6,25 @@ import { fmtBehind, fmtWallClock } from '@/app/lib/timeshift/format';
 
 export type TimeshiftControlsProps = {
   state: TimeshiftState;
-  onSeekBy: (deltaSec: number) => void;
   onGoLive: () => void;
   onSeekTo: (wallClockMs: number) => void;
   ticks: { atMs: number; title: string }[];
 };
 
-// Layout: a full-width scrubber on its own row above a centered
-// [−30] [LIVE] [+30] cluster. The scrubber tints the played-behind portion,
-// marks song boundaries (ticks) and real audio gaps (discontinuities), and
-// seeks on click/drag.
-const STEP_SEC = 30;
-
+// Layout (YouTube-live style): a full-width scrubber with, below it, a LIVE
+// toggle pinned left and the behind-live readout pinned right. Seeking is done
+// on the timeline itself (click/drag, or J/L on the keyboard) — there are no
+// step buttons. The LIVE toggle's content never changes (state is expressed by
+// color only) and each end of the row is independent, so nothing shifts when
+// the offset appears, grows to hours, or vanishes.
 export function TimeshiftControls(props: TimeshiftControlsProps) {
-  const { bufferStartMs, liveEdgeMs, playheadMs, atLiveEdge } = props.state;
-  const head = playheadMs ?? liveEdgeMs;
-  // −30 needs a full step of rewindable history behind the playhead; on first
-  // load (or once rewound to the start) there isn't, so disable it rather than
-  // letting it clamp to a no-op. +30 is meaningless at the live edge.
-  const canRewind = head !== null && bufferStartMs !== null && head - bufferStartMs >= STEP_SEC * 1000;
-  const canForward = !atLiveEdge;
   return (
     <div className="flex flex-col gap-1.5 w-full">
       <Timeline state={props.state} onSeekTo={props.onSeekTo} ticks={props.ticks} height={4} />
-      <div className="flex items-center justify-center gap-3">
-        <StepButton delta={-30} onSeekBy={props.onSeekBy} disabled={!canRewind} />
-        <LivePill state={props.state} onGoLive={props.onGoLive} />
-        <StepButton delta={30} onSeekBy={props.onSeekBy} disabled={!canForward} />
+      <div className="flex items-center">
+        <LiveButton state={props.state} onGoLive={props.onGoLive} />
+        <div className="flex-1" />
+        <BehindReadout state={props.state} />
       </div>
     </div>
   );
@@ -152,27 +144,11 @@ function Timeline({ state, onSeekTo, ticks, height }: {
   );
 }
 
-function StepButton({ delta, onSeekBy, disabled }: { delta: number; onSeekBy: (d: number) => void; disabled?: boolean }) {
-  return (
-    <button
-      onClick={() => onSeekBy(delta)}
-      disabled={disabled}
-      aria-label={delta < 0 ? 'Back 30 seconds' : 'Forward 30 seconds'}
-      title={delta < 0 ? 'Back 30s (J)' : 'Forward 30s (L)'}
-      className={[
-        'w-9 h-9 rounded-full border border-[var(--color-line)] text-[11px] font-bold transition-colors',
-        disabled
-          ? 'text-[var(--color-ink-4)] opacity-40 cursor-default'
-          : 'text-[var(--color-ink-3)] hover:border-[var(--color-brand-pink)] hover:text-[var(--color-ink)] cursor-pointer',
-      ].join(' ')}
-    >
-      {delta < 0 ? '−30' : '+30'}
-    </button>
-  );
-}
-
-function LivePill({ state, onGoLive }: { state: TimeshiftState; onGoLive: () => void }) {
+function LiveButton({ state, onGoLive }: { state: TimeshiftState; onGoLive: () => void }) {
   const atEdge = state.atLiveEdge;
+  // Fixed content in every state — at/behind live is expressed by color only,
+  // so the button never changes size. The `border-transparent` keeps the
+  // at-edge box identical to the behind box.
   return (
     <button
       onClick={onGoLive}
@@ -180,13 +156,31 @@ function LivePill({ state, onGoLive }: { state: TimeshiftState; onGoLive: () => 
       aria-label={atEdge ? 'Live' : `Behind live by ${fmtBehind(state.behindSec)} — back to live`}
       title={atEdge ? 'Live' : 'Back to live (Shift+L)'}
       className={[
-        'px-3 py-1.5 rounded-full text-[11px] tracking-[1px] uppercase font-bold transition-colors',
+        'h-9 px-3 inline-flex items-center gap-1.5 rounded-full border text-[11px] tracking-[1px] uppercase font-bold transition-colors',
         atEdge
-          ? 'bg-[var(--color-danger)]/10 text-[var(--color-danger)] cursor-default'
-          : 'border border-[var(--color-line)] text-[var(--color-ink-3)] hover:border-[var(--color-danger)] hover:text-[var(--color-danger)] cursor-pointer',
+          ? 'border-transparent bg-[var(--color-brand-purple)]/10 text-[var(--color-brand-purple)] cursor-default'
+          : 'border-[var(--color-line)] text-[var(--color-ink-3)] hover:border-[var(--color-brand-purple)] hover:text-[var(--color-brand-purple)] cursor-pointer',
       ].join(' ')}
     >
-      {atEdge ? '● Live' : `${fmtBehind(state.behindSec)} · Live`}
+      <span className={`w-1.5 h-1.5 rounded-full bg-current ${atEdge ? 'pulse-soft' : ''}`} />
+      Live
     </button>
+  );
+}
+
+// The behind-live offset, at the far end of the row so its appearance, growth
+// (to hours) or disappearance can never move the LIVE toggle. Fades rather
+// than unmounts; hidden from the a11y tree since the LIVE button announces it.
+function BehindReadout({ state }: { state: TimeshiftState }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={[
+        'text-[11px] font-semibold tabular-nums text-[var(--color-ink-3)] whitespace-nowrap pointer-events-none transition-opacity duration-300',
+        state.atLiveEdge ? 'opacity-0' : 'opacity-100',
+      ].join(' ')}
+    >
+      {fmtBehind(state.behindSec)}
+    </span>
   );
 }

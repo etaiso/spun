@@ -545,7 +545,6 @@ export function Player({ station, onPlayStateChange, dock = false, nowPlaying = 
         <div className="relative z-10 mt-3">
           <TimeshiftControls
             state={tsState}
-            onSeekBy={(d) => engineRef.current?.seekBy(d)}
             onGoLive={() => engineRef.current?.goLive()}
             onSeekTo={(ms) => engineRef.current?.seekToWallClock(ms)}
             ticks={ticks ?? []}
