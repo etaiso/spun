@@ -283,8 +283,9 @@ export function Player({ station, onPlayStateChange, dock = false, nowPlaying = 
   }, []);
 
   // Global media keyboard shortcuts for the audio it owns: Space/K play-pause,
-  // M mute, Up/Down volume. Skips when the user is typing in a field and when
-  // a modifier is held (so browser shortcuts still work).
+  // M mute, Up/Down volume, Left/Right seek ±10s (J/L ±30s). Skips when the
+  // user is typing in a field and when a modifier is held (so browser
+  // shortcuts still work).
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const t = e.target as HTMLElement | null;
@@ -322,6 +323,14 @@ export function Player({ station, onPlayStateChange, dock = false, nowPlaying = 
         case 'ArrowDown':
           e.preventDefault();
           setVolume(v => Math.max(0, +(v - 0.05).toFixed(2)));
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          engineRef.current?.seekBy(-10);
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          engineRef.current?.seekBy(10);
           break;
         case 'j':
         case 'J':

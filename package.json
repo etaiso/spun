@@ -5,6 +5,7 @@
   "main": "electron/main.js",
   "scripts": {
     "dev": "next dev",
+    "dev:preview": "node scripts/ensure-deps.mjs && next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
