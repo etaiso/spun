@@ -131,23 +131,42 @@ export function Player({ station, onPlayStateChange, dock = false, nowPlaying = 
         streamUrl: station.streamUrl,
         stationId: station.id,
         onState: (s) => { setTsState(s); publishTimeshiftState(s); },
-        onFallback: () => {
+        onFallback: (reason) => {
           if (cancelled) return;
           engineRef.current = null;
           setTsState(null);
           publishTimeshiftState(null);
           if (tsRetriesRef.current < TS_MAX_RETRIES) {
             tsRetriesRef.current++;
-            setTsAttempt(n => n + 1); // rebuild a fresh engine; tsMode stays 'pending'
+            console.warn(`[timeshift] rebuilding engine (retry ${tsRetriesRef.current}/${TS_MAX_RETRIES}):`, reason);
+            // Back to 'pending' so the lifecycle effect actually rebuilds: it
+            // no-ops on any other mode, so a failure after we reached 'on'
+            // would otherwise strand playback with no engine and no controls.
+            setTsMode('pending');
+            setTsAttempt(n => n + 1); // re-trigger the effect for a fresh engine
           } else {
-            setTsMode('off'); // give up — plain audio for this session
+            console.warn('[timeshift] giving up after retries, plain audio for this session:', reason);
+            setTsMode('off');
           }
         },
       });
       engineRef.current = engine;
+      // A failing engine can error the media element (e.g. a decode error),
+      // which pauses it — so the rebuilt engine can't infer "was playing"
+      // from the element. Capture intent before start(): playing, or paused
+      // BY the error rather than by the user.
+      const resumeAfterStart = !a.paused || a.error !== null;
       engine.start().then(ok => {
         if (cancelled) return;
-        if (ok) { tsRetriesRef.current = 0; setTsMode('on'); return; }
+        if (ok) {
+          tsRetriesRef.current = 0;
+          setTsMode('on');
+          if (resumeAfterStart && a.paused) {
+            setPaused(false);
+            a.play().catch(() => { /* gesture-gated — the next interaction resumes */ });
+          }
+          return;
+        }
         // start() returned false = format gate (unsupported codec / no MSE).
         // That's not transient — go straight to plain, no retry.
         engineRef.current = null;
