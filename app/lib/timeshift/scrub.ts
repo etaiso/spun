@@ -12,9 +12,11 @@ export type ScrubState =
 
 export const IDLE: ScrubState = { phase: 'idle' };
 
-// Wider than the engine's live-enter band (LIVE_ENTER_SEC = 5 s): a drop
-// near the live edge snaps to live, which can land the playhead several
-// seconds past the literal target — that still counts as "landed".
+// Wider than the engine's DEFAULT live-enter band (~5 s): a drop near the
+// live edge snaps to live, which can land the playhead several seconds past
+// the literal target — that still counts as "landed". The band is adaptive
+// (liveBand, sized to station burst cadence) and can exceed this tolerance on
+// bursty stations; those drops settle via the timeout backstop instead.
 export const SETTLE_TOLERANCE_MS = 8000;
 // Safety valve so a failed or clamped seek can never freeze the display.
 export const SETTLE_TIMEOUT_MS = 2000;
@@ -56,7 +58,7 @@ export function scrubCancel(): ScrubState {
  *  completes, the engine still reports the PRE-seek playhead, which can sit
  *  far on either side of the target (ahead after a backward drag from live,
  *  behind after a forward drag). Overshoot past the target is bounded by the
- *  engine's live-snap band (LIVE_ENTER_SEC = 5 s < tolerance), and the
+ *  engine's adaptive live-snap band (typically under the tolerance), and the
  *  timeout is the backstop for anything pathological. */
 export function scrubSettle(
   s: ScrubState, playheadMs: number | null, nowMs: number,
