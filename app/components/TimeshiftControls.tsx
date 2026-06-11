@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { LIVE_ENTER_SEC, type TimeshiftState } from '@/app/lib/timeshift/engine';
+import { type TimeshiftState } from '@/app/lib/timeshift/engine';
 import { fmtBehind, fmtWallClock } from '@/app/lib/timeshift/format';
 
 export type TimeshiftControlsProps = {
@@ -135,7 +135,7 @@ function Timeline({ state, onSeekTo, ticks, height }: {
           className="absolute bottom-full mb-1.5 -translate-x-1/2 px-2 py-1 rounded-md bg-[var(--color-ink)] text-[var(--color-bg)] text-[10px] font-semibold tabular-nums whitespace-nowrap pointer-events-none shadow-lg z-10"
           style={{ left: hover.x }}
         >
-          {hoverBehindSec < LIVE_ENTER_SEC
+          {hoverBehindSec < state.liveEnterSec
             ? 'Live'
             : `${fmtWallClock(hover.ms)} · ${fmtBehind(hoverBehindSec)}`}
         </div>
