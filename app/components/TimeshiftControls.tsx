@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { type TimeshiftState } from '@/app/lib/timeshift/engine';
+import { IDLE, displayMs, scrubCancel, scrubCommit, scrubMove, scrubRelease, scrubSettle, scrubStart, type ScrubState } from '@/app/lib/timeshift/scrub';
 import { fmtBehind, fmtWallClock } from '@/app/lib/timeshift/format';
 
 export type TimeshiftControlsProps = {
@@ -20,7 +21,7 @@ export type TimeshiftControlsProps = {
 export function TimeshiftControls(props: TimeshiftControlsProps) {
   return (
     <div className="flex flex-col gap-1.5 w-full">
-      <Timeline state={props.state} onSeekTo={props.onSeekTo} ticks={props.ticks} height={4} />
+      <Timeline state={props.state} onSeekTo={props.onSeekTo} ticks={props.ticks} height={6} />
       <div className="flex items-center">
         <LiveButton state={props.state} onGoLive={props.onGoLive} />
         <div className="flex-1" />
@@ -37,14 +38,38 @@ function Timeline({ state, onSeekTo, ticks, height }: {
   const barRef = useRef<HTMLDivElement | null>(null);
   const tipRef = useRef<HTMLDivElement | null>(null);
   const [hover, setHover] = useState<{ x: number; ms: number } | null>(null);
+  // Scrub state lives in BOTH a ref and useState: pointer events stream
+  // faster than renders, and pointerup must commit the exact position of the
+  // last pointermove — a useState read from the event closure can be one
+  // move stale. The ref is authoritative; the state mirror drives rendering.
+  const [scrub, setScrubState] = useState<ScrubState>(IDLE);
+  const scrubRef = useRef<ScrubState>(scrub);
+  const setScrub = useCallback((next: ScrubState) => {
+    if (next === scrubRef.current) return; // scrubSettle returns same ref on no-op
+    scrubRef.current = next;
+    setScrubState(next);
+  }, []);
+
   const { bufferStartMs, liveEdgeMs, playheadMs, atLiveEdge } = state;
   const span = (liveEdgeMs ?? 0) - (bufferStartMs ?? 0);
   const frac = useCallback((ms: number) =>
     span > 0 ? Math.min(1, Math.max(0, (ms - (bufferStartMs ?? 0)) / span)) : 1,
     [bufferStartMs, span]);
+
+  // Release the post-seek display hold once the engine playhead catches up.
+  // Depends on the state OBJECT (fresh every engine tick), not the playhead
+  // value: while paused the playhead is static, but the settle timeout must
+  // still be evaluated each tick or a failed seek could freeze the display.
+  useEffect(() => {
+    setScrub(scrubSettle(scrubRef.current, state.playheadMs, Date.now()));
+  }, [state, setScrub]);
+
+  const dispMs = displayMs(scrub);
   // The playhead trails the advancing live edge by decode latency, which would
   // leave a permanent unfilled tail — at LIVE the bar is simply full.
-  const fillFrac = atLiveEdge ? 1 : frac(playheadMs ?? liveEdgeMs ?? 0);
+  const fillFrac = dispMs !== null
+    ? frac(dispMs)
+    : atLiveEdge ? 1 : frac(playheadMs ?? liveEdgeMs ?? 0);
 
   const pointOnBar = (e: ReactPointerEvent): { x: number; ms: number } | null => {
     const el = barRef.current;
@@ -55,14 +80,47 @@ function Timeline({ state, onSeekTo, ticks, height }: {
     return { x, ms: bufferStartMs + (x / r.width) * span };
   };
 
-  const seekFromPointer = (e: ReactPointerEvent) => {
+  const onDown = (e: ReactPointerEvent) => {
+    // Primary pointer + main button only — a second touch, right-click, or
+    // pen barrel button must not start or restart a drag.
+    if (!e.isPrimary || e.button !== 0) return;
     const p = pointOnBar(e);
-    if (p) onSeekTo(p.ms);
+    if (!p) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setScrub(scrubStart(p.ms));
+    setHover(p); // tooltip follows the drag for every pointer type
   };
 
   const onMove = (e: ReactPointerEvent) => {
-    if (e.pointerType !== 'mouse') return; // hover tooltip is a mouse affordance
-    setHover(pointOnBar(e));
+    if (!e.isPrimary) return; // capture only redirects the captured pointer
+    const p = pointOnBar(e);
+    if (!p) return;
+    if (scrubRef.current.phase === 'dragging') {
+      setScrub(scrubMove(scrubRef.current, p.ms));
+      setHover(p);
+    } else if (e.pointerType === 'mouse') {
+      setHover(p); // hover preview is a mouse affordance
+    }
+  };
+
+  const onUp = (e: ReactPointerEvent) => {
+    if (!e.isPrimary) return; // a second finger's up must not commit the drag
+    const { next, commitMs } = scrubRelease(scrubRef.current, Date.now());
+    setScrub(next);
+    if (commitMs !== null) onSeekTo(commitMs);
+    if (e.pointerType !== 'mouse') setHover(null);
+  };
+
+  const onCancel = (e: ReactPointerEvent) => {
+    if (!e.isPrimary) return; // a second pointer's cancel must not kill the drag
+    setScrub(scrubCancel());
+    setHover(null);
+  };
+
+  const onLeave = () => {
+    // Pointer capture still delivers boundary events — keep the tooltip alive
+    // mid-drag when the pointer strays off the bar.
+    if (scrubRef.current.phase !== 'dragging') setHover(null);
   };
 
   // Clamp the tooltip inside the bar once its rendered width is known.
@@ -78,6 +136,8 @@ function Timeline({ state, onSeekTo, ticks, height }: {
   // from first load while it fills — frac() clamps to the live edge until then.
   if (bufferStartMs === null || liveEdgeMs === null) return null;
   const hoverBehindSec = hover ? Math.max(0, (liveEdgeMs - hover.ms) / 1000) : 0;
+  const dispBehindSec = Math.max(0, (liveEdgeMs - (dispMs ?? playheadMs ?? liveEdgeMs)) / 1000);
+  const shownLive = dispMs === null ? atLiveEdge : dispBehindSec < state.liveEnterSec;
   return (
     <div
       ref={barRef}
@@ -85,15 +145,18 @@ function Timeline({ state, onSeekTo, ticks, height }: {
       aria-label="Rewind position"
       aria-valuemin={0} aria-valuemax={100}
       aria-valuenow={Math.round(fillFrac * 100)}
-      onPointerDown={seekFromPointer}
+      aria-valuetext={shownLive ? 'Live' : `${fmtBehind(dispBehindSec)} behind live`}
+      onPointerDown={onDown}
       onPointerMove={onMove}
-      onPointerLeave={() => setHover(null)}
-      className="relative w-full cursor-pointer group/tl"
-      style={{ height: height + 8, paddingTop: 4, paddingBottom: 4 }}
+      onPointerUp={onUp}
+      onPointerCancel={onCancel}
+      onPointerLeave={onLeave}
+      className="relative w-full cursor-pointer"
+      style={{ height: 24 }}
     >
       {/* base track: the whole seekable buffer, always reads filled */}
       <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 rounded-full bg-[var(--color-brand-purple)]/20" style={{ height }}>
-        {/* strong fill up to the playhead (100% at LIVE) */}
+        {/* strong fill up to the displayed position (100% at LIVE) */}
         <div
           className="absolute left-0 top-0 h-full rounded-full bg-[var(--color-brand-purple)]/55"
           style={{ width: `${fillFrac * 100}%` }}
@@ -110,7 +173,15 @@ function Timeline({ state, onSeekTo, ticks, height }: {
             key={t.atMs}
             title={t.title}
             aria-label={`Jump to ${t.title}`}
-            onPointerDown={(e) => { e.stopPropagation(); onSeekTo(t.atMs - 3000); }}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              // Hold the display at the target (settling) like a released
+              // drag — ram/disk-tier seeks land async and the handle would
+              // otherwise flicker back to the stale pre-seek position.
+              const target = t.atMs - 3000;
+              setScrub(scrubCommit(target, Date.now()));
+              onSeekTo(target);
+            }}
             className="absolute top-1/2 -translate-y-1/2 w-[3px] h-[150%] rounded bg-[var(--color-brand-pink)]/70 hover:bg-[var(--color-brand-pink)] cursor-pointer"
             style={{ left: `${frac(t.atMs) * 100}%` }}
           />
@@ -122,10 +193,10 @@ function Timeline({ state, onSeekTo, ticks, height }: {
             style={{ left: hover.x }}
           />
         )}
-        {/* playhead */}
+        {/* scrub handle — always visible, fixed size (spec: no hover growth) */}
         <div
-          className="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-[var(--color-ink)] shadow opacity-0 group-hover/tl:opacity-100 transition-opacity"
-          style={{ left: `calc(${fillFrac * 100}% - 5px)` }}
+          className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-[var(--color-brand-purple)] shadow"
+          style={{ left: `${fillFrac * 100}%` }}
         />
       </div>
       {/* hover tooltip: broadcast wall-clock · behind-live */}
