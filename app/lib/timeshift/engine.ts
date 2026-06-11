@@ -12,22 +12,23 @@ import { TimeMap } from './timeMap';
 import { resolveSeek, resolveNearLiveSeek, type Range } from './resolveSeek';
 import { LiveEdgeEstimator } from './liveEdge';
 import { BehindSmoother } from './behind';
+import { LiveBandEstimator } from './liveBand';
 
 const AHEAD_MAX_SEC = 45;      // stop appending this far ahead of the playhead
 const BEHIND_KEEP_SEC = 180;   // evict SourceBuffer data older than this
 const STATE_TICK_MS = 500;
-// "At live" is hysteretic, not a bare threshold: upstream delivers in ~6 s
-// bursts, so behind-live naturally sawtooths 0–~6 s at the edge. Without
-// hysteresis the LIVE pill would flicker between "● Live" and "−00:0x". Enter
-// the live state below ENTER, only leave it above EXIT — the band is wider than
-// one burst so the sawtooth can't toggle it.
-export const LIVE_ENTER_SEC = 5; // exported: the scrubber tooltip shows "Live" inside this band
-const LIVE_EXIT_SEC = 12;
+// "At live" is hysteretic, not a bare threshold: bursty upstreams make
+// behind-live sawtooth 0–~6 s at the edge, which would flicker the LIVE pill
+// without one. Enter the live state below the band's enter value, only leave
+// it above exit. The band adapts to each station's measured delivery cadence
+// (see LiveBandEstimator) — smooth stations narrow it so near-live positions
+// like −00:01 stay pinpointable; bursty ones keep the wide default.
 
 export type TimeshiftState = {
   active: true;
   behindSec: number;            // 0 at the live edge
   atLiveEdge: boolean;          // hysteretic "at live" flag — drives the LIVE pill
+  liveEnterSec: number;         // adaptive band: behind less than this renders as "Live"
   playheadMs: number | null;    // wall clock at the playhead
   liveEdgeMs: number | null;
   bufferStartMs: number | null; // oldest seekable (disk-aware)
@@ -73,7 +74,9 @@ export class TimeshiftEngine {
   // Physics-derived behind-live readout — see BehindSmoother for why the raw
   // stamp-based value jitters and creeps.
   private behind = new BehindSmoother();
-  private liveSticky = true; // hysteretic "at live edge" — see LIVE_ENTER/EXIT
+  // Per-station near-live band, measured from arrival cadence — see LiveBandEstimator.
+  private liveBand = new LiveBandEstimator();
+  private liveSticky = true; // hysteretic "at live edge" — see the band comment above
   // Rebuilds (ram/disk seeks) must not overlap: a second buildMediaSource while
   // the first is mid-flight corrupts the append stream (CHUNK_DEMUXER append
   // failed). While building, a new seek is coalesced into pendingSeekMs and
@@ -142,6 +145,7 @@ export class TimeshiftEngine {
       while (!signal.aborted && !this.stopped) {
         const { value, done } = await reader.read();
         if (done) break;
+        this.liveBand.push(performance.now());
         for (const f of dec.push(value)) this.ring.push(f.wallClock, f.payload);
         const end = this.ring.endMs();
         if (end !== null) this.liveEdge.push(end, performance.now());
@@ -297,12 +301,13 @@ export class TimeshiftEngine {
           targetMs, edge, newest,
           sb.buffered.start(0), sb.buffered.end(sb.buffered.length - 1),
           this.appendCursor >= this.ring.length(),
-          LIVE_ENTER_SEC,
+          this.liveBand.band(performance.now()).enterSec,
         );
         if (near !== null) {
           // A deliberate seek overrides the hysteresis: snap the pill to LIVE
           // inside the enter band, and drop it when seeking behind — without
-          // this, a click at −8 s keeps the stale sticky flag until EXIT (12 s).
+          // this, a click just outside the band keeps the stale sticky flag
+          // until the exit threshold.
           this.liveSticky = near.snapLive;
           this.audio.currentTime = near.bufferTime;
           this.lastSeekTier = 'window';
@@ -394,12 +399,14 @@ export class TimeshiftEngine {
       ? this.behind.update(rawBehind, this.audio.currentTime, performance.now())
       : rawBehind;
     // Hysteresis so the LIVE pill doesn't flicker on the burst sawtooth.
-    if (this.liveSticky) { if (behindSec > LIVE_EXIT_SEC) this.liveSticky = false; }
-    else { if (behindSec < LIVE_ENTER_SEC) this.liveSticky = true; }
+    const band = this.liveBand.band(performance.now());
+    if (this.liveSticky) { if (behindSec > band.exitSec) this.liveSticky = false; }
+    else { if (behindSec < band.enterSec) this.liveSticky = true; }
     return {
       active: true,
       behindSec,
       atLiveEdge: this.liveSticky,
+      liveEnterSec: band.enterSec,
       playheadMs,
       liveEdgeMs,
       bufferStartMs: this.diskStartMs ?? this.ring.startMs(),
