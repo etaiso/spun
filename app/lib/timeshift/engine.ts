@@ -13,6 +13,7 @@ import { resolveSeek, resolveNearLiveSeek, type Range } from './resolveSeek';
 import { LiveEdgeEstimator } from './liveEdge';
 import { BehindSmoother } from './behind';
 import { LiveBandEstimator } from './liveBand';
+import { ReconnectPolicy } from './reconnect';
 
 const AHEAD_MAX_SEC = 45;      // stop appending this far ahead of the playhead
 const BEHIND_KEEP_SEC = 180;   // evict SourceBuffer data older than this
@@ -49,6 +50,11 @@ export type EngineOpts = {
 
 function mseMime(contentType: string): string | null {
   const ct = contentType.toLowerCase();
+  // HLS playlists ('audio/mpegurl', 'application/vnd.apple.mpegurl') must not
+  // match the 'mpeg' substring below: the playlist text is not a continuous
+  // stream — the feed ends after one file, which the engine would treat as an
+  // upstream drop and reconnect-loop until it falls back.
+  if (ct.includes('mpegurl')) return null;
   if (ct.includes('mpeg') || ct.includes('mp3')) return 'audio/mpeg';
   if (ct.includes('aac')) return 'audio/aac';
   return null;
@@ -90,6 +96,19 @@ export class TimeshiftEngine {
   private stateTimer: ReturnType<typeof setInterval> | null = null;
   private stopped = false;
   private objectUrl: string | null = null;
+  // Some upstreams (CDN-fronted Icecast) drop every connection after a few
+  // minutes; the server tee dies and a fresh one is created on the next
+  // /api/timeshift open. So a stream ending is NOT terminal: re-open with
+  // backoff and only fail() (→ plain-audio fallback) when the policy gives up,
+  // so periodic drops never burn the Player's retry budget.
+  private reconnect = new ReconnectPolicy();
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  // Stamps of the first chunk of each stream connection. A reconnected
+  // upstream resumes at an arbitrary byte offset, so when the append loop
+  // reaches such a chunk it must re-run the frame-sync trim (needAlign) —
+  // the junction is a permanent byte discontinuity in the ring, so this also
+  // re-fires when a seek rebuild re-appends across it.
+  private realignWallClocks = new Set<number>();
 
   constructor(private audio: HTMLAudioElement, private opts: EngineOpts) {}
 
@@ -115,11 +134,24 @@ export class TimeshiftEngine {
   /** Open (or re-open) the framed stream. from='live' or epoch ms. Returns
    *  false when the format gate fails (not an error). */
   private async openStream(from: 'live' | number): Promise<boolean> {
+    // A deliberate (re)open supersedes any reconnect waiting on its backoff
+    // timer — without this, the timer would later fire and abort this stream.
+    if (this.reconnectTimer !== null) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     this.fetchAbort?.abort();
     this.fetchAbort = new AbortController();
     const url = `/api/timeshift?url=${encodeURIComponent(this.opts.streamUrl)}` +
       `&sid=${encodeURIComponent(this.opts.stationId)}&from=${from}`;
     const res = await fetch(url, { signal: this.fetchAbort.signal });
+    // Torn down while the fetch was in flight (stop() aborts the PREVIOUS
+    // controller, not the one this call just installed) — drop the response
+    // body, or the server keeps streaming to a reader nobody drains.
+    if (this.stopped) {
+      this.fetchAbort.abort();
+      return false;
+    }
     if (!res.ok || !res.body) throw new Error(`timeshift route ${res.status}`);
     this.contentType = res.headers.get('x-upstream-content-type') || '';
     const mime = mseMime(this.contentType);
@@ -128,10 +160,12 @@ export class TimeshiftEngine {
       return false; // format gate — silent fallback
     }
     this.mime = mime;
+    this.reconnect.connected(performance.now());
     const bufStart = res.headers.get('x-buffer-start');
     this.diskStartMs = bufStart ? Number(bufStart) : null;
     if (from !== 'live') {
       this.ring.clear(); // disk seek replays through to live
+      this.realignWallClocks.clear(); // ring stamps gone — marks are stale
       this.liveEdge.reset(); // re-anchored from the replayed frames below
     }
     void this.pump(res.body, this.fetchAbort.signal);
@@ -141,18 +175,75 @@ export class TimeshiftEngine {
   private async pump(body: ReadableStream<Uint8Array>, signal: AbortSignal): Promise<void> {
     const reader = body.getReader();
     const dec = new FrameDecoder();
+    // A reconnect's opening burst can overlap what the ring already holds
+    // (the server tee survived and replays its RAM tail): such frames are
+    // SKIPPED — appending them would duplicate audio. An overlap also proves
+    // the byte stream dovetails with what we already consumed (same tee, same
+    // chunk sequence), so no frame-sync realign is needed. Only when the first
+    // genuinely new frame arrives with NO overlap (fresh tee, or the outage
+    // outran the replay tail) is the connection a byte discontinuity that the
+    // append loop must re-align at.
+    let pendingRealign = true;
+    let sawOverlap = false;
     try {
       while (!signal.aborted && !this.stopped) {
         const { value, done } = await reader.read();
         if (done) break;
         this.liveBand.push(performance.now());
-        for (const f of dec.push(value)) this.ring.push(f.wallClock, f.payload);
+        for (const f of dec.push(value)) {
+          // The dedup window is ONLY the connection's opening replay (until
+          // the first accepted frame). In-flow frames must never be skipped:
+          // while a fresh tee's clock settles, burst chunks carry equal
+          // provisional arrival stamps, and a stamp-based skip there would
+          // silently drop audio bytes — a corrupt seam the decoder trips
+          // over minutes later.
+          if (pendingRealign) {
+            const end = this.ring.endMs();
+            if (end !== null && f.wallClock <= end) { sawOverlap = true; continue; }
+            if (!sawOverlap) this.realignWallClocks.add(f.wallClock);
+            pendingRealign = false;
+          }
+          this.ring.push(f.wallClock, f.payload);
+        }
         const end = this.ring.endMs();
         if (end !== null) this.liveEdge.push(end, performance.now());
         this.tryAppend();
       }
     } catch (e) {
-      if (!signal.aborted && !this.stopped) this.fail(`stream: ${String(e)}`);
+      if (!signal.aborted && !this.stopped) this.scheduleReconnect(`stream error: ${String(e)}`);
+      return;
+    }
+    // Clean end: the upstream dropped and the server tee died with it. A fresh
+    // tee is created on the next open — reconnect rather than letting the
+    // SourceBuffer drain into a stall.
+    if (!signal.aborted && !this.stopped) this.scheduleReconnect('stream ended');
+  }
+
+  /** Ask the policy for a backoff delay and re-open the live stream after it;
+   *  fail() to plain audio only when the policy gives up. The ring is kept —
+   *  history stays seekable and any unrecovered wall-clock gap is rendered as
+   *  a discontinuity. */
+  private scheduleReconnect(reason: string): void {
+    const decision = this.reconnect.streamEnded(performance.now());
+    if (decision.action === 'give-up') {
+      this.fail(`reconnect exhausted: ${reason}`);
+      return;
+    }
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      void this.reopenLive();
+    }, decision.delayMs);
+  }
+
+  private async reopenLive(): Promise<void> {
+    if (this.stopped) return;
+    try {
+      const ok = await this.openStream('live');
+      // The format gate can't transiently fail (same station, same codec) —
+      // if it does, the content type really changed under us; fall back.
+      if (!ok) this.fail('reconnect: format gate');
+    } catch (e) {
+      this.scheduleReconnect(`reopen failed: ${String(e)}`);
     }
   }
 
@@ -211,6 +302,19 @@ export class TimeshiftEngine {
     }
     let chunk = this.ring.chunkAt(this.appendCursor);
     if (!chunk) return;
+    // Crossing into a new connection's bytes (reconnect junction) — the
+    // upstream resumed at an arbitrary byte offset, so re-run the frame-sync
+    // trim exactly as after a (re)build. Trimming alone is not enough: the
+    // OLD connection's final chunk likely ended mid-frame and that partial
+    // frame is still pending inside the SourceBuffer's segment parser —
+    // followed by our trimmed (clean) bytes it decodes as garbage and errors
+    // the media element. abort() is the spec mechanism to drop the pending
+    // partial input and reset the parser. (No-op risk: sb isn't updating here
+    // — guarded above — and buffered data is unaffected.)
+    if (this.realignWallClocks.has(chunk.wallClock) && !this.needAlign) {
+      try { sb.abort(); } catch { /* detached — the rebuild path handles it */ }
+      this.needAlign = true;
+    }
     let bytes = chunk.bytes;
     if (this.needAlign) {
       // First append after a (re)build — align to a codec frame boundary so the
@@ -231,6 +335,13 @@ export class TimeshiftEngine {
     }
     try {
       this.evictBehind();
+      // remove() is async like append: if eviction just started one, this
+      // append must wait. Its updateend re-enters tryAppend, the eviction cut
+      // is then a no-op, and the append proceeds. Without this bail the
+      // appendBuffer below throws InvalidStateError the first time the
+      // playhead crosses BEHIND_KEEP_SEC — which used to kill the engine
+      // ~3 minutes into every uninterrupted playback.
+      if (sb.updating) return;
       sb.appendBuffer(bytes as BufferSource);
       this.needAlign = false;
       this.appendedWallClocks.push(chunk.wallClock);
@@ -425,6 +536,9 @@ export class TimeshiftEngine {
 
   private fail(reason: string): void {
     if (this.stopped) return;
+    // Deliberately loud: fallback means the user loses rewind for the session
+    // (or burns a retry) — the reason must be visible in the field.
+    console.warn('[timeshift] engine failed:', reason);
     this.stop();
     this.opts.onFallback(reason);
   }
@@ -432,6 +546,7 @@ export class TimeshiftEngine {
   stop(): void {
     this.stopped = true;
     if (this.stateTimer) clearInterval(this.stateTimer);
+    if (this.reconnectTimer !== null) clearTimeout(this.reconnectTimer);
     this.fetchAbort?.abort();
     if (this.objectUrl) {
       // Don't revoke a blob that's still the element's src — doing so errors the
