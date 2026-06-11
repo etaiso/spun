@@ -81,9 +81,9 @@ function Timeline({ state, onSeekTo, ticks, height }: {
   };
 
   const onDown = (e: ReactPointerEvent) => {
-    // Primary pointer + left button only — a second touch or a right-click
-    // must not restart the drag mid-flight.
-    if (!e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    // Primary pointer + main button only — a second touch, right-click, or
+    // pen barrel button must not start or restart a drag.
+    if (!e.isPrimary || e.button !== 0) return;
     const p = pointOnBar(e);
     if (!p) return;
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -92,6 +92,7 @@ function Timeline({ state, onSeekTo, ticks, height }: {
   };
 
   const onMove = (e: ReactPointerEvent) => {
+    if (!e.isPrimary) return; // capture only redirects the captured pointer
     const p = pointOnBar(e);
     if (!p) return;
     if (scrubRef.current.phase === 'dragging') {
@@ -103,13 +104,15 @@ function Timeline({ state, onSeekTo, ticks, height }: {
   };
 
   const onUp = (e: ReactPointerEvent) => {
+    if (!e.isPrimary) return; // a second finger's up must not commit the drag
     const { next, commitMs } = scrubRelease(scrubRef.current, Date.now());
     setScrub(next);
     if (commitMs !== null) onSeekTo(commitMs);
     if (e.pointerType !== 'mouse') setHover(null);
   };
 
-  const onCancel = () => {
+  const onCancel = (e: ReactPointerEvent) => {
+    if (!e.isPrimary) return; // a second pointer's cancel must not kill the drag
     setScrub(scrubCancel());
     setHover(null);
   };
