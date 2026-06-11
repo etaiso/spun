@@ -167,6 +167,7 @@ export function DebugPanel({ station, playState, currentTrack, active }: Props) 
               {ts.behindSec < 3 ? 'live' : `−${mmss(ts.behindSec * 1000)} behind`}
               <span className="text-[var(--color-ink-4)]"> · tier {ts.lastSeekTier ?? '—'} · ahead {ts.sourceBufferAhead.toFixed(1)}s</span>
             </Row>
+            <Row label="Live band">enter {ts.liveEnterSec.toFixed(1)}s</Row>
             <Row label="Gaps">
               {ts.discontinuities.length === 0 ? 'none'
                 : `${ts.discontinuities.length} · last ${mmss(now - ts.discontinuities[ts.discontinuities.length - 1].toMs)} ago`}

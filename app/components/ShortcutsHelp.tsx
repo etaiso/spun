@@ -7,7 +7,8 @@ const SHORTCUTS: Shortcut[] = [
   { keys: ['Space'], label: 'Play / pause' },
   { keys: ['M'], label: 'Mute / unmute' },
   { keys: ['↑', '↓'], label: 'Volume up / down' },
-  { keys: ['←', '→'], label: 'Previous / next favorite' },
+  { keys: ['←', '→'], label: 'Back / forward 10 seconds' },
+  { keys: ['J', 'L'], label: 'Back / forward 30 seconds' },
   { keys: ['S'], label: 'Saved songs' },
   { keys: ['?'], label: 'Show this help' },
 ];

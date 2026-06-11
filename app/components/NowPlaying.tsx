@@ -439,6 +439,25 @@ export function NowPlaying({ station, playState, everPlayed, onTrack, onHistory 
   );
 }
 
+function StarIcon({ filled, className }: { filled: boolean; className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+    </svg>
+  );
+}
+
+function RefreshIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+      <path d="M21 3v5h-5" />
+      <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+      <path d="M3 21v-5h5" />
+    </svg>
+  );
+}
+
 function NowPlayingHeaderControls({
   lastUpdate, refreshing, onRefresh, isFavorite, onToggleFavorite,
 }: {
@@ -455,20 +474,20 @@ function NowPlayingHeaderControls({
         aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
         title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
         className={[
-          'w-7 h-7 flex items-center justify-center text-xl leading-none cursor-pointer transition-transform hover:scale-125',
+          'w-9 h-9 flex items-center justify-center cursor-pointer transition-transform hover:scale-125',
           isFavorite ? 'text-[var(--color-brand-purple)]' : 'text-[var(--color-ink-4)] hover:text-[var(--color-brand-purple)]',
         ].join(' ')}
       >
-        {isFavorite ? '★' : '☆'}
+        <StarIcon filled={isFavorite} className="w-[22px] h-[22px]" />
       </button>
       <button
         onClick={onRefresh}
         disabled={refreshing}
         aria-label="Check for song update"
         title="Check for song update"
-        className="w-7 h-7 rounded-full border border-[var(--color-line)] flex items-center justify-center text-[13px] text-[var(--color-ink-3)] hover:text-[var(--color-ink)] hover:border-[var(--color-brand-pink)] hover:bg-white transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+        className="w-9 h-9 rounded-full border border-[var(--color-line)] flex items-center justify-center text-[var(--color-ink-3)] hover:text-[var(--color-ink)] hover:border-[var(--color-brand-pink)] hover:bg-white transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
       >
-        {refreshing ? <span className="spin-brand" /> : <span aria-hidden="true">↻</span>}
+        <RefreshIcon className={`w-[18px] h-[18px] ${refreshing ? 'animate-spin' : ''}`} />
       </button>
       {lastUpdate && (
         <span className="text-[11px] tracking-[0.6px] uppercase font-semibold text-[var(--color-ink-3)] tabular-nums">
