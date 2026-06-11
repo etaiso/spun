@@ -31,7 +31,15 @@ export function scrubRelease(
   s: ScrubState, nowMs: number,
 ): { next: ScrubState; commitMs: number | null } {
   if (s.phase !== 'dragging') return { next: s, commitMs: null };
-  return { next: { phase: 'settling', ms: s.ms, sinceMs: nowMs }, commitMs: s.ms };
+  return { next: scrubCommit(s.ms, nowMs), commitMs: s.ms };
+}
+
+// Direct-jump seek (song tick) with no drag phase: enter settling so the
+// display holds the target until the engine playhead lands, exactly like a
+// released drag — otherwise the handle flickers back to the stale pre-seek
+// position on ram/disk-tier seeks.
+export function scrubCommit(ms: number, nowMs: number): ScrubState {
+  return { phase: 'settling', ms, sinceMs: nowMs };
 }
 
 // Pointer-cancel. During `dragging` this aborts without committing; during

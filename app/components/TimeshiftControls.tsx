@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { LIVE_ENTER_SEC, type TimeshiftState } from '@/app/lib/timeshift/engine';
-import { IDLE, displayMs, scrubCancel, scrubMove, scrubRelease, scrubSettle, scrubStart, type ScrubState } from '@/app/lib/timeshift/scrub';
+import { IDLE, displayMs, scrubCancel, scrubCommit, scrubMove, scrubRelease, scrubSettle, scrubStart, type ScrubState } from '@/app/lib/timeshift/scrub';
 import { fmtBehind, fmtWallClock } from '@/app/lib/timeshift/format';
 
 export type TimeshiftControlsProps = {
@@ -173,7 +173,15 @@ function Timeline({ state, onSeekTo, ticks, height }: {
             key={t.atMs}
             title={t.title}
             aria-label={`Jump to ${t.title}`}
-            onPointerDown={(e) => { e.stopPropagation(); onSeekTo(t.atMs - 3000); }}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              // Hold the display at the target (settling) like a released
+              // drag — ram/disk-tier seeks land async and the handle would
+              // otherwise flicker back to the stale pre-seek position.
+              const target = t.atMs - 3000;
+              setScrub(scrubCommit(target, Date.now()));
+              onSeekTo(target);
+            }}
             className="absolute top-1/2 -translate-y-1/2 w-[3px] h-[150%] rounded bg-[var(--color-brand-pink)]/70 hover:bg-[var(--color-brand-pink)] cursor-pointer"
             style={{ left: `${frac(t.atMs) * 100}%` }}
           />

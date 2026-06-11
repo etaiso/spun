@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   IDLE, SETTLE_TIMEOUT_MS, SETTLE_TOLERANCE_MS,
-  scrubStart, scrubMove, scrubRelease, scrubCancel, scrubSettle, displayMs,
+  scrubStart, scrubMove, scrubRelease, scrubCancel, scrubCommit, scrubSettle, displayMs,
   type ScrubState,
 } from '../app/lib/timeshift/scrub';
 
@@ -70,5 +70,27 @@ describe('scrub state machine', () => {
 
   it('display tracks the engine when idle', () => {
     expect(displayMs(IDLE)).toBeNull();
+  });
+
+  it('commit enters settling directly and holds the target (tick jump)', () => {
+    const s = scrubCommit(T0, 123);
+    expect(s).toEqual({ phase: 'settling', ms: T0, sinceMs: 123 });
+    // the display holds the jump target — no flicker back to the old playhead
+    expect(displayMs(s)).toBe(T0);
+  });
+
+  it('committed settling releases once the playhead lands near the target', () => {
+    const s = scrubCommit(T0, 0);
+    expect(scrubSettle(s, T0 + SETTLE_TOLERANCE_MS - 1, 100)).toBe(IDLE);
+  });
+
+  it('committed settling keeps holding while the playhead is still far away', () => {
+    const s = scrubCommit(T0, 0);
+    expect(scrubSettle(s, T0 + SETTLE_TOLERANCE_MS + 1, 100)).toBe(s);
+  });
+
+  it('committed settling releases on timeout even if the playhead never lands', () => {
+    const s = scrubCommit(T0, 0);
+    expect(scrubSettle(s, null, SETTLE_TIMEOUT_MS)).toBe(IDLE);
   });
 });
