@@ -23,6 +23,10 @@ falls back to **fingerprinting the live audio with Shazam** to identify it.
   filters. A docked mini-player keeps your station playing while you browse.
 - 🎙️ **Now playing** with the current song and **album cover art**, plus a
   **playlist history** restored when you reload or switch back to a station.
+- ⏪ **Rewind live radio** — scrub back up to **an hour** on any live station:
+  drag the timeline to seek, jump straight to any song still in the buffer, and
+  snap back to the **LIVE** edge. Audio is bit-identical to live with no added
+  latency.
 - 📡 **Background tracking** — track multiple stations at once and watch what's
   playing on each in a live monitor panel, no audio needed.
 - 💾 **Saved songs** — save any recognized track to a persisted playlist with a
@@ -94,8 +98,8 @@ npm run lint     # ESLint
 ## Tech stack
 
 **Next.js 16** · **React 19** · **TypeScript** · **Tailwind CSS v4** ·
-**SQLite** · **Electron** · **Web Audio API** · **Server-Sent Events** ·
-a **Python/ShazamIO** recognizer sidecar.
+**SQLite** · **Electron** · **Web Audio API** · **Media Source Extensions** ·
+**Server-Sent Events** · a **Python/ShazamIO** recognizer sidecar.
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for how song detection works,
 the API routes, persistence, and the project layout.
