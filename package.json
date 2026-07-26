@@ -34,7 +34,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitest/ui": "^4.1.6",
-    "concurrently": "^10.0.3",
+    "concurrently": "^10.0.4",
     "electron": "^39.8.5",
     "electron-builder": "^26.15.2",
     "eslint": "^9",
